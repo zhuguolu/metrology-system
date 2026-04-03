@@ -56,64 +56,104 @@ struct DeviceEditView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                if let validationMessage {
-                    Section {
-                        Text(validationMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 10) {
+                        if let validationMessage {
+                            Text(validationMessage)
+                                .font(.footnote)
+                                .foregroundStyle(MetrologyPalette.statusExpired)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 2)
+                        }
+
+                        sectionCard(title: "\u{5fc5}\u{586b}\u{4fe1}\u{606f}") {
+                            field("\u{8bbe}\u{5907}\u{540d}\u{79f0}", text: $name)
+                            field("\u{8ba1}\u{91cf}\u{7f16}\u{53f7}", text: $metricNo)
+                        }
+
+                        sectionCard(title: "\u{53f0}\u{8d26}\u{4fe1}\u{606f}") {
+                            field("\u{8d44}\u{4ea7}\u{7f16}\u{53f7}", text: $assetNo)
+                            field("\u{51fa}\u{5382}\u{7f16}\u{53f7}", text: $serialNo)
+                            field("\u{41}\u{42}\u{43}\u{5206}\u{7c7b}", text: $abcClass)
+                            field("\u{90e8}\u{95e8}", text: $dept)
+                            field("\u{8bbe}\u{5907}\u{4f4d}\u{7f6e}", text: $location)
+                            field("\u{8d23}\u{4efb}\u{4eba}", text: $responsiblePerson)
+                            field("\u{4f7f}\u{7528}\u{72b6}\u{6001}", text: $useStatus)
+                        }
+
+                        sectionCard(title: "\u{6821}\u{51c6}\u{4fe1}\u{606f}") {
+                            field("\u{68c0}\u{5b9a}\u{5468}\u{671f}\u{ff08}\u{534a}\u{5e74}\u{2f}\u{4e00}\u{5e74}\u{2f}\u{6570}\u{5b57}\u{ff09}", text: $cycleText, keyboard: .numbersAndPunctuation)
+                            field("\u{4e0a}\u{6b21}\u{6821}\u{51c6}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $calDate)
+                            field("\u{6821}\u{51c6}\u{7ed3}\u{679c}", text: $calibrationResult)
+                        }
+
+                        sectionCard(title: "\u{6269}\u{5c55}\u{4fe1}\u{606f}") {
+                            field("\u{5236}\u{9020}\u{5382}", text: $manufacturer)
+                            field("\u{8bbe}\u{5907}\u{578b}\u{53f7}", text: $model)
+                            field("\u{91c7}\u{8d2d}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $purchaseDate)
+                            field("\u{91c7}\u{8d2d}\u{4ef7}\u{683c}", text: $purchasePriceText, keyboard: .decimalPad)
+                            field("\u{5206}\u{5ea6}\u{503c}", text: $graduationValue)
+                            field("\u{6d4b}\u{8bd5}\u{8303}\u{56f4}", text: $testRange)
+                            field("\u{5141}\u{8bb8}\u{8bef}\u{5dee}", text: $allowableError)
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("\u{5907}\u{6ce8}")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(MetrologyPalette.textPrimary)
+                                TextEditor(text: $remark)
+                                    .font(.system(size: 15, weight: .regular))
+                                    .foregroundStyle(MetrologyPalette.textPrimary)
+                                    .frame(minHeight: 90)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Color.white)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                                    )
+                            }
+                        }
+
+                        HStack(spacing: 10) {
+                            Button("\u{53d6}\u{6d88}") { dismiss() }
+                                .buttonStyle(MetrologySecondaryButtonStyle())
+                            Button("\u{4fdd}\u{5b58}") { handleSave() }
+                                .buttonStyle(MetrologyPrimaryButtonStyle())
+                        }
                     }
-                }
-
-                Section("\u{5fc5}\u{586b}\u{4fe1}\u{606f}") {
-                    TextField("\u{8bbe}\u{5907}\u{540d}\u{79f0}", text: $name)
-                    TextField("\u{8ba1}\u{91cf}\u{7f16}\u{53f7}", text: $metricNo)
-                }
-
-                Section("\u{53f0}\u{8d26}\u{4fe1}\u{606f}") {
-                    TextField("\u{8d44}\u{4ea7}\u{7f16}\u{53f7}", text: $assetNo)
-                    TextField("\u{51fa}\u{5382}\u{7f16}\u{53f7}", text: $serialNo)
-                    TextField("\u{41}\u{42}\u{43}\u{5206}\u{7c7b}", text: $abcClass)
-                    TextField("\u{90e8}\u{95e8}", text: $dept)
-                    TextField("\u{8bbe}\u{5907}\u{4f4d}\u{7f6e}", text: $location)
-                    TextField("\u{8d23}\u{4efb}\u{4eba}", text: $responsiblePerson)
-                    TextField("\u{4f7f}\u{7528}\u{72b6}\u{6001}", text: $useStatus)
-                }
-
-                Section("\u{6821}\u{51c6}\u{4fe1}\u{606f}") {
-                    TextField("\u{68c0}\u{5b9a}\u{5468}\u{671f}\u{ff08}\u{534a}\u{5e74}\u{2f}\u{4e00}\u{5e74}\u{2f}\u{6570}\u{5b57}\u{ff09}", text: $cycleText)
-                        .keyboardType(.numbersAndPunctuation)
-                    TextField("\u{4e0a}\u{6b21}\u{6821}\u{51c6}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $calDate)
-                    TextField("\u{6821}\u{51c6}\u{7ed3}\u{679c}", text: $calibrationResult)
-                }
-
-                Section("\u{6269}\u{5c55}\u{4fe1}\u{606f}") {
-                    TextField("\u{5236}\u{9020}\u{5382}", text: $manufacturer)
-                    TextField("\u{8bbe}\u{5907}\u{578b}\u{53f7}", text: $model)
-                    TextField("\u{91c7}\u{8d2d}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $purchaseDate)
-                    TextField("\u{91c7}\u{8d2d}\u{4ef7}\u{683c}", text: $purchasePriceText)
-                        .keyboardType(.decimalPad)
-                    TextField("\u{5206}\u{5ea6}\u{503c}", text: $graduationValue)
-                    TextField("\u{6d4b}\u{8bd5}\u{8303}\u{56f4}", text: $testRange)
-                    TextField("\u{5141}\u{8bb8}\u{8bef}\u{5dee}", text: $allowableError)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\u{5907}\u{6ce8}")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextEditor(text: $remark)
-                            .frame(minHeight: 80)
-                    }
+                    .padding(12)
+                    .padding(.bottom, 18)
                 }
             }
             .navigationTitle("\u{7f16}\u{8f91}\u{53f0}\u{8d26}")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("\u{53d6}\u{6d88}") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("\u{4fdd}\u{5b58}") { handleSave() }
-                }
-            }
+        }
+    }
+
+    private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+            content()
+        }
+        .padding(10)
+        .metrologyCard()
+    }
+
+    private func field(_ title: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+            TextField(title, text: text)
+                .keyboardType(keyboard)
+                .metrologyInput()
         }
     }
 

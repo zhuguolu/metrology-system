@@ -182,8 +182,250 @@ final class APIClient {
         return fileURL
     }
 
+    func settings() async throws -> SettingsDto {
+        try await send(path: "api/settings", method: "GET", authorized: true)
+    }
+
+    func saveSettings(_ payload: SettingsDto) async throws -> SettingsDto {
+        try await send(path: "api/settings", method: "PUT", body: payload, authorized: true)
+    }
+
+    func runMaintenanceNow() async throws -> MaintenanceRunResultDto {
+        try await send(path: "api/settings/maintenance/run", method: "POST", body: [String: String](), authorized: true)
+    }
+
+    func deviceStatuses() async throws -> [DeviceStatusDto] {
+        try await send(path: "api/device-statuses", method: "GET", authorized: true)
+    }
+
+    func createDeviceStatus(name: String) async throws -> DeviceStatusDto {
+        try await send(path: "api/device-statuses", method: "POST", body: ["name": name], authorized: true)
+    }
+
+    func updateDeviceStatus(id: Int64, name: String) async throws -> DeviceStatusDto {
+        try await send(path: "api/device-statuses/\(id)", method: "PUT", body: ["name": name], authorized: true)
+    }
+
+    func deleteDeviceStatus(id: Int64) async throws {
+        try await sendWithoutResponse(path: "api/device-statuses/\(id)", method: "DELETE", authorized: true)
+    }
+
+    func departments(search: String?) async throws -> [DepartmentDto] {
+        var query: [URLQueryItem] = []
+        if let search, !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "search", value: search))
+        }
+        return try await send(path: "api/departments", method: "GET", queryItems: query, authorized: true)
+    }
+
+    func createDepartment(
+        name: String,
+        code: String,
+        sortOrder: Int,
+        parentId: Int64?
+    ) async throws -> DepartmentDto {
+        try await send(
+            path: "api/departments",
+            method: "POST",
+            body: [
+                "name": name,
+                "code": code,
+                "sortOrder": String(sortOrder),
+                "parentId": parentId.map(String.init) ?? ""
+            ],
+            authorized: true
+        )
+    }
+
+    func updateDepartment(
+        id: Int64,
+        name: String,
+        code: String,
+        sortOrder: Int,
+        parentId: Int64?
+    ) async throws -> DepartmentDto {
+        try await send(
+            path: "api/departments/\(id)",
+            method: "PUT",
+            body: [
+                "name": name,
+                "code": code,
+                "sortOrder": String(sortOrder),
+                "parentId": parentId.map(String.init) ?? ""
+            ],
+            authorized: true
+        )
+    }
+
+    func deleteDepartment(id: Int64) async throws {
+        try await sendWithoutResponse(path: "api/departments/\(id)", method: "DELETE", authorized: true)
+    }
+
+    func users() async throws -> [UserDto] {
+        try await send(path: "api/users", method: "GET", authorized: true)
+    }
+
+    func createUser(payload: UserCreatePayload) async throws -> SimpleMessageResponse {
+        try await send(path: "api/users", method: "POST", body: payload, authorized: true)
+    }
+
+    func updateUserRolePermissions(id: Int64, payload: UserRolePermissionPayload) async throws -> SimpleMessageResponse {
+        try await send(path: "api/users/\(id)/role-permissions", method: "PUT", body: payload, authorized: true)
+    }
+
+    func resetUserPassword(id: Int64, password: String) async throws -> SimpleMessageResponse {
+        try await send(path: "api/users/\(id)/password", method: "PUT", body: PasswordResetPayload(password: password), authorized: true)
+    }
+
+    func deleteUser(id: Int64) async throws {
+        try await sendWithoutResponse(path: "api/users/\(id)", method: "DELETE", authorized: true)
+    }
+
+    func changeRecords(
+        page: Int,
+        size: Int,
+        keyword: String?,
+        type: String?,
+        status: String?,
+        submittedBy: String?,
+        dateFrom: String?,
+        dateTo: String?
+    ) async throws -> ChangeRecordPageDto {
+        var query: [URLQueryItem] = [
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "size", value: String(size))
+        ]
+        if let keyword, !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "keyword", value: keyword))
+        }
+        if let type, !type.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "type", value: type))
+        }
+        if let status, !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "status", value: status))
+        }
+        if let submittedBy, !submittedBy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "submittedBy", value: submittedBy))
+        }
+        if let dateFrom, !dateFrom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "dateFrom", value: dateFrom))
+        }
+        if let dateTo, !dateTo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "dateTo", value: dateTo))
+        }
+        return try await send(path: "api/change-records", method: "GET", queryItems: query, authorized: true)
+    }
+
+    func changeRecordDetail(id: Int64) async throws -> AuditRecordDto {
+        try await send(path: "api/change-records/\(id)", method: "GET", authorized: true)
+    }
+
+    func webDavMounts() async throws -> [WebDavMountDto] {
+        try await send(path: "api/webdav/mounts", method: "GET", authorized: true)
+    }
+
+    func createWebDavMount(name: String, url: String, username: String, password: String) async throws -> WebDavMountDto {
+        try await send(
+            path: "api/webdav/mounts",
+            method: "POST",
+            body: [
+                "name": name,
+                "url": url,
+                "username": username,
+                "password": password
+            ],
+            authorized: true
+        )
+    }
+
+    func updateWebDavMount(id: Int64, body: [String: String]) async throws -> WebDavMountDto {
+        try await send(path: "api/webdav/mounts/\(id)", method: "PUT", body: body, authorized: true)
+    }
+
+    func deleteWebDavMount(id: Int64) async throws {
+        try await sendWithoutResponse(path: "api/webdav/mounts/\(id)", method: "DELETE", authorized: true)
+    }
+
+    func testWebDavConnection(url: String, username: String, password: String) async throws -> Bool {
+        let result: WebDavTestResponse = try await send(
+            path: "api/webdav/mounts/test",
+            method: "POST",
+            body: WebDavTestRequest(url: url, username: username, password: password),
+            authorized: true
+        )
+        return result.success == true
+    }
+
+    func webDavBrowse(mountId: Int64, path: String?) async throws -> [WebDavFileDto] {
+        var query: [URLQueryItem] = [URLQueryItem(name: "mountId", value: String(mountId))]
+        if let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "path", value: path))
+        }
+        return try await send(path: "api/webdav/browse", method: "GET", queryItems: query, authorized: true)
+    }
+
+    func webDavDownload(mountId: Int64, path: String, filename: String?) async throws -> URL {
+        var query: [URLQueryItem] = [
+            URLQueryItem(name: "mountId", value: String(mountId)),
+            URLQueryItem(name: "path", value: path)
+        ]
+        if let filename, !filename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "filename", value: filename))
+        }
+
+        var request = try makeRequest(path: "api/webdav/download", method: "GET", queryItems: query, bodyData: nil, authorized: true)
+        request.timeoutInterval = 180
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+
+        let safeName = sanitizeFilename(filename ?? URL(fileURLWithPath: path).lastPathComponent)
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "_" + safeName)
+        try data.write(to: fileURL, options: .atomic)
+        return fileURL
+    }
+
+    func webDavUpload(mountId: Int64, path: String, fileName: String, mimeType: String?, bytes: Data) async throws -> SimpleMessageResponse {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let body = makeMultipartBody(
+            boundary: boundary,
+            fileField: "file",
+            fileName: fileName,
+            mimeType: mimeType ?? "application/octet-stream",
+            fileBytes: bytes
+        )
+        let query = [
+            URLQueryItem(name: "mountId", value: String(mountId)),
+            URLQueryItem(name: "path", value: path)
+        ]
+        var request = try makeRequest(path: "api/webdav/upload", method: "POST", queryItems: query, bodyData: body, authorized: true)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(SimpleMessageResponse.self, from: data)
+    }
+
     private func sanitizeFilename(_ value: String) -> String {
         value.replacingOccurrences(of: "[\\/:*?\"<>|]", with: "_", options: .regularExpression)
+    }
+
+    private func makeMultipartBody(
+        boundary: String,
+        fileField: String,
+        fileName: String,
+        mimeType: String,
+        fileBytes: Data
+    ) -> Data {
+        var data = Data()
+        let lineBreak = "\r\n"
+        data.append("--\(boundary)\(lineBreak)".data(using: .utf8)!)
+        data.append("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(fileName)\"\(lineBreak)".data(using: .utf8)!)
+        data.append("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)".data(using: .utf8)!)
+        data.append(fileBytes)
+        data.append(lineBreak.data(using: .utf8)!)
+        data.append("--\(boundary)--\(lineBreak)".data(using: .utf8)!)
+        return data
     }
 
     private func send<T: Decodable>(
@@ -217,6 +459,17 @@ final class APIClient {
         } catch {
             throw APIError.decodingFailed
         }
+    }
+
+    private func sendWithoutResponse(
+        path: String,
+        method: String,
+        queryItems: [URLQueryItem] = [],
+        authorized: Bool
+    ) async throws {
+        let request = try makeRequest(path: path, method: method, queryItems: queryItems, bodyData: nil, authorized: authorized)
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
     }
 
     private func makeRequest(

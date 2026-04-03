@@ -167,21 +167,31 @@ struct AuditView: View {
             .metrologyInput()
 
             HStack(spacing: 8) {
-                Picker("\u{72b6}\u{6001}", selection: $viewModel.historyStatusFilter) {
-                    Text("\u{5168}\u{90e8}\u{72b6}\u{6001}").tag("")
-                    Text("\u{5f85}\u{5ba1}\u{6279}").tag("PENDING")
-                    Text("\u{5df2}\u{901a}\u{8fc7}").tag("APPROVED")
-                    Text("\u{5df2}\u{9a73}\u{56de}").tag("REJECTED")
+                Menu {
+                    Button("\u{5168}\u{90e8}\u{72b6}\u{6001}") { viewModel.historyStatusFilter = "" }
+                    Button("\u{5f85}\u{5ba1}\u{6279}") { viewModel.historyStatusFilter = "PENDING" }
+                    Button("\u{5df2}\u{901a}\u{8fc7}") { viewModel.historyStatusFilter = "APPROVED" }
+                    Button("\u{5df2}\u{9a73}\u{56de}") { viewModel.historyStatusFilter = "REJECTED" }
+                } label: {
+                    MetrologySelectField(
+                        title: "\u{72b6}\u{6001}",
+                        value: historyStatusLabel(viewModel.historyStatusFilter),
+                        compact: true
+                    )
                 }
-                .pickerStyle(.menu)
 
-                Picker("\u{7c7b}\u{578b}", selection: $viewModel.historyTypeFilter) {
-                    Text("\u{5168}\u{90e8}\u{7c7b}\u{578b}").tag("")
-                    Text("\u{65b0}\u{589e}").tag("CREATE")
-                    Text("\u{4fee}\u{6539}").tag("UPDATE")
-                    Text("\u{5220}\u{9664}").tag("DELETE")
+                Menu {
+                    Button("\u{5168}\u{90e8}\u{7c7b}\u{578b}") { viewModel.historyTypeFilter = "" }
+                    Button("\u{65b0}\u{589e}") { viewModel.historyTypeFilter = "CREATE" }
+                    Button("\u{4fee}\u{6539}") { viewModel.historyTypeFilter = "UPDATE" }
+                    Button("\u{5220}\u{9664}") { viewModel.historyTypeFilter = "DELETE" }
+                } label: {
+                    MetrologySelectField(
+                        title: "\u{7c7b}\u{578b}",
+                        value: historyTypeLabel(viewModel.historyTypeFilter),
+                        compact: true
+                    )
                 }
-                .pickerStyle(.menu)
 
                 Spacer(minLength: 0)
             }
@@ -202,6 +212,32 @@ struct AuditView: View {
         }
         .padding(10)
         .metrologyCard()
+    }
+
+    private func historyStatusLabel(_ value: String) -> String {
+        switch value {
+        case "PENDING":
+            return "\u{5f85}\u{5ba1}\u{6279}"
+        case "APPROVED":
+            return "\u{5df2}\u{901a}\u{8fc7}"
+        case "REJECTED":
+            return "\u{5df2}\u{9a73}\u{56de}"
+        default:
+            return "\u{5168}\u{90e8}\u{72b6}\u{6001}"
+        }
+    }
+
+    private func historyTypeLabel(_ value: String) -> String {
+        switch value {
+        case "CREATE":
+            return "\u{65b0}\u{589e}"
+        case "UPDATE":
+            return "\u{4fee}\u{6539}"
+        case "DELETE":
+            return "\u{5220}\u{9664}"
+        default:
+            return "\u{5168}\u{90e8}\u{7c7b}\u{578b}"
+        }
     }
 
     private var historyPagerBar: some View {
@@ -295,7 +331,7 @@ private struct AuditRowCard: View {
     }
 }
 
-private struct AuditDetailView: View {
+struct AuditDetailView: View {
     let record: AuditRecordDto
     @Environment(\.dismiss) private var dismiss
     @State private var compareMode: AuditCompareMode = .field

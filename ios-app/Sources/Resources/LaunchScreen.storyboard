@@ -1,40 +1,164 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="22685" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="LaunchScreenVC">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22685"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
-        <capability name="Named colors" minToolsVersion="9.0"/>
-        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
         <scene sceneID="LaunchScene">
             <objects>
                 <viewController id="LaunchScreenVC" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="LaunchView">
+                    <view key="view" contentMode="scaleToFill" id="RootView">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="计量管理系统" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TitleLabel">
-                                <rect key="frame" x="76" y="390" width="241" height="51"/>
-                                <fontDescription key="fontDescription" type="system" weight="black" pointSize="42"/>
-                                <color key="textColor" red="0.039215686274509803" green="0.11764705882352941" blue="0.23529411764705882" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="METROLOGY SYSTEM" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="SubtitleLabel">
-                                <rect key="frame" x="118" y="449" width="158" height="20"/>
-                                <fontDescription key="fontDescription" type="system" weight="medium" pointSize="13"/>
-                                <color key="textColor" red="0.22745098039215686" green="0.37254901960784315" blue="0.52941176470588236" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="TopGlow">
+                                <rect key="frame" x="183" y="-120" width="320" height="320"/>
+                                <color key="backgroundColor" red="0.6509803922" green="0.8470588235" blue="1" alpha="0.34" colorSpace="custom" customColorSpace="sRGB"/>
+                                <userDefinedRuntimeAttributes>
+                                    <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                                        <real key="value" value="160"/>
+                                    </userDefinedRuntimeAttribute>
+                                    <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                                </userDefinedRuntimeAttributes>
+                            </view>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="BottomGlow">
+                                <rect key="frame" x="-90" y="692" width="300" height="300"/>
+                                <color key="backgroundColor" red="0.7607843137" green="0.9490196078" blue="0.9098039216" alpha="0.31" colorSpace="custom" customColorSpace="sRGB"/>
+                                <userDefinedRuntimeAttributes>
+                                    <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                                        <real key="value" value="150"/>
+                                    </userDefinedRuntimeAttribute>
+                                    <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                                </userDefinedRuntimeAttributes>
+                            </view>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="PanelView">
+                                <rect key="frame" x="26" y="297" width="341" height="258"/>
+                                <subviews>
+                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="LogoChip">
+                                        <rect key="frame" x="124.5" y="28" width="92" height="92"/>
+                                        <subviews>
+                                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashMark" translatesAutoresizingMaskIntoConstraints="NO" id="LogoImage">
+                                                <rect key="frame" x="16" y="16" width="60" height="60"/>
+                                            </imageView>
+                                        </subviews>
+                                        <color key="backgroundColor" red="0.9803921569" green="0.9882352941" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <constraints>
+                                            <constraint firstAttribute="height" constant="92" id="logoChipHeight"/>
+                                            <constraint firstItem="LogoImage" firstAttribute="centerX" secondItem="LogoChip" secondAttribute="centerX" id="logoCenterX"/>
+                                            <constraint firstItem="LogoImage" firstAttribute="centerY" secondItem="LogoChip" secondAttribute="centerY" id="logoCenterY"/>
+                                            <constraint firstItem="LogoImage" firstAttribute="height" constant="60" id="logoHeight"/>
+                                            <constraint firstItem="LogoImage" firstAttribute="width" constant="60" id="logoWidth"/>
+                                            <constraint firstAttribute="width" constant="92" id="logoChipWidth"/>
+                                        </constraints>
+                                        <userDefinedRuntimeAttributes>
+                                            <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                                                <real key="value" value="20"/>
+                                            </userDefinedRuntimeAttribute>
+                                            <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                                            <userDefinedRuntimeAttribute type="number" keyPath="layer.borderWidth">
+                                                <real key="value" value="1"/>
+                                            </userDefinedRuntimeAttribute>
+                                            <userDefinedRuntimeAttribute type="color" keyPath="layer.borderColor">
+                                                <color red="0.7490196078" green="0.8431372549" blue="0.9490196078" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                            </userDefinedRuntimeAttribute>
+                                        </userDefinedRuntimeAttributes>
+                                    </view>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="计量管理系统" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TitleLabel">
+                                        <rect key="frame" x="82.5" y="136" width="176" height="34"/>
+                                        <fontDescription key="fontDescription" type="boldSystem" pointSize="28"/>
+                                        <color key="textColor" red="0.0392156863" green="0.1176470588" blue="0.2352941176" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <nil key="highlightedColor"/>
+                                    </label>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="设备、校准、审核与资料统一管理" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="SubtitleLabel">
+                                        <rect key="frame" x="50.5" y="176" width="240" height="19.5"/>
+                                        <fontDescription key="fontDescription" type="system" weight="medium" pointSize="13"/>
+                                        <color key="textColor" red="0.2274509804" green="0.3725490196" blue="0.5294117647" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <nil key="highlightedColor"/>
+                                    </label>
+                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="LoadingChip">
+                                        <rect key="frame" x="111" y="214" width="119" height="36"/>
+                                        <subviews>
+                                            <activityIndicatorView opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" style="medium" translatesAutoresizingMaskIntoConstraints="NO" id="LoadingIndicator">
+                                                <rect key="frame" x="12" y="10" width="16" height="16"/>
+                                                <color key="color" red="0.1450980392" green="0.3882352941" blue="0.9215686275" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                            </activityIndicatorView>
+                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="正在启动..." lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LoadingLabel">
+                                                <rect key="frame" x="36" y="11" width="71" height="14"/>
+                                                <fontDescription key="fontDescription" type="boldSystem" pointSize="11"/>
+                                                <color key="textColor" red="0.2274509804" green="0.3725490196" blue="0.5294117647" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                                <nil key="highlightedColor"/>
+                                            </label>
+                                        </subviews>
+                                        <color key="backgroundColor" red="0.968627451" green="0.9843137255" blue="1" alpha="0.8" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <constraints>
+                                            <constraint firstItem="LoadingLabel" firstAttribute="centerY" secondItem="LoadingChip" secondAttribute="centerY" id="loadingLabelCenterY"/>
+                                            <constraint firstItem="LoadingIndicator" firstAttribute="leading" secondItem="LoadingChip" secondAttribute="leading" constant="12" id="loadingLeading"/>
+                                            <constraint firstItem="LoadingLabel" firstAttribute="leading" secondItem="LoadingIndicator" secondAttribute="trailing" constant="8" id="loadingLabelLeading"/>
+                                            <constraint firstAttribute="trailing" secondItem="LoadingLabel" secondAttribute="trailing" constant="12" id="loadingTrailing"/>
+                                            <constraint firstItem="LoadingIndicator" firstAttribute="centerY" secondItem="LoadingChip" secondAttribute="centerY" id="loadingIndicatorCenterY"/>
+                                            <constraint firstAttribute="height" constant="36" id="loadingHeight"/>
+                                        </constraints>
+                                        <userDefinedRuntimeAttributes>
+                                            <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                                                <real key="value" value="18"/>
+                                            </userDefinedRuntimeAttribute>
+                                            <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                                            <userDefinedRuntimeAttribute type="number" keyPath="layer.borderWidth">
+                                                <real key="value" value="1"/>
+                                            </userDefinedRuntimeAttribute>
+                                            <userDefinedRuntimeAttribute type="color" keyPath="layer.borderColor">
+                                                <color red="0.6470588235" green="0.7725490196" blue="0.9019607843" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                            </userDefinedRuntimeAttribute>
+                                        </userDefinedRuntimeAttributes>
+                                    </view>
+                                </subviews>
+                                <color key="backgroundColor" red="0.9568627451" green="0.9803921569" blue="1" alpha="0.94" colorSpace="custom" customColorSpace="sRGB"/>
+                                <constraints>
+                                    <constraint firstItem="LogoChip" firstAttribute="top" secondItem="PanelView" secondAttribute="top" constant="28" id="logoTop"/>
+                                    <constraint firstItem="LogoChip" firstAttribute="centerX" secondItem="PanelView" secondAttribute="centerX" id="logoChipCenterX"/>
+                                    <constraint firstItem="TitleLabel" firstAttribute="top" secondItem="LogoChip" secondAttribute="bottom" constant="16" id="titleTop"/>
+                                    <constraint firstItem="TitleLabel" firstAttribute="centerX" secondItem="PanelView" secondAttribute="centerX" id="titleCenterX"/>
+                                    <constraint firstItem="SubtitleLabel" firstAttribute="top" secondItem="TitleLabel" secondAttribute="bottom" constant="6" id="subtitleTop"/>
+                                    <constraint firstItem="SubtitleLabel" firstAttribute="centerX" secondItem="PanelView" secondAttribute="centerX" id="subtitleCenterX"/>
+                                    <constraint firstItem="LoadingChip" firstAttribute="top" secondItem="SubtitleLabel" secondAttribute="bottom" constant="18" id="loadingTop"/>
+                                    <constraint firstItem="LoadingChip" firstAttribute="centerX" secondItem="PanelView" secondAttribute="centerX" id="loadingCenterX"/>
+                                    <constraint firstAttribute="bottom" secondItem="LoadingChip" secondAttribute="bottom" constant="22" id="panelBottom"/>
+                                    <constraint firstItem="SubtitleLabel" firstAttribute="leading" secondItem="PanelView" secondAttribute="leading" constant="22" id="subtitleLeading"/>
+                                    <constraint firstAttribute="trailing" secondItem="SubtitleLabel" secondAttribute="trailing" constant="22" id="subtitleTrailing"/>
+                                </constraints>
+                                <userDefinedRuntimeAttributes>
+                                    <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                                        <real key="value" value="28"/>
+                                    </userDefinedRuntimeAttribute>
+                                    <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                                    <userDefinedRuntimeAttribute type="number" keyPath="layer.borderWidth">
+                                        <real key="value" value="1"/>
+                                    </userDefinedRuntimeAttribute>
+                                    <userDefinedRuntimeAttribute type="color" keyPath="layer.borderColor">
+                                        <color red="0.7137254902" green="0.831372549" blue="0.9333333333" alpha="0.5" colorSpace="custom" customColorSpace="sRGB"/>
+                                    </userDefinedRuntimeAttribute>
+                                </userDefinedRuntimeAttributes>
+                            </view>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="SafeArea"/>
-                        <color key="backgroundColor" red="0.91764705882352937" green="0.95686274509803926" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.9450980392" green="0.9725490196" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
-                            <constraint firstItem="TitleLabel" firstAttribute="centerX" secondItem="SafeArea" secondAttribute="centerX" id="titleCenterX"/>
-                            <constraint firstItem="TitleLabel" firstAttribute="centerY" secondItem="SafeArea" secondAttribute="centerY" id="titleCenterY"/>
-                            <constraint firstItem="SubtitleLabel" firstAttribute="top" secondItem="TitleLabel" secondAttribute="bottom" constant="8" id="subtitleTop"/>
-                            <constraint firstItem="SubtitleLabel" firstAttribute="centerX" secondItem="SafeArea" secondAttribute="centerX" id="subtitleCenterX"/>
+                            <constraint firstItem="TopGlow" firstAttribute="top" secondItem="RootView" secondAttribute="top" constant="-120" id="topGlowTop"/>
+                            <constraint firstItem="TopGlow" firstAttribute="trailing" secondItem="RootView" secondAttribute="trailing" constant="110" id="topGlowTrailing"/>
+                            <constraint firstItem="TopGlow" firstAttribute="width" constant="320" id="topGlowWidth"/>
+                            <constraint firstItem="TopGlow" firstAttribute="height" constant="320" id="topGlowHeight"/>
+                            <constraint firstItem="BottomGlow" firstAttribute="leading" secondItem="RootView" secondAttribute="leading" constant="-90" id="bottomGlowLeading"/>
+                            <constraint firstItem="BottomGlow" firstAttribute="bottom" secondItem="RootView" secondAttribute="bottom" constant="140" id="bottomGlowBottom"/>
+                            <constraint firstItem="BottomGlow" firstAttribute="width" constant="300" id="bottomGlowWidth"/>
+                            <constraint firstItem="BottomGlow" firstAttribute="height" constant="300" id="bottomGlowHeight"/>
+                            <constraint firstItem="PanelView" firstAttribute="centerX" secondItem="SafeArea" secondAttribute="centerX" id="panelCenterX"/>
+                            <constraint firstItem="PanelView" firstAttribute="centerY" secondItem="SafeArea" secondAttribute="centerY" id="panelCenterY"/>
+                            <constraint firstItem="PanelView" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="SafeArea" secondAttribute="leading" constant="20" id="panelLeading"/>
+                            <constraint firstAttribute="trailing" relation="greaterThanOrEqual" secondItem="PanelView" secondAttribute="trailing" constant="20" id="panelTrailing"/>
+                            <constraint firstItem="PanelView" firstAttribute="width" relation="lessThanOrEqual" constant="360" id="panelMaxWidth"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -42,4 +166,7 @@
             </objects>
         </scene>
     </scenes>
+    <resources>
+        <image name="SplashMark" width="96" height="96"/>
+    </resources>
 </document>

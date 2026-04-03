@@ -166,3 +166,145 @@ struct BreadcrumbItemDto: Codable {
     let name: String?
     let readOnly: Bool?
 }
+
+struct SettingsDto: Codable {
+    let warningDays: Int?
+    let expiredDays: Int?
+    let autoLedgerExportEnabled: Bool?
+    let databaseBackupEnabled: Bool?
+    let cmsRootPath: String?
+    let ledgerExportPath: String?
+    let databaseBackupPath: String?
+}
+
+struct MaintenanceRunResultDto: Codable {
+    let ledgerExported: Bool?
+    let databaseBackedUp: Bool?
+    let ledgerExportPath: String?
+    let databaseBackupPath: String?
+    let message: String?
+}
+
+struct DeviceStatusDto: Codable, Identifiable {
+    let id: Int64?
+    let name: String?
+    let sortOrder: Int?
+}
+
+struct DepartmentDto: Codable, Identifiable {
+    let id: Int64?
+    let name: String?
+    let code: String?
+    let description: String?
+    let sortOrder: Int?
+    let parentId: Int64?
+    let createdAt: String?
+}
+
+struct UserFolderGrantDto: Codable {
+    let folderId: Int64?
+    let folderName: String?
+    let folderPath: String?
+}
+
+struct UserDto: Codable, Identifiable {
+    let id: Int64?
+    let username: String?
+    let role: String?
+    let department: String?
+    let departments: [String]?
+    let permissions: [String]?
+    let readonlyFolders: [UserFolderGrantDto]?
+    let readonlyFolderIds: [Int64]?
+    let createdAt: String?
+}
+
+struct UserCreatePayload: Codable {
+    let username: String
+    let password: String
+    let role: String
+    let departments: [String]
+    let permissions: [String]
+    let readonlyFolderIds: [Int64]
+}
+
+struct UserRolePermissionPayload: Codable {
+    let role: String
+    let departments: [String]
+    let permissions: [String]
+    let readonlyFolderIds: [Int64]
+}
+
+struct PasswordResetPayload: Codable {
+    let password: String
+}
+
+struct ChangeRecordItemDto: Codable, Identifiable {
+    let id: Int64?
+    let type: String?
+    let status: String?
+    let entityType: String?
+    let entityId: Int64?
+    let submittedBy: String?
+    let submittedAt: String?
+    let approvedBy: String?
+    let approvedAt: String?
+    let remark: String?
+    let rejectReason: String?
+    let deviceName: String?
+    let metricNo: String?
+    let changedFieldCount: Int?
+}
+
+struct ChangeRecordStatsDto: Codable {
+    let total: Int64?
+    let pending: Int64?
+    let approved: Int64?
+    let rejected: Int64?
+    let createCount: Int64?
+    let updateCount: Int64?
+    let deleteCount: Int64?
+    let submitterCount: Int64?
+}
+
+struct ChangeRecordPageDto: Codable {
+    let items: [ChangeRecordItemDto]?
+    let total: Int64?
+    let page: Int?
+    let size: Int?
+    let stats: ChangeRecordStatsDto?
+}
+
+struct WebDavMountDto: Codable, Identifiable {
+    let id: Int64?
+    let userId: String?
+    let name: String?
+    let url: String?
+    let username: String?
+    let password: String?
+    let createdAt: String?
+}
+
+struct WebDavFileDto: Codable, Identifiable {
+    let name: String?
+    let path: String?
+    let isDirectory: Bool?
+    let size: Int64?
+    let contentType: String?
+    let modified: Int64?
+
+    var id: String {
+        let fallback = UUID().uuidString
+        return path ?? name ?? fallback
+    }
+}
+
+struct WebDavTestRequest: Codable {
+    let url: String
+    let username: String?
+    let password: String?
+}
+
+struct WebDavTestResponse: Codable {
+    let success: Bool?
+}

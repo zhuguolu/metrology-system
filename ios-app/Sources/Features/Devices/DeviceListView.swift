@@ -4,8 +4,8 @@ private struct DeviceLayoutMetrics {
     let scale: AndroidScale
     let width: CGFloat
 
-    init(containerWidth: CGFloat) {
-        scale = AndroidScale(containerWidth: containerWidth)
+    init(containerWidth: CGFloat, containerHeight: CGFloat) {
+        scale = AndroidScale(containerWidth: containerWidth, containerHeight: containerHeight)
         width = containerWidth
     }
 
@@ -25,7 +25,7 @@ struct DeviceListView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let metrics = DeviceLayoutMetrics(containerWidth: proxy.size.width)
+            let metrics = DeviceLayoutMetrics(containerWidth: proxy.size.width, containerHeight: proxy.size.height)
 
             ZStack {
                 MetrologyPalette.background.ignoresSafeArea()
@@ -44,24 +44,20 @@ struct DeviceListView: View {
                 if viewModel.isLoading {
                     loadingOverlay
                 }
+
+                if let errorMessage = viewModel.errorMessage {
+                    MetrologyNoticeDialog(
+                        title: "\u{63d0}\u{793a}",
+                        message: errorMessage
+                    ) {
+                        viewModel.errorMessage = nil
+                    }
+                }
             }
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await viewModel.initialLoad()
-        }
-        .alert(
-            "提示",
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { value in
-                    if !value { viewModel.errorMessage = nil }
-                }
-            )
-        ) {
-            Button("确定", role: .cancel) {}
-        } message: {
-            Text(viewModel.errorMessage ?? "")
         }
         .sheet(
             isPresented: Binding(

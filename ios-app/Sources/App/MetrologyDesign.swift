@@ -43,16 +43,28 @@ enum MetrologyAppearance {
 struct AndroidScale {
     let factor: CGFloat
     let width: CGFloat
+    let height: CGFloat
 
-    init(containerWidth: CGFloat) {
-        let base: CGFloat = 390
-        let raw = containerWidth / base
-        factor = min(max(raw, 0.86), 1.22)
+    init(containerWidth: CGFloat, containerHeight: CGFloat? = nil) {
+        let baseWidth: CGFloat = 390
+        let baseHeight: CGFloat = 844
+        let rawWidth = containerWidth / baseWidth
+
+        let resolvedHeight = max(containerHeight ?? baseHeight, 568)
+        let rawHeight = resolvedHeight / baseHeight
+
+        let mixed = (rawWidth * 0.72) + (rawHeight * 0.28)
+        factor = min(max(mixed, 0.88), 1.26)
         width = containerWidth
+        height = resolvedHeight
     }
 
     func px(_ value: CGFloat) -> CGFloat {
         value * factor
+    }
+
+    func vertical(_ value: CGFloat) -> CGFloat {
+        value * min(max(factor * 0.96, 0.90), 1.20)
     }
 }
 
@@ -160,6 +172,186 @@ struct MetrologyGhostButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(MetrologyPalette.navActive.opacity(configuration.isPressed ? 0.72 : 1))
+    }
+}
+
+struct MetrologyDangerButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: configuration.isPressed
+                                ? [Color(hex: 0xE03B3B), Color(hex: 0xC61E1E)]
+                                : [Color(hex: 0xEF4444), Color(hex: 0xDC2626)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        configuration.isPressed ? Color(hex: 0xB91C1C) : Color(hex: 0xC92323),
+                        lineWidth: 1
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+    }
+}
+
+struct MetrologySelectField: View {
+    let title: String
+    let value: String
+    var compact: Bool = false
+
+    var body: some View {
+        HStack(spacing: compact ? 5 : 6) {
+            Text(compact ? "\(title):" : title)
+                .font(.system(size: compact ? 11 : 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .lineLimit(1)
+
+            Text(value)
+                .font(.system(size: compact ? 11 : 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: compact ? 10 : 11, weight: .semibold))
+                .foregroundStyle(MetrologyPalette.textMuted)
+        }
+        .padding(.horizontal, compact ? 10 : 12)
+        .padding(.vertical, compact ? 8 : 9)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white, Color(hex: 0xF4F8FE)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(hex: 0xCFDAEB), lineWidth: 1)
+        )
+    }
+}
+
+struct MetrologyNoticeDialog: View {
+    let title: String
+    let message: String
+    var confirmTitle: String = "确定"
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.24).ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(message)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button(confirmTitle, action: onConfirm)
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+            }
+            .padding(14)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x456B96, alpha: 0.22), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 20)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .zIndex(1000)
+    }
+}
+
+struct MetrologyConfirmDialog: View {
+    let title: String
+    let message: String
+    var cancelTitle: String = "取消"
+    var confirmTitle: String = "确定"
+    var destructive: Bool = false
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.24).ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(message)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 10) {
+                    Button(cancelTitle, action: onCancel)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .buttonStyle(MetrologySecondaryButtonStyle())
+
+                    Button(confirmTitle, action: onConfirm)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .buttonStyle(destructive ? MetrologyDangerButtonStyle() : MetrologyPrimaryButtonStyle())
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x456B96, alpha: 0.22), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 20)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .zIndex(1000)
     }
 }
 
