@@ -218,7 +218,7 @@ private struct DepartmentEditorState: Identifiable {
     let draft: DepartmentDraft
 }
 
-private struct DepartmentDraft {
+struct DepartmentDraft {
     var name: String = ""
     var code: String = ""
     var sortOrder: String = "0"

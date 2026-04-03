@@ -440,7 +440,7 @@ private struct WebDavFileRowCard: View {
     }
 }
 
-private struct WebDavMountDraft {
+struct WebDavMountDraft {
     var name: String = ""
     var url: String = ""
     var username: String = ""

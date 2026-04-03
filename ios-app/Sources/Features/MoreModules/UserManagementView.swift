@@ -307,7 +307,7 @@ private struct ResetPasswordEditorState: Identifiable {
     let user: UserDto
 }
 
-private struct UserCreateDraft {
+struct UserCreateDraft {
     var username: String = ""
     var password: String = ""
     var admin: Bool = false
