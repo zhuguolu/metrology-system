@@ -58,8 +58,8 @@ struct UserManagementView: View {
             viewModel.configure(currentUsername: appState.session?.username)
             await viewModel.initialLoad()
         }
-        .onChange(of: appState.session?.username) { newValue in
-            viewModel.configure(currentUsername: newValue)
+        .onChange(of: appState.session?.username) {
+            viewModel.configure(currentUsername: appState.session?.username)
             Task { await viewModel.loadUsers() }
         }
         .sheet(isPresented: $createSheetOpen) {

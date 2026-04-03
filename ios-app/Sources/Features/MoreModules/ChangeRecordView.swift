@@ -38,14 +38,14 @@ struct ChangeRecordView: View {
             viewModel.configure(admin: isAdmin)
             await viewModel.initialLoad()
         }
-        .onChange(of: appState.session?.role) { _ in
+        .onChange(of: appState.session?.role) {
             viewModel.configure(admin: isAdmin)
             Task { await viewModel.applyFilters() }
         }
-        .onChange(of: viewModel.type) { _ in
+        .onChange(of: viewModel.type) {
             Task { await viewModel.applyFilters() }
         }
-        .onChange(of: viewModel.status) { _ in
+        .onChange(of: viewModel.status) {
             Task { await viewModel.applyFilters() }
         }
         .sheet(item: $detailItem) { item in

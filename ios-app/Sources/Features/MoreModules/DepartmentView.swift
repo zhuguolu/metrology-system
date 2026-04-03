@@ -55,7 +55,7 @@ struct DepartmentView: View {
         .task {
             await viewModel.initialLoad()
         }
-        .onChange(of: viewModel.searchText) { _ in
+        .onChange(of: viewModel.searchText) {
             viewModel.scheduleSearch()
         }
         .sheet(item: $editor) { state in

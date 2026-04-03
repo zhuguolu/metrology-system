@@ -96,11 +96,11 @@ struct AuditView: View {
                 viewModel.configure(role: appState.session?.role, username: appState.session?.username)
                 await viewModel.loadCurrent()
             }
-            .onChange(of: sessionIdentity) { _ in
+            .onChange(of: sessionIdentity) {
                 viewModel.configure(role: appState.session?.role, username: appState.session?.username)
                 Task { await viewModel.loadCurrent() }
             }
-            .onChange(of: viewModel.mode) { _ in
+            .onChange(of: viewModel.mode) {
                 Task { await viewModel.loadCurrent() }
             }
             .overlay {
