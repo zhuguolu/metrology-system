@@ -57,8 +57,17 @@ jobs:
         run: |
           chmod +x scripts/build_unsigned_ipa.sh
           APP_DIR="${INPUT_APP_DIR:-ios-app}"
+          if [ -z "$APP_DIR" ] || [ "$APP_DIR" = "null" ]; then
+            APP_DIR="ios-app"
+          fi
           CONFIGURATION="${INPUT_CONFIGURATION:-Release}"
+          if [ -z "$CONFIGURATION" ] || [ "$CONFIGURATION" = "null" ]; then
+            CONFIGURATION="Release"
+          fi
           SCHEME="${INPUT_SCHEME:-}"
+          if [ "$SCHEME" = "null" ]; then
+            SCHEME=""
+          fi
           ./scripts/build_unsigned_ipa.sh "$APP_DIR" "$SCHEME" "$CONFIGURATION"
 
       - name: Upload Unsigned IPA Artifact
