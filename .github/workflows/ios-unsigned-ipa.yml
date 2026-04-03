@@ -1,4 +1,5 @@
 name: iOS Unsigned IPA
+# CI workflow for unsigned iOS IPA artifacts
 
 on:
   workflow_dispatch:
