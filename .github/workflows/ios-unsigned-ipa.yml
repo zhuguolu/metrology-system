@@ -52,6 +52,7 @@ jobs:
           import os
           import pathlib
           import re
+          import subprocess
 
           app_dirs_raw = (os.getenv("INPUT_APP_DIRS") or "").strip()
           scheme_override = (os.getenv("INPUT_SCHEME") or "").strip()
@@ -60,10 +61,14 @@ jobs:
               app_dirs = [d.strip().strip("/\\") for d in app_dirs_raw.split(",") if d.strip()]
           else:
               app_dirs = []
-              for path in pathlib.Path(".").rglob("project.yml"):
-                  if "node_modules" in path.parts:
+              tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+              for file_path in tracked:
+                  pure = pathlib.PurePosixPath(file_path)
+                  if pure.name != "project.yml":
                       continue
-                  app_dirs.append(path.parent.as_posix())
+                  if "node_modules" in pure.parts:
+                      continue
+                  app_dirs.append(str(pure.parent) if str(pure.parent) != "." else ".")
               app_dirs = sorted(set(app_dirs))
 
           if not app_dirs:
