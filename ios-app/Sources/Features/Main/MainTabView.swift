@@ -1,137 +1,478 @@
 import SwiftUI
 
-private enum MainTab: Hashable {
+private enum MainTab: String, CaseIterable, Hashable {
     case ledger
     case calibration
     case todo
     case audit
     case more
-}
 
-struct MainTabView: View {
-    @State private var selectedTab: MainTab = .ledger
-
-    var body: some View {
-        TabView(selection: $selectedTab) {
-            DeviceListView(mode: .ledger)
-                .tabItem {
-                    Label("台账", systemImage: selectedTab == .ledger ? "books.vertical.fill" : "books.vertical")
-                }
-                .tag(MainTab.ledger)
-
-            DeviceListView(mode: .calibration)
-                .tabItem {
-                    Label("校准", systemImage: selectedTab == .calibration ? "checkmark.seal.fill" : "checkmark.seal")
-                }
-                .tag(MainTab.calibration)
-
-            DeviceListView(mode: .todo)
-                .tabItem {
-                    Label("待办", systemImage: selectedTab == .todo ? "clipboard.fill" : "clipboard")
-                }
-                .tag(MainTab.todo)
-
-            AuditView()
-                .tabItem {
-                    Label("审核", systemImage: selectedTab == .audit ? "doc.text.magnifyingglass" : "doc.text")
-                }
-                .tag(MainTab.audit)
-
-            MoreHubView()
-                .tabItem {
-                    Label("更多", systemImage: selectedTab == .more ? "square.grid.2x2.fill" : "square.grid.2x2")
-                }
-                .tag(MainTab.more)
+    var navTitle: String {
+        switch self {
+        case .ledger: return "设备台账"
+        case .calibration: return "校准管理"
+        case .todo: return "我的待办"
+        case .audit: return "数据审核"
+        case .more: return "更多模块"
         }
-        .tint(MetrologyPalette.accent)
+    }
+
+    var tabTitle: String {
+        switch self {
+        case .ledger: return "台账"
+        case .calibration: return "校准"
+        case .todo: return "待办"
+        case .audit: return "审核"
+        case .more: return "更多"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .ledger: return "books.vertical"
+        case .calibration: return "checkmark.seal"
+        case .todo: return "clipboard"
+        case .audit: return "doc.text.magnifyingglass"
+        case .more: return "square.grid.2x2"
+        }
+    }
+
+    var iconActive: String {
+        switch self {
+        case .ledger: return "books.vertical.fill"
+        case .calibration: return "checkmark.seal.fill"
+        case .todo: return "clipboard.fill"
+        case .audit: return "doc.text.magnifyingglass"
+        case .more: return "square.grid.2x2.fill"
+        }
+    }
+
+    var showBackToBoard: Bool {
+        switch self {
+        case .ledger, .calibration, .todo:
+            return true
+        case .audit, .more:
+            return false
+        }
     }
 }
 
-struct MoreHubView: View {
+struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var selectedTab: MainTab = .ledger
+    @State private var loadedTabs: Set<MainTab> = [.ledger]
+    @State private var dashboardSheetOpen = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let safeBottom = max(proxy.safeAreaInsets.bottom, 10)
+
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    if selectedTab != .more {
+                        topBar
+                    }
+
+                    ZStack {
+                        if loadedTabs.contains(.ledger) {
+                            DeviceListView(mode: .ledger)
+                                .opacity(selectedTab == .ledger ? 1 : 0)
+                                .allowsHitTesting(selectedTab == .ledger)
+                        }
+                        if loadedTabs.contains(.calibration) {
+                            DeviceListView(mode: .calibration)
+                                .opacity(selectedTab == .calibration ? 1 : 0)
+                                .allowsHitTesting(selectedTab == .calibration)
+                        }
+                        if loadedTabs.contains(.todo) {
+                            DeviceListView(mode: .todo)
+                                .opacity(selectedTab == .todo ? 1 : 0)
+                                .allowsHitTesting(selectedTab == .todo)
+                        }
+                        if loadedTabs.contains(.audit) {
+                            AuditView()
+                                .opacity(selectedTab == .audit ? 1 : 0)
+                                .allowsHitTesting(selectedTab == .audit)
+                        }
+                        if loadedTabs.contains(.more) {
+                            MoreHubView(selectedTab: $selectedTab)
+                                .opacity(selectedTab == .more ? 1 : 0)
+                                .allowsHitTesting(selectedTab == .more)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, selectedTab == .more ? 0 : 10)
+
+                    AndroidStyleTabBar(selectedTab: $selectedTab) { tab in
+                        loadedTabs.insert(tab)
+                    }
+                    .padding(.top, 10)
+                    .padding(.bottom, safeBottom)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+            }
+            .animation(.easeOut(duration: 0.16), value: selectedTab)
+        }
+        .sheet(isPresented: $dashboardSheetOpen) {
+            NavigationStack {
+                DashboardView()
+            }
+        }
+    }
+
+    private var topBar: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(selectedTab.navTitle)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                if selectedTab == .audit {
+                    Text("当前用户：\(appState.session?.username ?? "-")")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                }
+            }
+
+            Spacer(minLength: 6)
+
+            if selectedTab.showBackToBoard {
+                Button("回看板") {
+                    dashboardSheetOpen = true
+                }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.navActive)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white, Color(hex: 0xF4F8FE)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color(hex: 0xCFDAEB), lineWidth: 1)
+                )
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: 0xEEF5FF), Color(hex: 0xEAF8F3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(hex: 0xD3E2F6), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: 0x6485AA, alpha: 0.15), radius: 4, x: 0, y: 2)
+    }
+}
+
+private struct AndroidStyleTabBar: View {
+    @Binding var selectedTab: MainTab
+    let onSelect: (MainTab) -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let scale = AndroidScale(containerWidth: proxy.size.width)
+            let horizontalPadding = max(scale.px(12), 10)
+            let verticalPadding = max(scale.px(8), 7)
+            let navHeight = max(scale.px(72), 68)
+            let iconSize = max(scale.px(20), 18)
+            let labelSize = max(scale.px(10.5), 10)
+            let corner = max(scale.px(24), 20)
+
+            HStack(spacing: max(scale.px(6), 4)) {
+                ForEach(MainTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTab = tab
+                        onSelect(tab)
+                    } label: {
+                        VStack(spacing: max(scale.px(2), 1)) {
+                            Image(systemName: selectedTab == tab ? tab.iconActive : tab.icon)
+                                .font(.system(size: iconSize, weight: .semibold))
+                                .scaleEffect(selectedTab == tab ? 1.05 : 0.94)
+                                .opacity(selectedTab == tab ? 1 : 0.78)
+                            Text(tab.tabTitle)
+                                .font(.system(size: labelSize, weight: .bold))
+                        }
+                        .foregroundStyle(selectedTab == tab ? MetrologyPalette.navActive : MetrologyPalette.navInactive)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background {
+                            if selectedTab == tab {
+                                RoundedRectangle(cornerRadius: max(scale.px(14), 12), style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(hex: 0xF8FBFF), Color(hex: 0xD2E5FF)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: max(scale.px(14), 12), style: .continuous)
+                                            .stroke(Color(hex: 0xAFC8F2), lineWidth: 1)
+                                    )
+                                    .shadow(color: Color(hex: 0x2C63BF, alpha: 0.18), radius: 2, x: 0, y: 1)
+                            } else {
+                                RoundedRectangle(cornerRadius: max(scale.px(14), 12), style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.white, Color(hex: 0xF4F8FF)],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: max(scale.px(14), 12), style: .continuous)
+                                            .stroke(Color(hex: 0xD7E3F3), lineWidth: 1)
+                                    )
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .frame(width: proxy.size.width, height: navHeight)
+            .background(
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xE8F1FF)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: corner, style: .continuous)
+                            .stroke(Color(hex: 0xC9DBF5), lineWidth: 1)
+                    )
+            )
+            .shadow(color: Color(hex: 0x345A8F, alpha: 0.18), radius: 4, x: 0, y: 2)
+        }
+        .frame(height: 78)
+    }
+}
+
+private struct MoreHubView: View {
+    @Binding var selectedTab: MainTab
+    @EnvironmentObject private var appState: AppState
+
+    private let columns: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
 
     var body: some View {
         NavigationStack {
             ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+                LinearGradient(
+                    colors: [MetrologyPalette.moreBgStart, MetrologyPalette.moreBgEnd],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 14) {
-                        sectionCard(title: "常用模块") {
-                            NavigationLink {
-                                DashboardView()
-                            } label: {
-                                menuRow(icon: "rectangle.grid.1x2.fill", title: "总览看板", subtitle: "查看关键业务指标")
-                            }
-                            NavigationLink {
-                                FilesView()
-                            } label: {
-                                menuRow(icon: "folder.fill", title: "我的文件", subtitle: "浏览与预览共享文件")
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
+                        section(title: "常用模块") {
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                moduleCard(icon: "rectangle.grid.1x2.fill", title: "总览看板", tint: Color(hex: 0x1D4ED8)) {
+                                    selectedTab = .ledger
+                                }
+                                moduleCard(icon: "books.vertical.fill", title: "设备台账", tint: Color(hex: 0x047857)) {
+                                    selectedTab = .ledger
+                                }
+                                moduleCard(icon: "checkmark.seal.fill", title: "校准管理", tint: Color(hex: 0xB45309)) {
+                                    selectedTab = .calibration
+                                }
+                                moduleCard(icon: "clipboard.fill", title: "我的待办", tint: Color(hex: 0x6D28D9)) {
+                                    selectedTab = .todo
+                                }
+                                moduleCard(icon: "doc.text.magnifyingglass", title: "数据审核", tint: Color(hex: 0x6D28D9)) {
+                                    selectedTab = .audit
+                                }
                             }
                         }
 
-                        sectionCard(title: "当前账号") {
-                            HStack {
-                                Text("用户")
-                                    .foregroundStyle(MetrologyPalette.textSecondary)
-                                Spacer()
-                                Text(appState.session?.username ?? "-")
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
+                        section(title: "协作与数据") {
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                NavigationLink {
+                                    FilesView()
+                                } label: {
+                                    moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8))
+                                }
+                                NavigationLink {
+                                    ModulePlaceholderView(title: "网络挂载", subtitle: "与安卓端保持同模块入口")
+                                } label: {
+                                    moduleCardContent(icon: "network", title: "网络挂载", tint: Color(hex: 0x047857))
+                                }
+                                NavigationLink {
+                                    ModulePlaceholderView(title: "变更记录", subtitle: "与安卓端保持同模块入口")
+                                } label: {
+                                    moduleCardContent(icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8))
+                                }
+                                NavigationLink {
+                                    ModulePlaceholderView(title: "使用状态", subtitle: "与安卓端保持同模块入口")
+                                } label: {
+                                    moduleCardContent(icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857))
+                                }
                             }
-                            Button(role: .destructive) {
-                                appState.logout()
-                            } label: {
-                                Text("退出登录")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                            }
-                            .buttonStyle(MetrologySecondaryButtonStyle())
                         }
+
+                        section(title: "管理与配置") {
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                NavigationLink {
+                                    ModulePlaceholderView(title: "部门管理", subtitle: "与安卓端保持同模块入口")
+                                } label: {
+                                    moduleCardContent(icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309))
+                                }
+                                NavigationLink {
+                                    ModulePlaceholderView(title: "用户管理", subtitle: "与安卓端保持同模块入口")
+                                } label: {
+                                    moduleCardContent(icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9))
+                                }
+                                NavigationLink {
+                                    ModulePlaceholderView(title: "系统维护", subtitle: "与安卓端保持同模块入口")
+                                } label: {
+                                    moduleCardContent(icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155))
+                                }
+                            }
+                        }
+
+                        Button {
+                            appState.logout()
+                        } label: {
+                            Text("退出登录")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(MetrologyPalette.textPrimary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(MetrologySecondaryButtonStyle())
                     }
-                    .padding(16)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("更多")
-            .toolbarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
-    private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            content()
-        }
-        .padding(14)
-        .metrologyCard()
-    }
-
-    private func menuRow(icon: String, title: String, subtitle: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(MetrologyPalette.accent)
-                .frame(width: 34, height: 34)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(MetrologyPalette.surface)
-                )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+    private var header: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("更多模块")
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textPrimary)
-                Text(subtitle)
-                    .font(.system(size: 12))
+                Text("点击图标快速进入模块")
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(MetrologyPalette.textMuted)
+            Spacer(minLength: 8)
+            Text("用户：\(appState.session?.username ?? "-")")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color(hex: 0xE9F1FF))
+                )
         }
-        .padding(.vertical, 6)
-        .contentShape(Rectangle())
+    }
+
+    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color(hex: 0x2D5DAF))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule(style: .continuous).fill(Color(hex: 0xE9F1FF))
+                )
+
+            content()
+        }
+    }
+
+    private func moduleCard(icon: String, title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            moduleCardContent(icon: icon, title: title, tint: tint)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func moduleCardContent(icon: String, title: String, tint: Color) -> some View {
+        VStack(spacing: 9) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xDBE9FF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color(hex: 0xD5E3F5), lineWidth: 1)
+                    )
+                    .frame(width: 56, height: 56)
+                Image(systemName: icon)
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color(hex: 0x233247))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(height: 30, alignment: .top)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 116)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white, Color(hex: 0xF0F7FF)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(hex: 0xD5E3F5), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: 0x557CA5, alpha: 0.10), radius: 3, x: 0, y: 2)
+    }
+}
+
+private extension Color {
+    init(hex: Int, alpha: Double = 1.0) {
+        let red = Double((hex >> 16) & 0xFF) / 255.0
+        let green = Double((hex >> 8) & 0xFF) / 255.0
+        let blue = Double(hex & 0xFF) / 255.0
+        self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 }

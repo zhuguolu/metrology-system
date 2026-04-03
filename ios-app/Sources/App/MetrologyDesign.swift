@@ -2,43 +2,57 @@ import SwiftUI
 import UIKit
 
 enum MetrologyPalette {
-    static let background = Color(red: 0.02, green: 0.03, blue: 0.06)
-    static let surface = Color(red: 0.08, green: 0.10, blue: 0.14)
-    static let card = Color(red: 0.10, green: 0.12, blue: 0.17)
-    static let stroke = Color.white.opacity(0.08)
-    static let accent = Color(red: 0.09, green: 0.55, blue: 1.00)
-    static let textPrimary = Color.white
-    static let textSecondary = Color(red: 0.63, green: 0.66, blue: 0.72)
-    static let textMuted = Color(red: 0.47, green: 0.50, blue: 0.56)
+    static let brandBlue = Color(hex: 0x2563EB)
+
+    static let background = Color(hex: 0xEEF4FB)         // surfacePage
+    static let surface = Color.white
+    static let card = Color(hex: 0xF9FCFF)               // surfaceCard
+    static let cardSoftBlue = Color(hex: 0xEEF4FF)
+    static let stroke = Color(hex: 0xD5E2F2)
+
+    static let textPrimary = Color(hex: 0x0F1F3A)
+    static let textSecondary = Color(hex: 0x5E6F87)
+    static let textMuted = Color(hex: 0x8A9AAF)
+
+    static let navActive = Color(hex: 0x1D4ED8)
+    static let navInactive = Color(hex: 0x7B8BA0)
+
+    static let statusValid = Color(hex: 0x059669)
+    static let statusWarning = Color(hex: 0xD97706)
+    static let statusExpired = Color(hex: 0xDC2626)
+
+    static let moreBgStart = Color(hex: 0xF7FAFF)
+    static let moreBgEnd = Color(hex: 0xEEF7FF)
 }
 
 enum MetrologyAppearance {
     static func applyGlobal() {
-        let tab = UITabBarAppearance()
-        tab.configureWithOpaqueBackground()
-        tab.backgroundColor = UIColor(red: 0.03, green: 0.04, blue: 0.07, alpha: 0.96)
-        tab.shadowColor = UIColor.white.withAlphaComponent(0.08)
-
-        let normalColor = UIColor(red: 0.52, green: 0.55, blue: 0.62, alpha: 1)
-        let selectedColor = UIColor(red: 0.09, green: 0.55, blue: 1.00, alpha: 1)
-
-        tab.stackedLayoutAppearance.normal.iconColor = normalColor
-        tab.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
-        tab.stackedLayoutAppearance.selected.iconColor = selectedColor
-        tab.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
-        UITabBar.appearance().standardAppearance = tab
-        UITabBar.appearance().scrollEdgeAppearance = tab
-
         let nav = UINavigationBarAppearance()
         nav.configureWithOpaqueBackground()
-        nav.backgroundColor = UIColor(red: 0.03, green: 0.04, blue: 0.07, alpha: 1)
-        nav.shadowColor = UIColor.clear
-        nav.titleTextAttributes = [.foregroundColor: UIColor.white]
-        nav.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        nav.backgroundColor = UIColor(hex: 0xF8FBFF)
+        nav.shadowColor = UIColor(hex: 0xDCE8F8)
+        nav.titleTextAttributes = [.foregroundColor: UIColor(hex: 0x0F1F3A)]
+        nav.largeTitleTextAttributes = [.foregroundColor: UIColor(hex: 0x0F1F3A)]
         UINavigationBar.appearance().standardAppearance = nav
         UINavigationBar.appearance().scrollEdgeAppearance = nav
         UINavigationBar.appearance().compactAppearance = nav
-        UINavigationBar.appearance().tintColor = selectedColor
+        UINavigationBar.appearance().tintColor = UIColor(hex: 0x1D4ED8)
+    }
+}
+
+struct AndroidScale {
+    let factor: CGFloat
+    let width: CGFloat
+
+    init(containerWidth: CGFloat) {
+        let base: CGFloat = 390
+        let raw = containerWidth / base
+        factor = min(max(raw, 0.86), 1.22)
+        width = containerWidth
+    }
+
+    func px(_ value: CGFloat) -> CGFloat {
+        value * factor
     }
 }
 
@@ -47,29 +61,36 @@ struct MetrologyCardModifier: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(MetrologyPalette.card)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(MetrologyPalette.stroke, lineWidth: 1)
             )
+            .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 6, x: 0, y: 2)
     }
 }
 
 struct MetrologyInputModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .font(.system(size: 20, weight: .regular))
+            .font(.system(size: 16, weight: .regular))
             .foregroundStyle(MetrologyPalette.textPrimary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(MetrologyPalette.surface)
+                    .fill(Color.white)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                    .stroke(Color(hex: 0xD6E2F2), lineWidth: 1)
             )
     }
 }
@@ -77,42 +98,68 @@ struct MetrologyInputModifier: ViewModifier {
 struct MetrologyPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 20, weight: .semibold))
+            .font(.system(size: 17, weight: .bold))
             .foregroundStyle(Color.white)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 11)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(MetrologyPalette.accent.opacity(configuration.isPressed ? 0.72 : 1))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: configuration.isPressed
+                                ? [Color(hex: 0x276EDD), Color(hex: 0x1B54C2)]
+                                : [Color(hex: 0x2F7CF7), Color(hex: 0x1F62E8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        configuration.isPressed ? Color(hex: 0x1E58C9) : Color(hex: 0x2C6EEA),
+                        lineWidth: 1
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
 struct MetrologySecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(MetrologyPalette.accent)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 11)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(MetrologyPalette.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(MetrologyPalette.surface.opacity(configuration.isPressed ? 0.72 : 1))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: configuration.isPressed
+                                ? [Color(hex: 0xEEF4FD), Color(hex: 0xE3ECF9)]
+                                : [Color.white, Color(hex: 0xF4F8FE)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        configuration.isPressed ? Color(hex: 0xBFCFE5) : Color(hex: 0xCFDAEB),
+                        lineWidth: 1
+                    )
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
 struct MetrologyGhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 18, weight: .medium))
-            .foregroundStyle(MetrologyPalette.accent.opacity(configuration.isPressed ? 0.68 : 1))
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(MetrologyPalette.navActive.opacity(configuration.isPressed ? 0.72 : 1))
     }
 }
 
@@ -123,5 +170,23 @@ extension View {
 
     func metrologyInput() -> some View {
         modifier(MetrologyInputModifier())
+    }
+}
+
+private extension Color {
+    init(hex: Int, alpha: Double = 1.0) {
+        let red = Double((hex >> 16) & 0xFF) / 255.0
+        let green = Double((hex >> 8) & 0xFF) / 255.0
+        let blue = Double(hex & 0xFF) / 255.0
+        self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
+    }
+}
+
+private extension UIColor {
+    convenience init(hex: Int, alpha: CGFloat = 1.0) {
+        let red = CGFloat((hex >> 16) & 0xFF) / 255.0
+        let green = CGFloat((hex >> 8) & 0xFF) / 255.0
+        let blue = CGFloat(hex & 0xFF) / 255.0
+        self.init(red: red, green: green, blue: blue, alpha: alpha)
     }
 }

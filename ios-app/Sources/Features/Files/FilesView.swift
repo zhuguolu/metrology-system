@@ -62,6 +62,10 @@ struct FilesView: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(MetrologyPalette.surface)
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                    )
             }
         }
         .sheet(item: $viewModel.previewItem, onDismiss: {
@@ -95,7 +99,7 @@ struct FilesView: View {
             if let message = viewModel.errorMessage {
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(Color.red.opacity(0.9))
+                    .foregroundStyle(MetrologyPalette.statusExpired)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,7 +111,7 @@ struct FilesView: View {
         HStack(spacing: 12) {
             Image(systemName: item.isFolder ? "folder.fill" : "doc.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(item.isFolder ? MetrologyPalette.accent : MetrologyPalette.textMuted)
+                .foregroundStyle(item.isFolder ? MetrologyPalette.navActive : MetrologyPalette.textMuted)
                 .frame(width: 32, height: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)

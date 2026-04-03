@@ -20,7 +20,6 @@ struct MetrologyIOSApp: App {
                     LoginView()
                 }
             }
-            .preferredColorScheme(.dark)
             .environmentObject(appState)
             .task {
                 guard showsStartup else { return }

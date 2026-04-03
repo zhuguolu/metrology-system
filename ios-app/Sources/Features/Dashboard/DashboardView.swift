@@ -11,18 +11,19 @@ struct DashboardView: View {
                 VStack(spacing: 12) {
                     if let message = viewModel.errorMessage {
                         Text(message)
-                            .foregroundStyle(Color.red.opacity(0.9))
+                            .font(.system(size: 13))
+                            .foregroundStyle(MetrologyPalette.statusExpired)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .metrologyCard()
                     }
 
-                    MetricCard(title: "设备总数", value: viewModel.total, accent: MetrologyPalette.accent)
-                    MetricCard(title: "本月到期", value: viewModel.dueThisMonth, accent: Color.orange)
-                    MetricCard(title: "有效设备", value: viewModel.valid, accent: Color.green)
-                    MetricCard(title: "失效/预警", value: viewModel.risk, accent: Color.red)
+                    MetricCard(title: "设备总数", value: viewModel.total, accent: MetrologyPalette.navActive)
+                    MetricCard(title: "本月到期", value: viewModel.dueThisMonth, accent: MetrologyPalette.statusWarning)
+                    MetricCard(title: "有效设备", value: viewModel.valid, accent: MetrologyPalette.statusValid)
+                    MetricCard(title: "失效/预警", value: viewModel.risk, accent: MetrologyPalette.statusExpired)
                 }
-                .padding(16)
+                .padding(14)
                 .padding(.bottom, 12)
             }
         }
@@ -44,6 +45,10 @@ struct DashboardView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(MetrologyPalette.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
                     )
             }
         }
