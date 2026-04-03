@@ -10,7 +10,10 @@ struct AuditView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
+
+                VStack(spacing: 10) {
                 if viewModel.isAdmin {
                     Picker("\u{5ba1}\u{6838}\u{6a21}\u{5f0f}", selection: $viewModel.mode) {
                         Text(AuditListMode.pending.title).tag(AuditListMode.pending)
@@ -27,14 +30,14 @@ struct AuditView: View {
                 if let message = viewModel.errorMessage {
                     Text(message)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.red.opacity(0.9))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if viewModel.mode == .history, !viewModel.historyHint.isEmpty {
                     Text(viewModel.historyHint)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(MetrologyPalette.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -43,7 +46,7 @@ struct AuditView: View {
                    !fallbackHint.isEmpty {
                     Text(fallbackHint)
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.orange.opacity(0.9))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -68,9 +71,11 @@ struct AuditView: View {
                         )
                         .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                         .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
 
                 if viewModel.mode == .history {
                     historyPagerBar
@@ -78,6 +83,7 @@ struct AuditView: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
+            }
             .navigationTitle("\u{6570}\u{636e}\u{5ba1}\u{6838}")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -101,8 +107,10 @@ struct AuditView: View {
                 if viewModel.isLoading {
                     ProgressView("\u{52a0}\u{8f7d}\u{4e2d}\u{2e}\u{2e}\u{2e}")
                         .padding(14)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(MetrologyPalette.surface)
+                        )
                 }
             }
             .sheet(item: $detailSheetItem) { item in
@@ -156,7 +164,7 @@ struct AuditView: View {
                 "\u{5173}\u{952e}\u{8bcd}\u{ff1a}\u{8bbe}\u{5907}\u{540d}\u{79f0}\u{2f}\u{8ba1}\u{91cf}\u{7f16}\u{53f7}\u{2f}\u{63d0}\u{4ea4}\u{4eba}",
                 text: $viewModel.historyKeyword
             )
-            .textFieldStyle(.roundedBorder)
+            .metrologyInput()
 
             HStack(spacing: 8) {
                 Picker("\u{72b6}\u{6001}", selection: $viewModel.historyStatusFilter) {
@@ -182,16 +190,18 @@ struct AuditView: View {
                 Button("\u{67e5}\u{8be2}") {
                     Task { await viewModel.applyHistoryFilters() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(MetrologyPrimaryButtonStyle())
 
                 Button("\u{91cd}\u{7f6e}") {
                     Task { await viewModel.resetHistoryFilters() }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(MetrologySecondaryButtonStyle())
 
                 Spacer(minLength: 0)
             }
         }
+        .padding(10)
+        .metrologyCard()
     }
 
     private var historyPagerBar: some View {
@@ -199,20 +209,24 @@ struct AuditView: View {
             Button("\u{4e0a}\u{4e00}\u{9875}") {
                 Task { await viewModel.prevHistoryPage() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(MetrologySecondaryButtonStyle())
             .disabled(viewModel.historyPage <= 1 || viewModel.isLoading)
+            .opacity((viewModel.historyPage <= 1 || viewModel.isLoading) ? 0.45 : 1)
 
             Text("\u{7b2c} \(viewModel.historyPage) / \(viewModel.historyTotalPages) \u{9875}")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textSecondary)
 
             Button("\u{4e0b}\u{4e00}\u{9875}") {
                 Task { await viewModel.nextHistoryPage() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(MetrologyPrimaryButtonStyle())
             .disabled(viewModel.historyPage >= viewModel.historyTotalPages || viewModel.isLoading)
+            .opacity((viewModel.historyPage >= viewModel.historyTotalPages || viewModel.isLoading) ? 0.45 : 1)
         }
         .padding(.bottom, 8)
+        .padding(10)
+        .metrologyCard()
     }
 }
 
@@ -227,7 +241,8 @@ private struct AuditRowCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(translateType(item.type))
-                    .font(.headline)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
                 Spacer()
                 Text(translateStatus(item.status))
                     .font(.caption)
@@ -240,29 +255,26 @@ private struct AuditRowCard: View {
 
             Text("\u{5bf9}\u{8c61}: \(translateEntityType(item.entityType)) / ID: \(item.entityId.map(String.init) ?? "-")")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MetrologyPalette.textSecondary)
 
             Text("\u{63d0}\u{4ea4}\u{4eba}: \(item.submittedBy ?? "-")   \u{63d0}\u{4ea4}\u{65f6}\u{95f4}: \(item.submittedAt ?? "-")")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MetrologyPalette.textSecondary)
 
             if showActionButtons {
                 HStack(spacing: 10) {
                     Button("\u{901a}\u{8fc7}") { onApprove() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(MetrologyPrimaryButtonStyle())
                         .controlSize(.small)
                     Button("\u{9a73}\u{56de}") { onReject() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(MetrologySecondaryButtonStyle())
                         .controlSize(.small)
                 }
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
+        .metrologyCard()
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
@@ -370,6 +382,8 @@ private struct AuditDetailView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(MetrologyPalette.background)
             .navigationTitle("\u{5ba1}\u{6838}\u{8be6}\u{60c5}")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -398,7 +412,7 @@ private struct AuditRejectReasonSheet: View {
                 TextEditor(text: $reason)
                     .frame(minHeight: 120)
                     .padding(8)
-                    .background(Color(.secondarySystemBackground))
+                    .background(MetrologyPalette.surface)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Spacer()
             }
@@ -465,7 +479,7 @@ private struct AuditRawCompareCard: View {
                     .textSelection(.enabled)
             }
             .padding(8)
-            .background(Color(.secondarySystemBackground))
+            .background(MetrologyPalette.surface)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
     }

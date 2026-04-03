@@ -5,12 +5,12 @@ options:
 settings:
   base:
     SWIFT_VERSION: 5.0
-    IPHONEOS_DEPLOYMENT_TARGET: 16.0
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
 targets:
   MetrologyiOS:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - Sources
     settings:

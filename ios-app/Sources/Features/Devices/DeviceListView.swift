@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 struct DeviceListView: View {
     @StateObject private var viewModel: DeviceListViewModel
@@ -10,51 +10,33 @@ struct DeviceListView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
-                filterPanel
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
 
-                summaryPanel
+                VStack(spacing: 0) {
+                    headerBar
 
-                List {
-                    ForEach(deviceRows) { row in
-                        DeviceRowCard(
-                            item: row.item,
-                            mode: viewModel.mode,
-                            onTap: {
-                                selectedDevice = row.item
-                            },
-                            onQuickCalibrate: {
-                                Task { await viewModel.quickCalibrate(row.item) }
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                        .listRowSeparator(.hidden)
+                    ScrollView {
+                        LazyVStack(spacing: 14) {
+                            filterPanel
+                            summaryPanel
+                            listPanel
+                            pagerBar
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                        .padding(.bottom, 18)
                     }
+                    .scrollIndicators(.hidden)
                 }
-                .listStyle(.plain)
 
-                pagerBar
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .navigationTitle(viewModel.mode.title)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("刷新") {
-                        Task { await viewModel.reloadCurrentPage() }
-                    }
+                if viewModel.isLoading {
+                    loadingOverlay
                 }
             }
+            .toolbar(.hidden, for: .navigationBar)
             .task {
                 await viewModel.initialLoad()
-            }
-            .overlay {
-                if viewModel.isLoading {
-                    ProgressView("加载中...")
-                        .padding(14)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
             }
             .alert(
                 "提示",
@@ -112,84 +94,125 @@ struct DeviceListView: View {
         }
     }
 
-    private var deviceRows: [DeviceListRow] {
-        var duplicated: [String: Int] = [:]
-        return viewModel.items.map { item in
-            let base = baseDeviceRowID(item)
-            let count = duplicated[base, default: 0]
-            duplicated[base] = count + 1
-            let id = count == 0 ? base : "\(base)#\(count)"
-            return DeviceListRow(id: id, item: item)
-        }
-    }
+    private var headerBar: some View {
+        HStack(alignment: .center) {
+            Text(viewModel.mode.title)
+                .font(.system(size: 58, weight: .black))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+                .minimumScaleFactor(0.72)
+                .lineLimit(1)
 
-    private func baseDeviceRowID(_ item: DeviceDto) -> String {
-        if let id = item.id {
-            return "id:\(id)"
+            Spacer(minLength: 8)
+
+            Button("刷新") {
+                Task { await viewModel.reloadCurrentPage() }
+            }
+            .buttonStyle(MetrologyGhostButtonStyle())
         }
-        return "tmp:\(item.metricNo ?? "")|\(item.assetNo ?? "")|\(item.name ?? "")|\(item.dept ?? "")"
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     private var filterPanel: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             HStack(spacing: 8) {
                 TextField("搜索名称/编号/责任人", text: $viewModel.searchText)
-                    .textFieldStyle(.roundedBorder)
+                    .metrologyInput()
                 TextField("部门", text: $viewModel.deptFilter)
-                    .textFieldStyle(.roundedBorder)
+                    .metrologyInput()
             }
 
             if viewModel.mode == .ledger {
                 TextField("使用状态（可选）", text: $viewModel.useStatusFilter)
-                    .textFieldStyle(.roundedBorder)
+                    .metrologyInput()
             } else {
                 HStack(spacing: 8) {
-                    TextField("有效性（有效/即将过期/失效）", text: $viewModel.validityFilter)
-                        .textFieldStyle(.roundedBorder)
+                    TextField("有效性", text: $viewModel.validityFilter)
+                        .metrologyInput()
                     TextField("起始日期", text: $viewModel.nextDateFrom)
-                        .textFieldStyle(.roundedBorder)
+                        .metrologyInput()
                     TextField("结束日期", text: $viewModel.nextDateTo)
-                        .textFieldStyle(.roundedBorder)
+                        .metrologyInput()
                 }
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button("查询") {
                     Task { await viewModel.load(page: 1) }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(MetrologyPrimaryButtonStyle())
 
                 Button("重置") {
                     Task { await viewModel.resetFilters() }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(MetrologySecondaryButtonStyle())
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
+
                 Text(viewModel.hintMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
             }
         }
+        .padding(12)
+        .metrologyCard()
     }
 
     private var summaryPanel: some View {
         let labels = viewModel.mode.summaryLabels
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(labels, id: \.self) { label in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(label)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("\(summaryValue(label: label))")
-                            .font(.headline)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(.secondarySystemBackground))
+        return HStack(spacing: 8) {
+            ForEach(labels, id: \.self) { label in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(label)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                    Text(formatCount(summaryValue(label: label)))
+                        .font(.system(size: 25, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(MetrologyPalette.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                )
+            }
+        }
+        .padding(12)
+        .metrologyCard()
+    }
+
+    private var listPanel: some View {
+        VStack(spacing: 10) {
+            if deviceRows.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 30))
+                        .foregroundStyle(MetrologyPalette.textMuted)
+                    Text("暂无设备数据")
+                        .font(.system(size: 16))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+                .metrologyCard()
+            } else {
+                ForEach(deviceRows) { row in
+                    DeviceRowCard(
+                        item: row.item,
+                        mode: viewModel.mode,
+                        onTap: { selectedDevice = row.item },
+                        onQuickCalibrate: {
+                            Task { await viewModel.quickCalibrate(row.item) }
+                        }
                     )
                 }
             }
@@ -201,20 +224,56 @@ struct DeviceListView: View {
             Button("上一页") {
                 Task { await viewModel.prevPage() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(MetrologySecondaryButtonStyle())
             .disabled(viewModel.page <= 1 || viewModel.isLoading)
+            .opacity((viewModel.page <= 1 || viewModel.isLoading) ? 0.45 : 1)
 
             Text("第 \(viewModel.page) / \(viewModel.totalPages) 页")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .lineLimit(1)
 
             Button("下一页") {
                 Task { await viewModel.nextPage() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(MetrologyPrimaryButtonStyle())
             .disabled(viewModel.page >= viewModel.totalPages || viewModel.isLoading)
+            .opacity((viewModel.page >= viewModel.totalPages || viewModel.isLoading) ? 0.45 : 1)
         }
-        .padding(.bottom, 8)
+        .padding(12)
+        .metrologyCard()
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.32).ignoresSafeArea()
+            ProgressView("加载中...")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(MetrologyPalette.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                )
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isLoading)
+    }
+
+    private var deviceRows: [DeviceListRow] {
+        var duplicated: [String: Int] = [:]
+        return viewModel.items.map { item in
+            let base = baseDeviceRowID(item)
+            let count = duplicated[base, default: 0]
+            duplicated[base] = count + 1
+            let id = count == 0 ? base : "\(base)#\(count)"
+            return DeviceListRow(id: id, item: item)
+        }
     }
 
     private func summaryValue(label: String) -> Int64 {
@@ -222,6 +281,19 @@ struct DeviceListView: View {
             return viewModel.useStatusSummary[label] ?? 0
         }
         return viewModel.summaryCounts[label] ?? 0
+    }
+
+    private func baseDeviceRowID(_ item: DeviceDto) -> String {
+        if let id = item.id {
+            return "id:\(id)"
+        }
+        return "tmp:\(item.metricNo ?? "")|\(item.assetNo ?? "")|\(item.name ?? "")|\(item.dept ?? "")"
+    }
+
+    private func formatCount(_ value: Int64) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }
 
@@ -237,43 +309,64 @@ private struct DeviceRowCard: View {
     let onQuickCalibrate: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 Text(item.displayName)
-                    .font(.headline)
+                    .font(.system(size: 46, weight: .black))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
                     .lineLimit(1)
-                Spacer()
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: 8)
+
                 if mode != .ledger {
                     Button("校准完成") {
                         onQuickCalibrate()
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
                 }
             }
 
             Text("编号: \(item.metricNo ?? "-")")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .lineLimit(1)
 
-            HStack(spacing: 12) {
-                Text("部门: \(item.dept ?? "-")")
-                Text("有效性: \(item.validity ?? "-")")
-                Text("下次: \(item.nextDate ?? "-")")
+            HStack(spacing: 10) {
+                metaChip(title: "部门", value: item.dept ?? "-")
+                if mode == .ledger {
+                    metaChip(title: "状态", value: item.useStatus ?? "-")
+                } else {
+                    metaChip(title: "有效性", value: item.validity ?? "-")
+                }
+                metaChip(title: "下次", value: item.nextDate ?? "-")
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
+        .metrologyCard()
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
         }
+    }
+
+    private func metaChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(MetrologyPalette.textMuted)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(MetrologyPalette.surface.opacity(0.7))
+        )
     }
 }
 
@@ -314,6 +407,8 @@ private struct DeviceDetailView: View {
                     DetailRow(label: "备注", value: device.remark ?? "-")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(MetrologyPalette.background)
             .navigationTitle("设备详情")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -344,11 +439,10 @@ private struct DeviceDetailView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
                     .padding(.horizontal, 14)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
-                    .background(.ultraThinMaterial)
+                    .padding(.vertical, 10)
+                    .background(MetrologyPalette.background)
                 }
             }
             .sheet(isPresented: $showEditSheet) {
@@ -357,6 +451,7 @@ private struct DeviceDetailView: View {
                 }
             }
         }
+        .presentationDetents([.large])
     }
 
     private func formatCycle(_ cycle: Int?) -> String {

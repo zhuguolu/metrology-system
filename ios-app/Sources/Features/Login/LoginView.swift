@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject private var appState: AppState
@@ -6,58 +6,65 @@ struct LoginView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Text("校准管理系统")
-                    .font(.system(size: 28, weight: .bold))
-                Text("请输入账号密码登录")
-                    .foregroundStyle(.secondary)
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
 
-                VStack(spacing: 14) {
-                    TextField("用户名", text: $viewModel.username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .padding()
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 18) {
+                    Spacer(minLength: 30)
 
-                    SecureField("密码", text: $viewModel.password)
-                        .padding()
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
+                    Text("校准管理系统")
+                        .font(.system(size: 42, weight: .black))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                    Text("请输入账号密码登录")
+                        .font(.system(size: 16))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
 
-                Button {
-                    Task {
-                        await viewModel.login { response in
-                            appState.applyLogin(response)
+                    VStack(spacing: 12) {
+                        TextField("用户名", text: $viewModel.username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .metrologyInput()
+
+                        SecureField("密码", text: $viewModel.password)
+                            .metrologyInput()
+                    }
+                    .padding(14)
+                    .metrologyCard()
+
+                    Button {
+                        Task {
+                            await viewModel.login { response in
+                                appState.applyLogin(response)
+                            }
+                        }
+                    } label: {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .tint(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        } else {
+                            Text("登录")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         }
                     }
-                } label: {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    } else {
-                        Text("登录")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+                    .disabled(viewModel.isLoading)
+                    .opacity(viewModel.isLoading ? 0.8 : 1)
+
+                    if let message = viewModel.errorMessage {
+                        Text(message)
+                            .foregroundStyle(Color.red.opacity(0.9))
+                            .font(.footnote)
+                            .padding(.horizontal, 4)
                     }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isLoading)
 
-                if let message = viewModel.errorMessage {
-                    Text(message)
-                        .foregroundStyle(.red)
-                        .font(.footnote)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer()
                 }
-
-                Spacer()
+                .padding(.horizontal, 20)
             }
-            .padding(20)
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }

@@ -1,50 +1,40 @@
-﻿import SwiftUI
+import SwiftUI
 
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
 
     var body: some View {
-        List {
-            Section {
-                HStack {
-                    Text("路径")
-                    Spacer()
-                    Text(viewModel.currentPath)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+        ZStack {
+            MetrologyPalette.background.ignoresSafeArea()
 
-                if !viewModel.hint.isEmpty {
-                    Text(viewModel.hint)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+            ScrollView {
+                VStack(spacing: 12) {
+                    headerPanel
 
-                if let message = viewModel.errorMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-            }
-
-            Section("文件列表") {
-                ForEach(fileRows) { row in
-                    Button {
-                        Task { await viewModel.open(row.item) }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: row.item.isFolder ? "folder.fill" : "doc.fill")
-                                .foregroundStyle(row.item.isFolder ? .blue : .gray)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.item.displayName)
-                                    .foregroundStyle(.primary)
-                                Text(row.item.createdAt ?? "")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                    if fileRows.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 30))
+                                .foregroundStyle(MetrologyPalette.textMuted)
+                            Text("当前目录暂无文件")
+                                .foregroundStyle(MetrologyPalette.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 26)
+                        .metrologyCard()
+                    } else {
+                        ForEach(fileRows) { row in
+                            Button {
+                                Task { await viewModel.open(row.item) }
+                            } label: {
+                                fileRow(item: row.item)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
+                .padding(14)
+                .padding(.bottom, 14)
             }
         }
         .navigationTitle("我的文件")
@@ -67,6 +57,11 @@ struct FilesView: View {
         .overlay {
             if viewModel.isLoading {
                 ProgressView("处理中...")
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(MetrologyPalette.surface)
+                    )
             }
         }
         .sheet(item: $viewModel.previewItem, onDismiss: {
@@ -78,6 +73,63 @@ struct FilesView: View {
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
+    }
+
+    private var headerPanel: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("路径")
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                Spacer()
+                Text(viewModel.currentPath)
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .lineLimit(1)
+            }
+
+            if !viewModel.hint.isEmpty {
+                Text(viewModel.hint)
+                    .font(.footnote)
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+            }
+
+            if let message = viewModel.errorMessage {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Color.red.opacity(0.9))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .metrologyCard()
+    }
+
+    private func fileRow(item: UserFileItemDto) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.isFolder ? "folder.fill" : "doc.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(item.isFolder ? MetrologyPalette.accent : MetrologyPalette.textMuted)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(MetrologyPalette.surface)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.displayName)
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .lineLimit(1)
+                Text(item.createdAt ?? "")
+                    .font(.caption2)
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: item.isFolder ? "chevron.right" : "arrow.down.circle")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textMuted)
+        }
+        .padding(12)
+        .metrologyCard()
     }
 
     private var fileRows: [FileListRow] {
