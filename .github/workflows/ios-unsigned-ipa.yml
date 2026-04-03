@@ -56,6 +56,7 @@ jobs:
           INPUT_SCHEME: ${{ github.event.inputs.scheme }}
           INPUT_CONFIGURATION: ${{ github.event.inputs.configuration }}
         run: |
+          set +e
           chmod +x scripts/build_unsigned_ipa.sh
           APP_DIR="${INPUT_APP_DIR:-ios-app}"
           if [ -z "$APP_DIR" ] || [ "$APP_DIR" = "null" ]; then
@@ -69,7 +70,14 @@ jobs:
           if [ "$SCHEME" = "null" ]; then
             SCHEME=""
           fi
-          ./scripts/build_unsigned_ipa.sh "$APP_DIR" "$SCHEME" "$CONFIGURATION"
+          ./scripts/build_unsigned_ipa.sh "$APP_DIR" "$SCHEME" "$CONFIGURATION" > build_unsigned_ipa.log 2>&1
+          EXIT_CODE=$?
+          tail -n 200 build_unsigned_ipa.log || true
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            LAST_LINES="$(tail -n 20 build_unsigned_ipa.log | tr '\n' ' ' | sed 's/[[:space:]]\\+/ /g')"
+            echo "::error::Unsigned IPA build failed (exit=$EXIT_CODE): $LAST_LINES"
+            exit "$EXIT_CODE"
+          fi
 
       - name: Upload Unsigned IPA Artifact
         uses: actions/upload-artifact@v4
