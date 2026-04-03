@@ -431,7 +431,7 @@ private struct MoreHubView: View {
         let cardRadius = max(scale.px(18), 15)
         let opticalScale = moduleIconOpticalScale(icon)
 
-        VStack(spacing: 9) {
+        return VStack(spacing: 9) {
             ZStack {
                 RoundedRectangle(cornerRadius: max(scale.px(20), 16), style: .continuous)
                     .fill(
