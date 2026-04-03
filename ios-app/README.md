@@ -75,7 +75,7 @@ chmod +x scripts/build_ipa.sh
 1. 手动触发时填写 `app_dir` 指定目标目录（如 `ios-app` 或 `ios-app-2`）
 2. 两个 iOS 应用可分别运行两次工作流
 3. `scheme` 可留空（自动读取目标目录 `project.yml` 的 `name`），也可手动覆盖
-4. `min_ipa_mb` 可设置最小 IPA 体积阈值（默认 `1`，小于阈值工作流会失败）
+4. `min_ipa_mb` 可设置最小未压缩 `.app` 体积阈值（默认 `1`，小于阈值工作流会失败）
 
 - 构建产物（Artifacts）：
 1. `<Scheme>-unsigned.ipa`
@@ -92,7 +92,8 @@ chmod +x scripts/build_unsigned_ipa.sh
 ```
 
 输出：`<app_dir>/build/artifacts/<Scheme>-unsigned.ipa`
-可选：`MIN_IPA_SIZE_MB=1 ./scripts/build_unsigned_ipa.sh ios-app MetrologyiOS Release`
+可选：`MIN_APP_BUNDLE_SIZE_MB=1 ./scripts/build_unsigned_ipa.sh ios-app MetrologyiOS Release`
+兼容旧参数：`MIN_IPA_SIZE_MB=1 ./scripts/build_unsigned_ipa.sh ios-app MetrologyiOS Release`
 
 ## 注意
 

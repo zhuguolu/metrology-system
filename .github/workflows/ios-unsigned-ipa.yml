@@ -17,7 +17,7 @@ on:
         required: false
         default: "Release"
       min_ipa_mb:
-        description: "Minimum IPA size in MB (default 1, smaller => fail)"
+        description: "Minimum uncompressed .app size in MB (default 1, smaller => fail)"
         required: false
         default: "1"
   push:
@@ -59,7 +59,7 @@ jobs:
           INPUT_APP_DIR: ${{ github.event.inputs.app_dir }}
           INPUT_SCHEME: ${{ github.event.inputs.scheme }}
           INPUT_CONFIGURATION: ${{ github.event.inputs.configuration }}
-          INPUT_MIN_IPA_MB: ${{ github.event.inputs.min_ipa_mb }}
+          INPUT_MIN_APP_BUNDLE_MB: ${{ github.event.inputs.min_ipa_mb }}
         run: |
           set +e
           chmod +x scripts/build_unsigned_ipa.sh
@@ -75,11 +75,11 @@ jobs:
           if [ "$SCHEME" = "null" ]; then
             SCHEME=""
           fi
-          MIN_IPA_MB="${INPUT_MIN_IPA_MB:-1}"
-          if [ -z "$MIN_IPA_MB" ] || [ "$MIN_IPA_MB" = "null" ]; then
-            MIN_IPA_MB="1"
+          MIN_APP_BUNDLE_MB="${INPUT_MIN_APP_BUNDLE_MB:-1}"
+          if [ -z "$MIN_APP_BUNDLE_MB" ] || [ "$MIN_APP_BUNDLE_MB" = "null" ]; then
+            MIN_APP_BUNDLE_MB="1"
           fi
-          MIN_IPA_SIZE_MB="$MIN_IPA_MB" ./scripts/build_unsigned_ipa.sh "$APP_DIR" "$SCHEME" "$CONFIGURATION" > build_unsigned_ipa.log 2>&1
+          MIN_APP_BUNDLE_SIZE_MB="$MIN_APP_BUNDLE_MB" MIN_IPA_SIZE_MB="$MIN_APP_BUNDLE_MB" ./scripts/build_unsigned_ipa.sh "$APP_DIR" "$SCHEME" "$CONFIGURATION" > build_unsigned_ipa.log 2>&1
           EXIT_CODE=$?
           tail -n 200 build_unsigned_ipa.log || true
           if [ "$EXIT_CODE" -ne 0 ]; then

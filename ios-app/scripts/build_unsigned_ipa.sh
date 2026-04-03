@@ -3,13 +3,13 @@ set -euo pipefail
 
 SCHEME="${1:-MetrologyiOS}"
 CONFIGURATION="${2:-Release}"
-MIN_IPA_SIZE_MB="${MIN_IPA_SIZE_MB:-1}"
+MIN_APP_BUNDLE_SIZE_MB="${MIN_APP_BUNDLE_SIZE_MB:-${MIN_IPA_SIZE_MB:-1}}"
 
-if ! [[ "$MIN_IPA_SIZE_MB" =~ ^[0-9]+$ ]]; then
-  echo "MIN_IPA_SIZE_MB must be a non-negative integer, got: $MIN_IPA_SIZE_MB"
+if ! [[ "$MIN_APP_BUNDLE_SIZE_MB" =~ ^[0-9]+$ ]]; then
+  echo "MIN_APP_BUNDLE_SIZE_MB must be a non-negative integer, got: $MIN_APP_BUNDLE_SIZE_MB"
   exit 1
 fi
-MIN_IPA_SIZE_BYTES=$((MIN_IPA_SIZE_MB * 1024 * 1024))
+MIN_APP_BUNDLE_SIZE_BYTES=$((MIN_APP_BUNDLE_SIZE_MB * 1024 * 1024))
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_YML_PATH="$ROOT_DIR/project.yml"
@@ -163,7 +163,7 @@ fi
   echo "configuration=$CONFIGURATION"
   echo "app=$APP_NAME"
   echo "built_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "min_ipa_size_mb=$MIN_IPA_SIZE_MB"
+  echo "min_app_bundle_size_mb=$MIN_APP_BUNDLE_SIZE_MB"
   echo "ipa_size_bytes=$IPA_SIZE_BYTES"
   echo "app_zip_size_bytes=$APP_ZIP_SIZE_BYTES"
   echo "app_bundle_size_bytes=$APP_BUNDLE_SIZE_BYTES"
@@ -173,8 +173,8 @@ fi
   xcodebuild -version | tr '\n' '|' | sed 's/|$//'
 } > "$BUILD_INFO_PATH"
 
-if [ "$IPA_SIZE_BYTES" -lt "$MIN_IPA_SIZE_BYTES" ]; then
-  echo "IPA size check failed: ${IPA_SIZE_BYTES} bytes (< ${MIN_IPA_SIZE_BYTES} bytes, MIN_IPA_SIZE_MB=${MIN_IPA_SIZE_MB}); app_bundle_size_bytes=${APP_BUNDLE_SIZE_BYTES}; app_file_count=${APP_FILE_COUNT}; executable_name=${EXECUTABLE_NAME}; executable_size_bytes=${EXECUTABLE_SIZE_BYTES}"
+if [ "$APP_BUNDLE_SIZE_BYTES" -lt "$MIN_APP_BUNDLE_SIZE_BYTES" ]; then
+  echo "App bundle size check failed: ${APP_BUNDLE_SIZE_BYTES} bytes (< ${MIN_APP_BUNDLE_SIZE_BYTES} bytes, MIN_APP_BUNDLE_SIZE_MB=${MIN_APP_BUNDLE_SIZE_MB}); ipa_size_bytes=${IPA_SIZE_BYTES}; app_file_count=${APP_FILE_COUNT}; executable_name=${EXECUTABLE_NAME}; executable_size_bytes=${EXECUTABLE_SIZE_BYTES}"
   exit 66
 fi
 
