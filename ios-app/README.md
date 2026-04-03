@@ -72,9 +72,9 @@ chmod +x scripts/build_ipa.sh
 2. 在 GitHub Actions 中手动执行 `iOS Unsigned IPA`
 
 - 多应用支持：
-1. 默认会自动发现仓库内所有包含 `project.yml` 的 iOS 应用目录并逐个构建
-2. 也可在手动触发时填写 `app_dirs`（逗号分隔，例如 `ios-app,ios-app-2`）
-3. `scheme` 可留空（自动读取各自 `project.yml` 的 `name`），也可统一覆盖
+1. 手动触发时填写 `app_dir` 指定目标目录（如 `ios-app` 或 `ios-app-2`）
+2. 两个 iOS 应用可分别运行两次工作流
+3. `scheme` 可留空（自动读取目标目录 `project.yml` 的 `name`），也可手动覆盖
 
 - 构建产物（Artifacts）：
 1. `<Scheme>-unsigned.ipa`
