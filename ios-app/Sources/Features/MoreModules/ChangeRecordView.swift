@@ -508,7 +508,7 @@ final class ChangeRecordViewModel: ObservableObject {
     }
 }
 
-private struct ChangeRecordSummary {
+struct ChangeRecordSummary {
     let total: Int64
     let pending: Int64
     let approved: Int64
