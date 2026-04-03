@@ -28,8 +28,34 @@ if [ ! -f "$PROJECT_YML_PATH" ]; then
   exit 1
 fi
 
+resolve_scheme_from_project_yml() {
+  local spec="$1"
+  local value=""
+
+  # Primary: top-level "name:" (tolerate BOM + spaces).
+  value="$(sed -n 's/^[[:space:]]*name:[[:space:]]*//p' "$spec" | head -n 1 | tr -d '\r\357\273\277' || true)"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+    return
+  fi
+
+  # Fallback: first key under "schemes:" block.
+  value="$(awk '
+    /^[[:space:]]*schemes:[[:space:]]*$/ { in_schemes=1; next }
+    in_schemes && /^[^[:space:]]/ { in_schemes=0 }
+    in_schemes && /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$/ {
+      line=$0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/:[[:space:]]*$/, "", line)
+      print line
+      exit
+    }
+  ' "$spec" | tr -d '\r\357\273\277' || true)"
+  printf '%s' "$value"
+}
+
 if [ -z "$SCHEME" ]; then
-  SCHEME="$(awk -F': ' '/^name:/{print $2; exit}' "$PROJECT_YML_PATH" | tr -d '\r' || true)"
+  SCHEME="$(resolve_scheme_from_project_yml "$PROJECT_YML_PATH")"
 fi
 
 if [ -z "$SCHEME" ]; then

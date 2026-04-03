@@ -5,7 +5,7 @@ SCHEME="${1:-MetrologyiOS}"
 CONFIGURATION="${2:-Release}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT_PATH="$ROOT_DIR/MetrologyiOS.xcodeproj"
+PROJECT_YML_PATH="$ROOT_DIR/project.yml"
 DERIVED_DATA_PATH="$ROOT_DIR/build/DerivedData"
 PRODUCTS_DIR="$DERIVED_DATA_PATH/Build/Products/${CONFIGURATION}-iphoneos"
 PACKAGE_DIR="$ROOT_DIR/build/unsigned_ipa"
@@ -24,6 +24,44 @@ if ! command -v xcodegen >/dev/null 2>&1; then
   echo "xcodegen is required. Install with: brew install xcodegen"
   exit 1
 fi
+
+if [ ! -f "$PROJECT_YML_PATH" ]; then
+  echo "project.yml not found in: $ROOT_DIR"
+  exit 1
+fi
+
+resolve_scheme_from_project_yml() {
+  local spec="$1"
+  local value=""
+  value="$(sed -n 's/^[[:space:]]*name:[[:space:]]*//p' "$spec" | head -n 1 | tr -d '\r\357\273\277' || true)"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+    return
+  fi
+  value="$(awk '
+    /^[[:space:]]*schemes:[[:space:]]*$/ { in_schemes=1; next }
+    in_schemes && /^[^[:space:]]/ { in_schemes=0 }
+    in_schemes && /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$/ {
+      line=$0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/:[[:space:]]*$/, "", line)
+      print line
+      exit
+    }
+  ' "$spec" | tr -d '\r\357\273\277' || true)"
+  printf '%s' "$value"
+}
+
+if [ -z "$SCHEME" ] || [ "$SCHEME" = "null" ]; then
+  SCHEME="$(resolve_scheme_from_project_yml "$PROJECT_YML_PATH")"
+fi
+
+if [ -z "$SCHEME" ]; then
+  echo "Unable to resolve scheme. Provide arg1 or set name/schemes in project.yml"
+  exit 1
+fi
+
+PROJECT_PATH="$ROOT_DIR/${SCHEME}.xcodeproj"
 
 cd "$ROOT_DIR"
 
