@@ -230,7 +230,6 @@ private struct AndroidStyleTabBar: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: iconSize * tab.iconOpticalScale, height: iconSize * tab.iconOpticalScale)
-                                .font(.system(weight: .semibold))
                                 .opacity(selectedTab == tab ? 1 : 0.78)
                             Text(tab.tabTitle)
                                 .font(.system(size: labelSize, weight: .bold))
@@ -451,7 +450,6 @@ private struct MoreHubView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: symbolSize * opticalScale, height: symbolSize * opticalScale)
-                    .font(.system(weight: .semibold))
                     .foregroundStyle(tint)
             }
 
