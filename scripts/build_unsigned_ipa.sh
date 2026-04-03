@@ -76,6 +76,12 @@ BUILD_INFO_PATH="$ARTIFACT_DIR/build-info.txt"
 cd "$ROOT_DIR"
 xcodegen generate --spec project.yml
 
+PBXPROJ_PATH="$PROJECT_PATH/project.pbxproj"
+if [ -f "$PBXPROJ_PATH" ]; then
+  # Work around XcodeGen newer objectVersion (77) not readable by Xcode 15.4 runners.
+  perl -0pi -e 's/objectVersion = 77;/objectVersion = 60;/g; s/compatibilityVersion = "Xcode 16\.0";/compatibilityVersion = "Xcode 15.0";/g' "$PBXPROJ_PATH"
+fi
+
 xcodebuild \
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
