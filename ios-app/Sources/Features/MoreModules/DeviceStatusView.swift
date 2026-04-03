@@ -131,8 +131,8 @@ struct DeviceStatusView: View {
                                 return
                             }
                             editor = DeviceStatusEditorState(
-                                title: "编辑状态",
                                 statusId: id,
+                                title: "编辑状态",
                                 initialName: row.item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                             )
                         },
