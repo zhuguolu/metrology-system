@@ -36,13 +36,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
       - name: Resolve App Matrix
         id: set-matrix
         env:
           INPUT_APP_DIRS: ${{ github.event.inputs.app_dirs }}
           INPUT_SCHEME: ${{ github.event.inputs.scheme }}
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import json
           import os
           import pathlib

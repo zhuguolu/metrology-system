@@ -1,5 +1,8 @@
 metrology-all-images.tar
 frontend/node_modules/
+frontend/dist/
+backend/target/
+backend/.m2/
 **/build/
 .idea/
 uploads/
