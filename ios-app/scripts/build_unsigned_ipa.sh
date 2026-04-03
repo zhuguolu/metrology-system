@@ -68,6 +68,17 @@ file_size_bytes() {
   fi
 }
 
+app_bundle_size_bytes() {
+  local path="$1"
+  du -sk "$path" | awk '{print $1 * 1024}'
+}
+
+plist_value() {
+  local plist="$1"
+  local key="$2"
+  /usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true
+}
+
 if [ -z "$SCHEME" ] || [ "$SCHEME" = "null" ]; then
   SCHEME="$(resolve_scheme_from_project_yml "$PROJECT_YML_PATH")"
 fi
@@ -134,9 +145,12 @@ rm -f "$APP_ZIP_PATH"
 
 IPA_SIZE_BYTES="$(file_size_bytes "$IPA_PATH")"
 APP_ZIP_SIZE_BYTES="$(file_size_bytes "$APP_ZIP_PATH")"
-if [ "$IPA_SIZE_BYTES" -lt "$MIN_IPA_SIZE_BYTES" ]; then
-  echo "IPA size check failed: ${IPA_SIZE_BYTES} bytes (< ${MIN_IPA_SIZE_BYTES} bytes, MIN_IPA_SIZE_MB=${MIN_IPA_SIZE_MB})"
-  exit 66
+APP_BUNDLE_SIZE_BYTES="$(app_bundle_size_bytes "$APP_PATH")"
+APP_FILE_COUNT="$(find "$APP_PATH" -type f | wc -l | tr -d ' ')"
+EXECUTABLE_NAME="$(plist_value "$APP_PATH/Info.plist" "CFBundleExecutable")"
+EXECUTABLE_SIZE_BYTES=0
+if [ -n "$EXECUTABLE_NAME" ] && [ -f "$APP_PATH/$EXECUTABLE_NAME" ]; then
+  EXECUTABLE_SIZE_BYTES="$(file_size_bytes "$APP_PATH/$EXECUTABLE_NAME")"
 fi
 
 (
@@ -152,12 +166,24 @@ fi
   echo "min_ipa_size_mb=$MIN_IPA_SIZE_MB"
   echo "ipa_size_bytes=$IPA_SIZE_BYTES"
   echo "app_zip_size_bytes=$APP_ZIP_SIZE_BYTES"
+  echo "app_bundle_size_bytes=$APP_BUNDLE_SIZE_BYTES"
+  echo "app_file_count=$APP_FILE_COUNT"
+  echo "executable_name=$EXECUTABLE_NAME"
+  echo "executable_size_bytes=$EXECUTABLE_SIZE_BYTES"
   xcodebuild -version | tr '\n' '|' | sed 's/|$//'
 } > "$BUILD_INFO_PATH"
+
+if [ "$IPA_SIZE_BYTES" -lt "$MIN_IPA_SIZE_BYTES" ]; then
+  echo "IPA size check failed: ${IPA_SIZE_BYTES} bytes (< ${MIN_IPA_SIZE_BYTES} bytes, MIN_IPA_SIZE_MB=${MIN_IPA_SIZE_MB}); app_bundle_size_bytes=${APP_BUNDLE_SIZE_BYTES}; app_file_count=${APP_FILE_COUNT}; executable_name=${EXECUTABLE_NAME}; executable_size_bytes=${EXECUTABLE_SIZE_BYTES}"
+  exit 66
+fi
 
 echo "Unsigned IPA: $IPA_PATH"
 echo "IPA size bytes: $IPA_SIZE_BYTES"
 echo "Zipped APP: $APP_ZIP_PATH"
 echo "APP zip size bytes: $APP_ZIP_SIZE_BYTES"
+echo "APP bundle size bytes: $APP_BUNDLE_SIZE_BYTES"
+echo "APP file count: $APP_FILE_COUNT"
+echo "Executable: $EXECUTABLE_NAME ($EXECUTABLE_SIZE_BYTES bytes)"
 echo "Checksums: $CHECKSUM_PATH"
 echo "Build info: $BUILD_INFO_PATH"
