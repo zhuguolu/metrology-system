@@ -3,6 +3,13 @@ set -euo pipefail
 
 SCHEME="${1:-MetrologyiOS}"
 CONFIGURATION="${2:-Release}"
+MIN_IPA_SIZE_MB="${MIN_IPA_SIZE_MB:-1}"
+
+if ! [[ "$MIN_IPA_SIZE_MB" =~ ^[0-9]+$ ]]; then
+  echo "MIN_IPA_SIZE_MB must be a non-negative integer, got: $MIN_IPA_SIZE_MB"
+  exit 1
+fi
+MIN_IPA_SIZE_BYTES=$((MIN_IPA_SIZE_MB * 1024 * 1024))
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_YML_PATH="$ROOT_DIR/project.yml"
@@ -50,6 +57,15 @@ resolve_scheme_from_project_yml() {
     }
   ' "$spec" | tr -d '\r\357\273\277' || true)"
   printf '%s' "$value"
+}
+
+file_size_bytes() {
+  local path="$1"
+  if stat -f%z "$path" >/dev/null 2>&1; then
+    stat -f%z "$path"
+  else
+    wc -c < "$path" | tr -d ' '
+  fi
 }
 
 if [ -z "$SCHEME" ] || [ "$SCHEME" = "null" ]; then
@@ -116,6 +132,13 @@ rm -f "$APP_ZIP_PATH"
   /usr/bin/zip -qry "$APP_ZIP_PATH" "$APP_NAME"
 )
 
+IPA_SIZE_BYTES="$(file_size_bytes "$IPA_PATH")"
+APP_ZIP_SIZE_BYTES="$(file_size_bytes "$APP_ZIP_PATH")"
+if [ "$IPA_SIZE_BYTES" -lt "$MIN_IPA_SIZE_BYTES" ]; then
+  echo "IPA size check failed: ${IPA_SIZE_BYTES} bytes (< ${MIN_IPA_SIZE_BYTES} bytes, MIN_IPA_SIZE_MB=${MIN_IPA_SIZE_MB})"
+  exit 66
+fi
+
 (
   cd "$ARTIFACT_DIR"
   shasum -a 256 "$(basename "$IPA_PATH")" "$(basename "$APP_ZIP_PATH")" > "$CHECKSUM_PATH"
@@ -126,10 +149,15 @@ rm -f "$APP_ZIP_PATH"
   echo "configuration=$CONFIGURATION"
   echo "app=$APP_NAME"
   echo "built_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "min_ipa_size_mb=$MIN_IPA_SIZE_MB"
+  echo "ipa_size_bytes=$IPA_SIZE_BYTES"
+  echo "app_zip_size_bytes=$APP_ZIP_SIZE_BYTES"
   xcodebuild -version | tr '\n' '|' | sed 's/|$//'
 } > "$BUILD_INFO_PATH"
 
 echo "Unsigned IPA: $IPA_PATH"
+echo "IPA size bytes: $IPA_SIZE_BYTES"
 echo "Zipped APP: $APP_ZIP_PATH"
+echo "APP zip size bytes: $APP_ZIP_SIZE_BYTES"
 echo "Checksums: $CHECKSUM_PATH"
 echo "Build info: $BUILD_INFO_PATH"
