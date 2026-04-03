@@ -167,7 +167,7 @@ struct UserManagementView: View {
                             guard role != "ADMIN" else { return }
                             permissionEditor = PermissionEditorState(
                                 user: row.item,
-                                selectedPermissions: Set(row.item.permissions ?? UserPermissionCatalog.defaultCodes)
+                                selectedPermissions: Set(row.item.permissions ?? Array(UserPermissionCatalog.defaultCodes))
                             )
                         },
                         onResetPassword: {

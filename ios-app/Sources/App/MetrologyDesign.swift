@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 import UIKit
 
 enum MetrologyPalette {
@@ -251,7 +251,7 @@ struct MetrologySelectField: View {
 struct MetrologyNoticeDialog: View {
     let title: String
     let message: String
-    var confirmTitle: String = "确定"
+    var confirmTitle: String = "纭畾"
     let onConfirm: () -> Void
 
     var body: some View {
@@ -326,9 +326,15 @@ struct MetrologyConfirmDialog: View {
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .buttonStyle(MetrologySecondaryButtonStyle())
 
-                    Button(confirmTitle, action: onConfirm)
-                        .frame(maxWidth: .infinity, minHeight: 42)
-                        .buttonStyle(destructive ? MetrologyDangerButtonStyle() : MetrologyPrimaryButtonStyle())
+                    if destructive {
+                        Button(confirmTitle, action: onConfirm)
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                            .buttonStyle(MetrologyDangerButtonStyle())
+                    } else {
+                        Button(confirmTitle, action: onConfirm)
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                            .buttonStyle(MetrologyPrimaryButtonStyle())
+                    }
                 }
             }
             .padding(14)
