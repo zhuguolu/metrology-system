@@ -22,6 +22,7 @@ on:
         default: "1"
   push:
     paths:
+      - "ios-app/**"
       - "**/project.yml"
       - ".github/workflows/ios-unsigned-ipa.yml"
       - "scripts/build_unsigned_ipa.sh"
