@@ -33,12 +33,22 @@ concurrency:
 
 jobs:
   build-unsigned-ipa:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 50
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          CANDIDATE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -z "$CANDIDATE" ]; then
+            echo "::error::Xcode 26 not found on runner. Installed Xcode apps:"
+            ls -1 /Applications | grep '^Xcode' || true
+            exit 2
+          fi
+          sudo xcode-select -s "$CANDIDATE/Contents/Developer"
 
       - name: Show Toolchain
         run: |

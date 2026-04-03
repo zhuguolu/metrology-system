@@ -24,6 +24,11 @@
 - 底部模块导航（台账/校准/待办/审核/更多，四大模块均可用）
 - 文件预览（QuickLook）
 
+## 基线版本
+
+- iOS Deployment Target: `26.0`
+- Xcode 基线: `26`（建议 26.0+）
+
 ## 目录结构
 
 - `project.yml`: XcodeGen 工程定义
@@ -33,7 +38,7 @@
 
 ## 在 Mac 上生成 Xcode 工程
 
-1. 安装 Xcode（15+）
+1. 安装 Xcode（26+）
 2. 安装 XcodeGen
 
 ```bash
@@ -66,6 +71,8 @@ chmod +x scripts/build_ipa.sh
 ## GitHub 无签名 IPA 构建
 
 仓库已提供工作流：`.github/workflows/ios-unsigned-ipa.yml`
+
+- 工作流运行环境：`macos-15`，并自动选择 `Xcode_26*.app`
 
 - 触发方式：
 1. 任意分支推送且变更了 `**/project.yml`
