@@ -30,7 +30,7 @@ struct WebDavView: View {
             if viewModel.deleteConfirmOpen {
                 MetrologyConfirmDialog(
                     title: "\u{5220}\u{9664}\u{6302}\u{8f7d}\u{70b9}",
-                    message: "\u{786e}\u{5b9a}\u{5220}\u{9664}\u{6302}\u{8f7d}\u{70b9}\u{201c}\(viewModel.selectedMountName)\u{201d\uff1f}",
+                    message: "确定删除挂载点“\(viewModel.selectedMountName)”？",
                     cancelTitle: "\u{53d6}\u{6d88}",
                     confirmTitle: "\u{5220}\u{9664}",
                     destructive: true,

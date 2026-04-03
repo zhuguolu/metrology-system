@@ -22,7 +22,7 @@ struct DepartmentView: View {
             if let deletingItem {
                 MetrologyConfirmDialog(
                     title: "\u{5220}\u{9664}\u{90e8}\u{95e8}",
-                    message: "\u{786e}\u{5b9a}\u{5220}\u{9664}\u{201c}\(deletingName(deletingItem))\u{201d\uff1f}",
+                    message: "确定删除“\(deletingName(deletingItem))”？",
                     cancelTitle: "\u{53d6}\u{6d88}",
                     confirmTitle: "\u{5220}\u{9664}",
                     destructive: true,

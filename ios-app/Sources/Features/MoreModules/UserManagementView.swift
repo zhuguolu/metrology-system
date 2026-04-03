@@ -26,7 +26,7 @@ struct UserManagementView: View {
             if let deleteTarget {
                 MetrologyConfirmDialog(
                     title: "\u{5220}\u{9664}\u{7528}\u{6237}",
-                    message: "\u{786e}\u{5b9a}\u{5220}\u{9664}\u{7528}\u{6237}\u{201c}\(displayUsername(deleteTarget))\u{201d\uff1f}",
+                    message: "确定删除用户“\(displayUsername(deleteTarget))”？",
                     cancelTitle: "\u{53d6}\u{6d88}",
                     confirmTitle: "\u{5220}\u{9664}",
                     destructive: true,
