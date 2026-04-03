@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 private enum MainTab: String, CaseIterable, Hashable {
     case ledger
@@ -64,63 +64,68 @@ struct MainTabView: View {
     @State private var dashboardSheetOpen = false
 
     var body: some View {
-        GeometryReader { proxy in
-            let safeBottom = max(proxy.safeAreaInsets.bottom, 10)
+        ZStack {
+            MetrologyPalette.background.ignoresSafeArea()
 
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    if selectedTab != .more {
-                        topBar
-                    }
-
-                    ZStack {
-                        if loadedTabs.contains(.ledger) {
-                            DeviceListView(mode: .ledger)
-                                .opacity(selectedTab == .ledger ? 1 : 0)
-                                .allowsHitTesting(selectedTab == .ledger)
-                        }
-                        if loadedTabs.contains(.calibration) {
-                            DeviceListView(mode: .calibration)
-                                .opacity(selectedTab == .calibration ? 1 : 0)
-                                .allowsHitTesting(selectedTab == .calibration)
-                        }
-                        if loadedTabs.contains(.todo) {
-                            DeviceListView(mode: .todo)
-                                .opacity(selectedTab == .todo ? 1 : 0)
-                                .allowsHitTesting(selectedTab == .todo)
-                        }
-                        if loadedTabs.contains(.audit) {
-                            AuditView()
-                                .opacity(selectedTab == .audit ? 1 : 0)
-                                .allowsHitTesting(selectedTab == .audit)
-                        }
-                        if loadedTabs.contains(.more) {
-                            MoreHubView(selectedTab: $selectedTab)
-                                .opacity(selectedTab == .more ? 1 : 0)
-                                .allowsHitTesting(selectedTab == .more)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, selectedTab == .more ? 0 : 10)
-
-                    AndroidStyleTabBar(selectedTab: $selectedTab) { tab in
-                        loadedTabs.insert(tab)
-                    }
-                    .padding(.top, 10)
-                    .padding(.bottom, safeBottom)
+            VStack(spacing: 0) {
+                if selectedTab != .more {
+                    topBar
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+
+                tabContainer
+                    .padding(.horizontal, selectedTab == .more ? 0 : 16)
+                    .padding(.top, selectedTab == .more ? 0 : 10)
             }
-            .animation(.easeOut(duration: 0.16), value: selectedTab)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AndroidStyleTabBar(selectedTab: $selectedTab) { tab in
+                loadedTabs.insert(tab)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .background(MetrologyPalette.background)
+        }
+        .animation(.easeOut(duration: 0.16), value: selectedTab)
         .sheet(isPresented: $dashboardSheetOpen) {
             NavigationStack {
                 DashboardView()
             }
         }
+    }
+
+    private var tabContainer: some View {
+        ZStack {
+            if loadedTabs.contains(.ledger) {
+                DeviceListView(mode: .ledger)
+                    .opacity(selectedTab == .ledger ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .ledger)
+            }
+            if loadedTabs.contains(.calibration) {
+                DeviceListView(mode: .calibration)
+                    .opacity(selectedTab == .calibration ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .calibration)
+            }
+            if loadedTabs.contains(.todo) {
+                DeviceListView(mode: .todo)
+                    .opacity(selectedTab == .todo ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .todo)
+            }
+            if loadedTabs.contains(.audit) {
+                AuditView()
+                    .opacity(selectedTab == .audit ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .audit)
+            }
+            if loadedTabs.contains(.more) {
+                MoreHubView(selectedTab: $selectedTab)
+                    .opacity(selectedTab == .more ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .more)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var topBar: some View {
@@ -226,7 +231,6 @@ private struct AndroidStyleTabBar: View {
                                         RoundedRectangle(cornerRadius: max(scale.px(14), 12), style: .continuous)
                                             .stroke(Color(hex: 0xAFC8F2), lineWidth: 1)
                                     )
-                                    .shadow(color: Color(hex: 0x2C63BF, alpha: 0.18), radius: 2, x: 0, y: 1)
                             } else {
                                 RoundedRectangle(cornerRadius: max(scale.px(14), 12), style: .continuous)
                                     .fill(
@@ -290,44 +294,26 @@ private struct MoreHubView: View {
                         header
                         section(title: "常用模块") {
                             LazyVGrid(columns: columns, spacing: 10) {
-                                moduleCard(icon: "rectangle.grid.1x2.fill", title: "总览看板", tint: Color(hex: 0x1D4ED8)) {
-                                    selectedTab = .ledger
-                                }
-                                moduleCard(icon: "books.vertical.fill", title: "设备台账", tint: Color(hex: 0x047857)) {
-                                    selectedTab = .ledger
-                                }
-                                moduleCard(icon: "checkmark.seal.fill", title: "校准管理", tint: Color(hex: 0xB45309)) {
-                                    selectedTab = .calibration
-                                }
-                                moduleCard(icon: "clipboard.fill", title: "我的待办", tint: Color(hex: 0x6D28D9)) {
-                                    selectedTab = .todo
-                                }
-                                moduleCard(icon: "doc.text.magnifyingglass", title: "数据审核", tint: Color(hex: 0x6D28D9)) {
-                                    selectedTab = .audit
-                                }
+                                moduleCard(icon: "rectangle.grid.1x2.fill", title: "总览看板", tint: Color(hex: 0x1D4ED8)) { selectedTab = .ledger }
+                                moduleCard(icon: "books.vertical.fill", title: "设备台账", tint: Color(hex: 0x047857)) { selectedTab = .ledger }
+                                moduleCard(icon: "checkmark.seal.fill", title: "校准管理", tint: Color(hex: 0xB45309)) { selectedTab = .calibration }
+                                moduleCard(icon: "clipboard.fill", title: "我的待办", tint: Color(hex: 0x6D28D9)) { selectedTab = .todo }
+                                moduleCard(icon: "doc.text.magnifyingglass", title: "数据审核", tint: Color(hex: 0x6D28D9)) { selectedTab = .audit }
                             }
                         }
 
                         section(title: "协作与数据") {
                             LazyVGrid(columns: columns, spacing: 10) {
-                                NavigationLink {
-                                    FilesView()
-                                } label: {
+                                NavigationLink { FilesView() } label: {
                                     moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8))
                                 }
-                                NavigationLink {
-                                    ModulePlaceholderView(title: "网络挂载", subtitle: "与安卓端保持同模块入口")
-                                } label: {
+                                NavigationLink { ModulePlaceholderView(title: "网络挂载", subtitle: "与安卓端保持同模块入口") } label: {
                                     moduleCardContent(icon: "network", title: "网络挂载", tint: Color(hex: 0x047857))
                                 }
-                                NavigationLink {
-                                    ModulePlaceholderView(title: "变更记录", subtitle: "与安卓端保持同模块入口")
-                                } label: {
+                                NavigationLink { ModulePlaceholderView(title: "变更记录", subtitle: "与安卓端保持同模块入口") } label: {
                                     moduleCardContent(icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8))
                                 }
-                                NavigationLink {
-                                    ModulePlaceholderView(title: "使用状态", subtitle: "与安卓端保持同模块入口")
-                                } label: {
+                                NavigationLink { ModulePlaceholderView(title: "使用状态", subtitle: "与安卓端保持同模块入口") } label: {
                                     moduleCardContent(icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857))
                                 }
                             }
@@ -335,19 +321,13 @@ private struct MoreHubView: View {
 
                         section(title: "管理与配置") {
                             LazyVGrid(columns: columns, spacing: 10) {
-                                NavigationLink {
-                                    ModulePlaceholderView(title: "部门管理", subtitle: "与安卓端保持同模块入口")
-                                } label: {
+                                NavigationLink { ModulePlaceholderView(title: "部门管理", subtitle: "与安卓端保持同模块入口") } label: {
                                     moduleCardContent(icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309))
                                 }
-                                NavigationLink {
-                                    ModulePlaceholderView(title: "用户管理", subtitle: "与安卓端保持同模块入口")
-                                } label: {
+                                NavigationLink { ModulePlaceholderView(title: "用户管理", subtitle: "与安卓端保持同模块入口") } label: {
                                     moduleCardContent(icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9))
                                 }
-                                NavigationLink {
-                                    ModulePlaceholderView(title: "系统维护", subtitle: "与安卓端保持同模块入口")
-                                } label: {
+                                NavigationLink { ModulePlaceholderView(title: "系统维护", subtitle: "与安卓端保持同模块入口") } label: {
                                     moduleCardContent(icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155))
                                 }
                             }

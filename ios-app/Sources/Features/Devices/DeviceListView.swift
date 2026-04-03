@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 private struct DeviceLayoutMetrics {
     let scale: AndroidScale
@@ -16,7 +16,7 @@ private struct DeviceLayoutMetrics {
 struct DeviceListView: View {
     @StateObject private var viewModel: DeviceListViewModel
     @State private var selectedDevice: DeviceDto?
-    @State private var filterExpanded = false
+    @State private var filterExpanded = true
     @State private var moreActionsExpanded = false
 
     init(mode: DeviceListMode) {
@@ -31,13 +31,13 @@ struct DeviceListView: View {
                 MetrologyPalette.background.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         filterCard(metrics: metrics)
                         statusLine
                         listPanel(metrics: metrics)
-                        pagerBar(metrics: metrics)
+                        pagerBar
                     }
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 8)
                 }
                 .scrollIndicators(.hidden)
 
@@ -102,7 +102,7 @@ struct DeviceListView: View {
     private func filterCard(metrics: DeviceLayoutMetrics) -> some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
-                TextField("搜索设备名称、编号、责任人", text: $viewModel.searchText)
+                TextField("搜索名称/编号/责任人", text: $viewModel.searchText)
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(MetrologyPalette.textPrimary)
                     .padding(.horizontal, 12)
@@ -130,12 +130,13 @@ struct DeviceListView: View {
             if filterExpanded {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
-                        field("使用部门", text: $viewModel.deptFilter, metrics: metrics)
+                        field("部门", text: $viewModel.deptFilter, metrics: metrics)
                         field("有效性", text: $viewModel.validityFilter, metrics: metrics)
                     }
 
                     HStack(spacing: 8) {
                         field("使用状态", text: $viewModel.useStatusFilter, metrics: metrics)
+
                         if viewModel.mode == .ledger {
                             Button("重置筛选") {
                                 Task { await viewModel.resetFilters() }
@@ -146,7 +147,7 @@ struct DeviceListView: View {
                             .buttonStyle(MetrologySecondaryButtonStyle())
                         } else {
                             HStack(spacing: 6) {
-                                field("开始日期", text: $viewModel.nextDateFrom, metrics: metrics)
+                                field("起始日期", text: $viewModel.nextDateFrom, metrics: metrics)
                                 Text("~")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(MetrologyPalette.textSecondary)
@@ -157,8 +158,7 @@ struct DeviceListView: View {
                     }
 
                     if viewModel.mode != .ledger {
-                        Divider()
-                            .overlay(MetrologyPalette.stroke)
+                        Divider().overlay(MetrologyPalette.stroke)
 
                         Button(moreActionsExpanded ? "收起更多" : "更多功能") {
                             withAnimation(.easeInOut(duration: 0.18)) {
@@ -187,20 +187,24 @@ struct DeviceListView: View {
                         }
                         .buttonStyle(MetrologyPrimaryButtonStyle())
 
-                        if viewModel.mode == .ledger {
-                            Button("重置") {
-                                Task { await viewModel.resetFilters() }
-                            }
-                            .buttonStyle(MetrologySecondaryButtonStyle())
+                        Button("重置") {
+                            Task { await viewModel.resetFilters() }
                         }
+                        .buttonStyle(MetrologySecondaryButtonStyle())
 
                         Spacer(minLength: 0)
+
+                        Text(viewModel.hintMessage)
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.trailing)
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            summaryChips
+            summaryTiles
         }
         .padding(12)
         .background(
@@ -220,65 +224,63 @@ struct DeviceListView: View {
         .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 5, x: 0, y: 2)
     }
 
-    private var summaryChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                summaryChip(
-                    title: "总数 \(formatCount(viewModel.total))",
-                    style: .neutral
-                ) {
-                    applySummaryFilter(nil)
-                }
+    private var summaryTiles: some View {
+        let columns: [GridItem] = viewModel.mode == .ledger
+            ? Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+            : Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
-                if viewModel.mode == .ledger {
-                    summaryChip(
-                        title: "正常 \(formatCount(viewModel.useStatusSummary["正常"] ?? 0))",
-                        style: .valid
-                    ) {
-                        applySummaryFilter("正常")
-                    }
-                    summaryChip(
-                        title: "故障 \(formatCount(viewModel.useStatusSummary["故障"] ?? 0))",
-                        style: .warning
-                    ) {
-                        applySummaryFilter("故障")
-                    }
-                    summaryChip(
-                        title: "报废 \(formatCount(viewModel.useStatusSummary["报废"] ?? 0))",
-                        style: .expired
-                    ) {
-                        applySummaryFilter("报废")
-                    }
-                    summaryChip(
-                        title: "其他 \(formatCount(viewModel.useStatusSummary["其他"] ?? 0))",
-                        style: .neutral
-                    ) {
-                        applySummaryFilter("其他")
-                    }
-                } else {
-                    summaryChip(
-                        title: "有效 \(formatCount(viewModel.summaryCounts["有效"] ?? 0))",
-                        style: .valid
-                    ) {
-                        applySummaryFilter("有效")
-                    }
-                    summaryChip(
-                        title: "即将过期 \(formatCount(viewModel.summaryCounts["即将过期"] ?? 0))",
-                        style: .warning
-                    ) {
-                        applySummaryFilter("即将过期")
-                    }
-                    summaryChip(
-                        title: "失效 \(formatCount(viewModel.summaryCounts["失效"] ?? 0))",
-                        style: .expired
-                    ) {
-                        applySummaryFilter("失效")
-                    }
+        return LazyVGrid(columns: columns, spacing: 8) {
+            if viewModel.mode == .ledger {
+                summaryTile(title: "正常", value: viewModel.useStatusSummary["正常"] ?? 0, style: .valid) {
+                    applySummaryFilter("正常")
+                }
+                summaryTile(title: "故障", value: viewModel.useStatusSummary["故障"] ?? 0, style: .warning) {
+                    applySummaryFilter("故障")
+                }
+                summaryTile(title: "报废", value: viewModel.useStatusSummary["报废"] ?? 0, style: .expired) {
+                    applySummaryFilter("报废")
+                }
+                summaryTile(title: "其他", value: viewModel.useStatusSummary["其他"] ?? 0, style: .neutral) {
+                    applySummaryFilter("其他")
+                }
+            } else {
+                summaryTile(title: "有效", value: viewModel.summaryCounts["有效"] ?? 0, style: .valid) {
+                    applySummaryFilter("有效")
+                }
+                summaryTile(title: "即将过期", value: viewModel.summaryCounts["即将过期"] ?? 0, style: .warning) {
+                    applySummaryFilter("即将过期")
+                }
+                summaryTile(title: "失效", value: viewModel.summaryCounts["失效"] ?? 0, style: .expired) {
+                    applySummaryFilter("失效")
                 }
             }
-            .padding(.horizontal, 1)
-            .padding(.vertical, 2)
         }
+    }
+
+    private func summaryTile(title: String, value: Int64, style: ChipStyle, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(style.textColor)
+                Text(formatCount(value))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(style.textColor)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(style.background)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(style.stroke, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var statusLine: some View {
@@ -291,12 +293,10 @@ struct DeviceListView: View {
                 Text("共 \(formatCount(viewModel.total)) 条")
             }
         }
-        .font(.system(size: 10.5, weight: .regular))
+        .font(.system(size: 12, weight: .regular))
         .foregroundStyle(MetrologyPalette.textMuted)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
-        .padding(.top, 2)
-        .padding(.bottom, 1)
     }
 
     private func listPanel(metrics: DeviceLayoutMetrics) -> some View {
@@ -345,66 +345,28 @@ struct DeviceListView: View {
         }
     }
 
-    private func pagerBar(metrics: DeviceLayoutMetrics) -> some View {
-        HStack(spacing: 6) {
-            pagerArrowButton(symbol: "chevron.left", disabled: viewModel.page <= 1 || viewModel.isLoading) {
+    private var pagerBar: some View {
+        HStack(spacing: 12) {
+            Button("上一页") {
                 Task { await viewModel.prevPage() }
             }
+            .buttonStyle(MetrologySecondaryButtonStyle())
+            .disabled(viewModel.page <= 1 || viewModel.isLoading)
+            .opacity((viewModel.page <= 1 || viewModel.isLoading) ? 0.45 : 1)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(pageItems, id: \.self) { page in
-                        Button("\(page)") {
-                            Task { await viewModel.load(page: page) }
-                        }
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(page == viewModel.page ? Color.white : MetrologyPalette.textPrimary)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(
-                                    page == viewModel.page
-                                        ? AnyShapeStyle(
-                                            LinearGradient(
-                                                colors: [Color(hex: 0x4DA3FF), Color(hex: 0x2F80ED)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        : AnyShapeStyle(Color(hex: 0xF3F6FC))
-                                )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(
-                                    page == viewModel.page ? Color(hex: 0x2A74D8) : Color(hex: 0xE3EAF5),
-                                    lineWidth: 1
-                                )
-                        )
-                        .disabled(viewModel.isLoading)
-                    }
-                }
-                .padding(.horizontal, 2)
-            }
+            Text("第 \(viewModel.page) / \(viewModel.totalPages) 页")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textSecondary)
 
-            pagerArrowButton(symbol: "chevron.right", disabled: viewModel.page >= viewModel.totalPages || viewModel.isLoading) {
+            Button("下一页") {
                 Task { await viewModel.nextPage() }
             }
+            .buttonStyle(MetrologyPrimaryButtonStyle())
+            .disabled(viewModel.page >= viewModel.totalPages || viewModel.isLoading)
+            .opacity((viewModel.page >= viewModel.totalPages || viewModel.isLoading) ? 0.45 : 1)
         }
         .padding(.top, 4)
         .padding(.bottom, 10)
-    }
-
-    private func pagerArrowButton(symbol: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(MetrologyPalette.textPrimary)
-                .frame(width: 28, height: 28)
-        }
-        .buttonStyle(MetrologySecondaryButtonStyle())
-        .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1)
     }
 
     private func field(_ placeholder: String, text: Binding<String>, metrics: DeviceLayoutMetrics) -> some View {
@@ -424,25 +386,6 @@ struct DeviceListView: View {
             )
     }
 
-    private func summaryChip(title: String, style: ChipStyle, onTap: @escaping () -> Void) -> some View {
-        Button(action: onTap) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(style.textColor)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(style.background)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(style.stroke, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
     private func applySummaryFilter(_ value: String?) {
         if viewModel.mode == .ledger {
             viewModel.useStatusFilter = value ?? ""
@@ -450,13 +393,6 @@ struct DeviceListView: View {
             viewModel.validityFilter = value ?? ""
         }
         Task { await viewModel.load(page: 1) }
-    }
-
-    private var pageItems: [Int] {
-        guard viewModel.totalPages > 1 else { return [1] }
-        let start = max(1, viewModel.page - 2)
-        let end = min(viewModel.totalPages, viewModel.page + 2)
-        return Array(start...end)
     }
 
     private var loadingOverlay: some View {
@@ -555,20 +491,20 @@ private struct DeviceRowCard: View {
                     )
             }
 
-            Text("计量编号：\(item.metricNo ?? "-")")
+            Text("编号: \(item.metricNo ?? "-")")
                 .font(.system(size: 12))
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 8)
                 .lineLimit(1)
 
-            Text("使用部门：\(item.dept ?? "-")    责任人：\(item.responsiblePerson ?? "-")")
+            Text("部门: \(item.dept ?? "-")    责任人: \(item.responsiblePerson ?? "-")")
                 .font(.system(size: 12))
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 3)
                 .lineLimit(1)
 
             HStack(alignment: .bottom, spacing: 8) {
-                Text("下次校准：\(item.nextDate ?? "-")")
+                Text("下次校准: \(item.nextDate ?? "-")")
                     .font(.system(size: 12))
                     .foregroundStyle(MetrologyPalette.textSecondary)
                     .lineLimit(1)
