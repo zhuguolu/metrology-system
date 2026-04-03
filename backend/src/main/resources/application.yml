@@ -1,0 +1,39 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/metrology_db?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${SPRING_DATASOURCE_USERNAME:metrology}
+    password: ${SPRING_DATASOURCE_PASSWORD:metrology123}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:metrology-jwt-secret-key-at-least-32-chars-2024}
+  expiration: ${JWT_EXPIRATION:604800000}
+
+upload:
+  path: ${UPLOAD_PATH:/app/uploads}
+
+logging:
+  level:
+    com.metrology: INFO
+
+maintenance:
+  cron: ${MAINTENANCE_CRON:0 0 23 * * *}
+  zone: ${MAINTENANCE_ZONE:Asia/Shanghai}
+  cms-root-path: ${CMS_ROOT_PATH:/app/cms}
+  ledger-export-file-name: ${LEDGER_EXPORT_FILE_NAME:device-ledger-latest.xlsx}
+  database-backup-file-name: ${DATABASE_BACKUP_FILE_NAME:metrology-db-backup.sql}

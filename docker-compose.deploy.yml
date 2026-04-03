@@ -1,0 +1,53 @@
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: metrology-mysql
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-metrology_db}
+      MYSQL_USER: ${MYSQL_USER:-metrology}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-metrology123}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  backend:
+    image: ${BACKEND_IMAGE:-crpi-52xa45ikkzp96ntt.cn-hangzhou.personal.cr.aliyuncs.com/zglweb/zspace-backup:backend-latest}
+    container_name: metrology-backend
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Duser.timezone=Asia/Shanghai}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-metrology_db}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-metrology}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-metrology123}
+      JWT_SECRET: ${JWT_SECRET:-metrology-jwt-secret-key-at-least-32-chars-2024}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-604800000}
+      UPLOAD_PATH: ${UPLOAD_PATH:-/app/uploads}
+      CMS_ROOT_PATH: ${CMS_ROOT_PATH:-/app/cms}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      - mysql
+    volumes:
+      - upload_data:/app/uploads
+      - ./:/app/cms
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-crpi-52xa45ikkzp96ntt.cn-hangzhou.personal.cr.aliyuncs.com/zglweb/zspace-backup:frontend-latest}
+    container_name: metrology-frontend
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  upload_data:

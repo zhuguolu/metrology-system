@@ -1,0 +1,5 @@
+metrology-all-images.tar
+frontend/node_modules/
+**/build/
+.idea/
+uploads/

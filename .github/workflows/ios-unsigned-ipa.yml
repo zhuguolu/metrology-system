@@ -1,0 +1,138 @@
+name: iOS Unsigned IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_dirs:
+        description: "Comma-separated app dirs; empty = auto discover project.yml"
+        required: false
+        default: ""
+      scheme:
+        description: "Optional scheme override for all apps"
+        required: false
+        default: ""
+      configuration:
+        description: "Build configuration"
+        required: false
+        default: "Release"
+  push:
+    paths:
+      - "**/project.yml"
+      - ".github/workflows/ios-unsigned-ipa.yml"
+      - "scripts/build_unsigned_ipa.sh"
+      - "ios-app/scripts/build_unsigned_ipa.sh"
+
+concurrency:
+  group: ios-unsigned-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve App Matrix
+        id: set-matrix
+        env:
+          INPUT_APP_DIRS: ${{ github.event.inputs.app_dirs }}
+          INPUT_SCHEME: ${{ github.event.inputs.scheme }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+
+          app_dirs_raw = (os.getenv("INPUT_APP_DIRS") or "").strip()
+          scheme_override = (os.getenv("INPUT_SCHEME") or "").strip()
+
+          if app_dirs_raw:
+              app_dirs = [d.strip().strip("/\\") for d in app_dirs_raw.split(",") if d.strip()]
+          else:
+              app_dirs = []
+              for path in pathlib.Path(".").rglob("project.yml"):
+                  if "node_modules" in path.parts:
+                      continue
+                  app_dirs.append(path.parent.as_posix())
+              app_dirs = sorted(set(app_dirs))
+
+          if not app_dirs:
+              raise SystemExit("No iOS app directories found (project.yml missing).")
+
+          include = []
+          for app_dir in app_dirs:
+              spec = pathlib.Path(app_dir) / "project.yml"
+              if not spec.exists():
+                  raise SystemExit(f"Missing project.yml in {app_dir}")
+
+              if scheme_override:
+                  scheme = scheme_override
+              else:
+                  scheme = ""
+                  for line in spec.read_text(encoding="utf-8").splitlines():
+                      m = re.match(r"^name:\s*(.+?)\s*$", line)
+                      if m:
+                          scheme = m.group(1).strip()
+                          break
+                  if not scheme:
+                      raise SystemExit(f"Unable to resolve scheme from {spec}")
+
+              artifact_slug = re.sub(r"[^A-Za-z0-9._-]+", "-", f"{app_dir}-{scheme}").strip("-")
+              include.append({
+                  "app_dir": app_dir,
+                  "scheme": scheme,
+                  "artifact_name": f"{artifact_slug}-unsigned-ipa"
+              })
+
+          matrix = {"include": include}
+          print(json.dumps(matrix, ensure_ascii=False))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write("matrix=" + json.dumps(matrix) + "\n")
+          PY
+
+  build-unsigned-ipa:
+    needs: prepare
+    runs-on: macos-14
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Toolchain
+        run: |
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Install XcodeGen
+        run: |
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version
+          else
+            brew install xcodegen
+            xcodegen --version
+          fi
+
+      - name: Build Unsigned IPA
+        env:
+          INPUT_CONFIGURATION: ${{ github.event.inputs.configuration }}
+        run: |
+          chmod +x scripts/build_unsigned_ipa.sh
+          CONFIGURATION="${INPUT_CONFIGURATION:-Release}"
+          ./scripts/build_unsigned_ipa.sh "${{ matrix.app_dir }}" "${{ matrix.scheme }}" "$CONFIGURATION"
+
+      - name: Upload Unsigned IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.app_dir }}/build/artifacts/**
+          retention-days: 14
+          if-no-files-found: error

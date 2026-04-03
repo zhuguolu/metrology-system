@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="10dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingLeft="2dp"
+    android:paddingRight="2dp">
+
+    <TextView
+        android:id="@+id/buttonPrev"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:background="@drawable/bg_secondary_button"
+        android:gravity="center"
+        android:text="&#x2039;"
+        android:textColor="@color/textPrimary"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <HorizontalScrollView
+        android:id="@+id/scrollPageItems"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="6dp"
+        android:layout_marginRight="6dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/layoutPageItems"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/buttonNext"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:background="@drawable/bg_secondary_button"
+        android:gravity="center"
+        android:text="&#x203A;"
+        android:textColor="@color/textPrimary"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+</LinearLayout>

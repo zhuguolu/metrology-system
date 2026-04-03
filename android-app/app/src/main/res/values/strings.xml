@@ -1,0 +1,88 @@
+<resources>
+    <string name="app_name">校准管理系统</string>
+    <string name="splash_tagline">设备校准与台账管理</string>
+    <string name="splash_loading">正在启动原生应用...</string>
+
+    <string name="login_title">欢迎使用</string>
+    <string name="login_subtitle">请使用系统账号登录</string>
+    <string name="login_username">用户名</string>
+    <string name="login_password">密码</string>
+    <string name="login_button">登录</string>
+    <string name="login_failed">登录失败，请检查用户名和密码</string>
+
+    <string name="action_back_home">回首页</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_save">保存</string>
+    <string name="action_run_now">立即执行一次</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_logout">退出登录</string>
+    <string name="action_approve">通过</string>
+    <string name="action_reject">驳回</string>
+    <string name="hint_search_device">搜索名称/编号/责任人</string>
+    <string name="hint_reject_reason">输入驳回原因（可选）</string>
+    <string name="label_page">%1$d / %2$d 页</string>
+    <string name="label_total">共 %1$d 条</string>
+    <string name="label_empty">暂无数据</string>
+    <string name="label_loading">加载中...</string>
+
+    <string name="title_dashboard">总览看板</string>
+    <string name="title_equipment">设备台账</string>
+    <string name="title_calibration">校准管理</string>
+    <string name="title_todo">我的待办</string>
+    <string name="title_audit">数据审核</string>
+    <string name="title_settings">系统维护</string>
+    <string name="title_placeholder">模块建设中</string>
+
+    <string name="tab_ledger">台账</string>
+    <string name="tab_calibration">校准</string>
+    <string name="tab_todo">待办</string>
+    <string name="tab_audit">审核</string>
+    <string name="tab_more">更多</string>
+
+    <string name="more_title">更多模块</string>
+    <string name="more_subtitle">点击图标快速进入模块</string>
+    <string name="close_more">关闭更多</string>
+    <string name="group_common">常用模块</string>
+    <string name="group_data">协作与数据</string>
+    <string name="group_admin">管理与配置</string>
+    <string name="menu_dashboard">总览看板</string>
+    <string name="menu_equipment">设备台账</string>
+    <string name="menu_calibration">校准管理</string>
+    <string name="menu_todo">我的待办</string>
+    <string name="menu_audit">数据审核</string>
+    <string name="menu_files">我的文件</string>
+    <string name="menu_status">使用状态</string>
+    <string name="menu_departments">部门管理</string>
+    <string name="menu_changes">变更记录</string>
+    <string name="menu_webdav">网络挂载</string>
+    <string name="menu_users">用户管理</string>
+    <string name="menu_settings">系统维护</string>
+
+    <string name="summary_valid">有效</string>
+    <string name="summary_warning">即将过期</string>
+    <string name="summary_expired">失效</string>
+    <string name="summary_pending">待处理</string>
+
+    <string name="dashboard_total">设备总数</string>
+    <string name="dashboard_due">本月到期</string>
+    <string name="dashboard_valid">有效设备</string>
+    <string name="dashboard_warning_expired">失效/即将过期</string>
+    <string name="dashboard_trend_title">校准趋势（近6个月）</string>
+    <string name="dashboard_trend_badge">月度统计</string>
+    <string name="dashboard_distribution_title">设备有效性分布</string>
+    <string name="dashboard_dept_title">部门设备统计</string>
+    <string name="dashboard_dept_empty">暂无部门统计数据</string>
+
+    <string name="settings_warning_days">即将过期预警天数</string>
+    <string name="settings_expired_days">失效判定天数</string>
+    <string name="settings_auto_export">每日 23:00 自动导出台账</string>
+    <string name="settings_auto_backup">每日 23:00 自动备份数据库</string>
+    <string name="settings_cms_path">CMS 挂载目录</string>
+    <string name="settings_export_file">导出台账文件</string>
+    <string name="settings_backup_file">数据库备份文件</string>
+    <string name="settings_run_result">执行结果：%1$s</string>
+    <string name="settings_save_success">系统维护设置已保存</string>
+
+    <string name="placeholder_desc">该模块正在进行全量原生重构，下一阶段上线。</string>
+    <string name="audit_reject_title">驳回审批</string>
+</resources>

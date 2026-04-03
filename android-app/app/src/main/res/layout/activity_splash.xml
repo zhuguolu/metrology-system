@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/splashRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_splash"
+    android:paddingLeft="20dp"
+    android:paddingTop="20dp"
+    android:paddingRight="20dp"
+    android:paddingBottom="20dp">
+
+    <View
+        android:layout_width="280dp"
+        android:layout_height="280dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="-120dp"
+        android:layout_marginRight="-110dp"
+        android:alpha="0.45"
+        android:background="@drawable/bg_splash_logo_chip" />
+
+    <View
+        android:layout_width="240dp"
+        android:layout_height="240dp"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="-110dp"
+        android:layout_marginLeft="-90dp"
+        android:alpha="0.4"
+        android:background="@drawable/bg_splash_logo_chip" />
+
+    <LinearLayout
+        android:id="@+id/splashContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_splash_panel"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingLeft="22dp"
+            android:paddingTop="28dp"
+            android:paddingRight="22dp"
+            android:paddingBottom="22dp">
+
+            <FrameLayout
+                android:id="@+id/logoChip"
+                android:layout_width="92dp"
+                android:layout_height="92dp"
+                android:background="@drawable/bg_splash_logo_chip"
+                android:elevation="4dp">
+
+                <ImageView
+                    android:id="@+id/splashLogo"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="计量管理系统"
+                    android:src="@drawable/ic_splash_mark" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/splashTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="计量管理系统"
+                android:textColor="@color/splashTitle"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/splashTagline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="设备、校准、审核与资料统一管理"
+                android:textColor="@color/splashSubTitle"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/splashLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_splash_loading_chip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp">
+
+                <ProgressBar
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:indeterminateTint="@color/brandBlue" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="8dp"
+                    android:text="正在启动..."
+                    android:textColor="@color/splashSubTitle"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
