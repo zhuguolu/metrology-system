@@ -16,7 +16,7 @@ private struct DeviceLayoutMetrics {
 struct DeviceListView: View {
     @StateObject private var viewModel: DeviceListViewModel
     @State private var selectedDevice: DeviceDto?
-    @State private var quickEditDevice: DeviceDto?
+    @State private var ledgerEditDevice: DeviceDto?
     @State private var createDeviceSheetOpen = false
     @State private var filterExpanded = false
     @State private var searchDebounceTask: Task<Void, Never>?
@@ -78,22 +78,13 @@ struct DeviceListView: View {
                 DeviceDetailView(
                     device: device,
                     mode: viewModel.mode,
-                    onRefresh: {
-                        Task { await viewModel.reloadCurrentPage() }
-                    },
-                    onQuickCalibrate: {
-                        selectedDevice = nil
-                        DispatchQueue.main.async {
-                            quickEditDevice = device
-                        }
-                    },
                     onSaveEdit: { payload in
                         guard let id = device.id else {
                             viewModel.errorMessage = "设备ID无效"
                             return
                         }
                         Task {
-                            let success = await viewModel.updateLedgerDevice(id: id, payload: payload)
+                            let success = await viewModel.updateDevice(id: id, payload: payload)
                             if success { selectedDevice = nil }
                         }
                     }
@@ -102,29 +93,23 @@ struct DeviceListView: View {
         }
         .sheet(
             isPresented: Binding(
-                get: { quickEditDevice != nil },
+                get: { ledgerEditDevice != nil },
                 set: { value in
-                    if !value { quickEditDevice = nil }
+                    if !value { ledgerEditDevice = nil }
                 }
             )
         ) {
-            if let device = quickEditDevice {
-                QuickCalibrationEditView(
-                    device: device,
-                    mode: viewModel.mode,
-                    onSave: { payload in
-                        guard let id = device.id else {
-                            viewModel.errorMessage = "设备ID无效"
-                            return
-                        }
-                        Task {
-                            let success = await viewModel.quickEditCalibration(id: id, payload: payload)
-                            if success {
-                                quickEditDevice = nil
-                            }
-                        }
+            if let device = ledgerEditDevice {
+                DeviceEditView(device: device) { payload in
+                    guard let id = device.id else {
+                        viewModel.errorMessage = "设备ID无效"
+                        return
                     }
-                )
+                    Task {
+                        let success = await viewModel.updateDevice(id: id, payload: payload)
+                        if success { ledgerEditDevice = nil }
+                    }
+                }
             }
         }
         .sheet(isPresented: $createDeviceSheetOpen) {
@@ -177,17 +162,6 @@ struct DeviceListView: View {
                             allLabel: "全部状态",
                             options: useStatusOptions
                         )
-
-                        if viewModel.mode != .ledger {
-                            HStack(spacing: 6) {
-                                field("起始日期", text: $viewModel.nextDateFrom, metrics: metrics)
-                                Text("~")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(MetrologyPalette.textSecondary)
-                                field("结束日期", text: $viewModel.nextDateTo, metrics: metrics)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -290,7 +264,7 @@ struct DeviceListView: View {
     private var summaryTiles: some View {
         let columns: [GridItem] = viewModel.mode == .ledger
             ? Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 5)
-            : Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+            : Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4)
 
         return LazyVGrid(columns: columns, spacing: 8) {
             if viewModel.mode == .ledger {
@@ -340,12 +314,21 @@ struct DeviceListView: View {
                     applySummaryFilter("其他")
                 }
             } else {
-                totalSummaryCapsule
+                summaryTile(
+                    title: "共",
+                    valueText: "\(formatCount(displayedOverallTotal))台",
+                    style: .neutral,
+                    isSelected: validitySummaryAllSelected,
+                    compact: true
+                ) {
+                    applySummaryFilter(nil)
+                }
                 summaryTile(
                     title: "有效",
                     value: displayedOverallValidity("有效"),
                     style: .valid,
-                    isSelected: viewModel.validityFilter == "有效"
+                    isSelected: viewModel.validityFilter == "有效",
+                    compact: true
                 ) {
                     applySummaryFilter("有效")
                 }
@@ -353,7 +336,8 @@ struct DeviceListView: View {
                     title: "即将过期",
                     value: displayedOverallValidity("即将过期"),
                     style: .warning,
-                    isSelected: viewModel.validityFilter == "即将过期"
+                    isSelected: viewModel.validityFilter == "即将过期",
+                    compact: true
                 ) {
                     applySummaryFilter("即将过期")
                 }
@@ -361,7 +345,8 @@ struct DeviceListView: View {
                     title: "失效",
                     value: displayedOverallValidity("失效"),
                     style: .expired,
-                    isSelected: viewModel.validityFilter == "失效"
+                    isSelected: viewModel.validityFilter == "失效",
+                    compact: true
                 ) {
                     applySummaryFilter("失效")
                 }
@@ -373,40 +358,8 @@ struct DeviceListView: View {
         viewModel.useStatusFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var totalSummaryCapsule: some View {
-        let selected: Bool = {
-            if viewModel.mode == .ledger {
-                return viewModel.useStatusFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            }
-            return viewModel.validityFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }()
-
-        return Button {
-            applySummaryFilter(nil)
-        } label: {
-            HStack(spacing: 6) {
-                Text("共 \(formatCount(displayedOverallTotal)) 台")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(selected ? Color(hex: 0x1D4ED8) : MetrologyPalette.textSecondary)
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color(hex: 0x1D4ED8))
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(selected ? Color(hex: 0xE8F1FF) : Color(hex: 0xF5F9FF))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(selected ? Color(hex: 0xAFC8F2) : Color(hex: 0xD8E4F6), lineWidth: selected ? 1.5 : 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private var validitySummaryAllSelected: Bool {
+        viewModel.validityFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var displayedOverallTotal: Int64 {
@@ -550,11 +503,7 @@ struct DeviceListView: View {
                         mode: viewModel.mode,
                         onTap: { selectedDevice = row.item },
                         onQuickAction: {
-                            if viewModel.mode == .ledger {
-                                selectedDevice = row.item
-                            } else {
-                                quickEditDevice = row.item
-                            }
+                            ledgerEditDevice = row.item
                         }
                     )
                 }
@@ -1127,79 +1076,74 @@ private struct QuickCalibrationEditView: View {
 private struct DeviceDetailView: View {
     let device: DeviceDto
     let mode: DeviceListMode
-    let onRefresh: () -> Void
-    let onQuickCalibrate: () -> Void
     let onSaveEdit: ((DeviceUpdatePayload) -> Void)?
-    @Environment(\.dismiss) private var dismiss
     @State private var showEditSheet = false
 
     var body: some View {
         NavigationStack {
             List {
-                if mode == .ledger {
-                    detailSection(title: "基本信息") {
-                        detailPairRow(
-                            leftLabel: "仪器名称",
-                            leftValue: device.displayName,
-                            rightLabel: "计量编号",
-                            rightValue: device.metricNo
-                        )
-                        detailPairRow(
-                            leftLabel: "资产编号",
-                            leftValue: device.assetNo,
-                            rightLabel: "出厂编号",
-                            rightValue: device.serialNo
-                        )
-                        detailPairRow(
-                            leftLabel: "ABC分类",
-                            leftValue: device.abcClass,
-                            rightLabel: "设备型号",
-                            rightValue: device.model
-                        )
-                        detailPairRow(
-                            leftLabel: "制造厂",
-                            leftValue: device.manufacturer,
-                            rightLabel: "使用部门",
-                            rightValue: device.dept
-                        )
-                        detailPairRow(
-                            leftLabel: "设备位置",
-                            leftValue: device.location,
-                            rightLabel: "使用责任人",
-                            rightValue: device.responsiblePerson
-                        )
-                        detailPairRow(
-                            leftLabel: "使用状态",
-                            leftValue: device.useStatus,
-                            leftStyle: .useStatus
-                        )
-                    }
+                detailSection(title: "基本信息") {
+                    detailPairRow(
+                        leftLabel: "仪器名称",
+                        leftValue: device.displayName,
+                        rightLabel: "计量编号",
+                        rightValue: device.metricNo
+                    )
+                    detailPairRow(
+                        leftLabel: "资产编号",
+                        leftValue: device.assetNo,
+                        rightLabel: "出厂编号",
+                        rightValue: device.serialNo
+                    )
+                    detailPairRow(
+                        leftLabel: "ABC分类",
+                        leftValue: device.abcClass,
+                        rightLabel: "设备型号",
+                        rightValue: device.model
+                    )
+                    detailPairRow(
+                        leftLabel: "制造厂",
+                        leftValue: device.manufacturer,
+                        rightLabel: "使用部门",
+                        rightValue: device.dept
+                    )
+                    detailPairRow(
+                        leftLabel: "设备位置",
+                        leftValue: device.location,
+                        rightLabel: "使用责任人",
+                        rightValue: device.responsiblePerson
+                    )
+                    detailPairRow(
+                        leftLabel: "使用状态",
+                        leftValue: device.useStatus,
+                        leftStyle: .useStatus
+                    )
+                }
 
-                    detailSection(title: "采购信息") {
-                        detailPairRow(
-                            leftLabel: "采购时间",
-                            leftValue: device.purchaseDate,
-                            rightLabel: "采购价格",
-                            rightValue: purchasePriceText
-                        )
-                        detailPairRow(
-                            leftLabel: "使用年限",
-                            leftValue: serviceLifeText
-                        )
-                    }
+                detailSection(title: "采购信息") {
+                    detailPairRow(
+                        leftLabel: "采购时间",
+                        leftValue: device.purchaseDate,
+                        rightLabel: "采购价格",
+                        rightValue: purchasePriceText
+                    )
+                    detailPairRow(
+                        leftLabel: "使用年限",
+                        leftValue: serviceLifeText
+                    )
+                }
 
-                    detailSection(title: "技术参数") {
-                        detailPairRow(
-                            leftLabel: "分度值",
-                            leftValue: device.graduationValue,
-                            rightLabel: "测试范围",
-                            rightValue: device.testRange
-                        )
-                        detailPairRow(
-                            leftLabel: "允许误差",
-                            leftValue: device.allowableError
-                        )
-                    }
+                detailSection(title: "技术参数") {
+                    detailPairRow(
+                        leftLabel: "分度值",
+                        leftValue: device.graduationValue,
+                        rightLabel: "测试范围",
+                        rightValue: device.testRange
+                    )
+                    detailPairRow(
+                        leftLabel: "允许误差",
+                        leftValue: device.allowableError
+                    )
                 }
 
                 detailSection(title: "校准信息") {
@@ -1225,36 +1169,13 @@ private struct DeviceDetailView: View {
             }
             .scrollContentBackground(.hidden)
             .background(MetrologyPalette.background)
-            .navigationTitle(mode == .ledger ? "设备详情" : "校准信息详情")
+            .navigationTitle("设备详情")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("刷新") { onRefresh() }
-                }
-                if mode == .ledger {
+                if onSaveEdit != nil {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("编辑") { showEditSheet = true }
                     }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                if mode != .ledger {
-                    Button {
-                        dismiss()
-                        onQuickCalibrate()
-                    } label: {
-                        Text("快改")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                    }
-                    .buttonStyle(MetrologyPrimaryButtonStyle())
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(MetrologyPalette.background)
                 }
             }
             .sheet(isPresented: $showEditSheet) {

@@ -95,10 +95,10 @@ struct DeviceEditView: View {
                             field("资产编号", text: $assetNo)
                             field("出厂编号", text: $serialNo)
                             selectField("ABC分类", text: $abcClass, options: ["A", "B", "C"])
-                            selectField("部门", text: $dept, options: departmentOptions)
+                            editableSelectField("部门", text: $dept, options: departmentOptions)
                             field("设备位置", text: $location)
                             field("责任人", text: $responsiblePerson)
-                            selectField("使用状态", text: $useStatus, options: useStatusOptions)
+                            editableSelectField("使用状态", text: $useStatus, options: useStatusOptions)
                         }
 
                         sectionCard(title: "校准信息") {
@@ -244,6 +244,52 @@ struct DeviceEditView: View {
                 )
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func editableSelectField(_ title: String, text: Binding<String>, options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+
+            HStack(spacing: 4) {
+                TextField("请输入或选择", text: text)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .padding(.leading, 10)
+                    .padding(.trailing, 4)
+
+                if !options.isEmpty {
+                    Menu {
+                        ForEach(options, id: \.self) { option in
+                            Button(option) {
+                                text.wrappedValue = option
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(MetrologyPalette.textMuted)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 6)
+                }
+            }
+            .frame(height: 38)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+            )
         }
     }
 
