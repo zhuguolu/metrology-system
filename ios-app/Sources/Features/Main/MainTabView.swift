@@ -1,4 +1,5 @@
 ﻿import SwiftUI
+import UIKit
 
 private enum MainTab: String, CaseIterable, Hashable {
     case ledger
@@ -454,7 +455,7 @@ private struct MoreHubView: View {
         destination()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
-            .modifier(MoreSubmoduleBackSwipeModifier())
+            .background(MoreSubmoduleSystemBackSwipeEnabler())
             .onAppear { submoduleTitle = title }
     }
 
@@ -542,36 +543,22 @@ private struct MoreHubView: View {
     }
 }
 
-private struct MoreSubmoduleBackSwipeModifier: ViewModifier {
-    @Environment(\.dismiss) private var dismiss
-    @State private var backTriggered = false
+private struct MoreSubmoduleSystemBackSwipeEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        controller.view.isUserInteractionEnabled = false
+        return controller
+    }
 
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .leading) {
-                Color.clear
-                    .frame(width: 24)
-                    .contentShape(Rectangle())
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 14, coordinateSpace: .local)
-                            .onChanged { value in
-                                guard !backTriggered else { return }
-                                let horizontal = value.translation.width
-                                let vertical = abs(value.translation.height)
-                                guard horizontal > 54, horizontal > vertical * 1.2 else { return }
-                                backTriggered = true
-                                dismiss()
-                            }
-                            .onEnded { _ in
-                                backTriggered = false
-                            }
-                    )
-                    .allowsHitTesting(true)
-                    .accessibilityHidden(true)
-            }
-            .onDisappear {
-                backTriggered = false
-            }
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            guard let navigationController = uiViewController.navigationController else { return }
+            guard let popGesture = navigationController.interactivePopGestureRecognizer else { return }
+
+            popGesture.isEnabled = navigationController.viewControllers.count > 1
+            popGesture.delegate = nil
+        }
     }
 }
 
@@ -583,3 +570,4 @@ private extension Color {
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 }
+
