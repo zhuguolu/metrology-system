@@ -259,6 +259,8 @@ struct DeviceListView: View {
             : Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
         return LazyVGrid(columns: columns, spacing: 8) {
+            totalSummaryCapsule
+
             if viewModel.mode == .ledger {
                 summaryTile(
                     title: "正常",
@@ -319,6 +321,42 @@ struct DeviceListView: View {
                 }
             }
         }
+    }
+
+    private var totalSummaryCapsule: some View {
+        let selected: Bool = {
+            if viewModel.mode == .ledger {
+                return viewModel.useStatusFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return viewModel.validityFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }()
+
+        return Button {
+            applySummaryFilter(nil)
+        } label: {
+            HStack(spacing: 6) {
+                Text("共 \(formatCount(viewModel.overallTotal)) 台")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(selected ? Color(hex: 0x1D4ED8) : MetrologyPalette.textSecondary)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color(hex: 0x1D4ED8))
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(selected ? Color(hex: 0xE8F1FF) : Color(hex: 0xF5F9FF))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(selected ? Color(hex: 0xAFC8F2) : Color(hex: 0xD8E4F6), lineWidth: selected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func summaryTile(
