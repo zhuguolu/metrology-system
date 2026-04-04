@@ -113,6 +113,10 @@ final class APIClient {
         try await send(path: "api/devices/\(id)", method: "PUT", body: payload, authorized: true)
     }
 
+    func deleteDevice(id: Int64) async throws {
+        try await sendWithoutResponse(path: "api/devices/\(id)", method: "DELETE", authorized: true)
+    }
+
     func createDevice(payload: DeviceUpdatePayload) async throws -> DeviceCreateResult {
         let bodyData = try encoder.encode(payload)
         let request = try makeRequest(

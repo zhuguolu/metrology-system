@@ -272,6 +272,23 @@ final class DeviceListViewModel: ObservableObject {
         }
     }
 
+    func deleteDevice(id: Int64) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            try await APIClient.shared.deleteDevice(id: id)
+            let targetPage = (items.count <= 1 && page > 1) ? (page - 1) : page
+            await load(page: targetPage)
+            hintMessage = "删除已处理"
+            return true
+        } catch {
+            errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
     func createLedgerDevice(payload: DeviceUpdatePayload) async -> Bool {
         isLoading = true
         errorMessage = nil

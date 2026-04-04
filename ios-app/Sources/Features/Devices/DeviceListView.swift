@@ -84,7 +84,10 @@ struct DeviceListView: View {
                             let success = await viewModel.updateDevice(id: id, payload: payload)
                             if success { selectedDevice = nil }
                         }
-                    }
+                    },
+                    onDelete: viewModel.mode == .ledger ? { id in
+                        await viewModel.deleteDevice(id: id)
+                    } : nil
                 )
             }
         }
@@ -1133,7 +1136,13 @@ private struct DeviceDetailView: View {
     let device: DeviceDto
     let mode: DeviceListMode
     let onSaveEdit: ((DeviceUpdatePayload) -> Void)?
+    let onDelete: ((Int64) async -> Bool)?
+
+    @Environment(\.dismiss) private var dismiss
     @State private var showEditSheet = false
+    @State private var deletingConfirmOpen = false
+    @State private var deletingInProgress = false
+    @State private var deletingErrorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -1228,13 +1237,48 @@ private struct DeviceDetailView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+
+                if deletingConfirmOpen {
+                    MetrologyConfirmDialog(
+                        title: "删除设备",
+                        message: "确定删除“\(device.displayName)”吗？此操作不可撤销。",
+                        cancelTitle: "取消",
+                        confirmTitle: deletingInProgress ? "处理中..." : "删除",
+                        destructive: true,
+                        onCancel: {
+                            if !deletingInProgress {
+                                deletingConfirmOpen = false
+                            }
+                        },
+                        onConfirm: {
+                            handleDeleteConfirm()
+                        }
+                    )
+                }
+
+                if let deletingErrorMessage {
+                    MetrologyNoticeDialog(
+                        title: "提示",
+                        message: deletingErrorMessage
+                    ) {
+                        self.deletingErrorMessage = nil
+                    }
+                }
             }
             .navigationTitle("设备详情")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if onSaveEdit != nil {
-                    ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if onSaveEdit != nil {
                         Button("编辑") { showEditSheet = true }
+                            .disabled(deletingInProgress)
+                    }
+                    if mode == .ledger, onDelete != nil, device.id != nil {
+                        Button("删除") {
+                            deletingConfirmOpen = true
+                        }
+                        .foregroundStyle(MetrologyPalette.statusExpired)
+                        .disabled(deletingInProgress)
                     }
                 }
             }
@@ -1246,6 +1290,34 @@ private struct DeviceDetailView: View {
         }
         .presentationDetents([.large])
         .preferredColorScheme(.light)
+    }
+
+    private func handleDeleteConfirm() {
+        guard !deletingInProgress else { return }
+        guard let id = device.id else {
+            deletingConfirmOpen = false
+            deletingErrorMessage = "设备ID无效"
+            return
+        }
+        guard let onDelete else {
+            deletingConfirmOpen = false
+            deletingErrorMessage = "当前不支持删除"
+            return
+        }
+
+        deletingInProgress = true
+        Task {
+            let success = await onDelete(id)
+            await MainActor.run {
+                deletingInProgress = false
+                deletingConfirmOpen = false
+                if success {
+                    dismiss()
+                } else {
+                    deletingErrorMessage = "删除失败，请稍后重试"
+                }
+            }
+        }
     }
 
     private func detailSection<Content: View>(
