@@ -124,6 +124,7 @@ struct MainTabView: View {
             let horizontal = max(scale.px(16), 12)
             let topPadding: CGFloat = 0
             let contentTop = max(scale.vertical(6), 3)
+            let moreSubmoduleContentTop = max(scale.vertical(6), 3)
             let tabTopSpacing = max(scale.vertical(2), 1)
             let tabBottomSpacing: CGFloat = 0
             let bottomInset = proxy.safeAreaInsets.bottom
@@ -141,7 +142,12 @@ struct MainTabView: View {
 
                     tabContainer
                         .padding(.horizontal, horizontal)
-                        .padding(.top, selectedTab == .more ? 0 : contentTop)
+                        .padding(
+                            .top,
+                            selectedTab == .more
+                                ? (activeMoreEntry == nil ? 0 : moreSubmoduleContentTop)
+                                : contentTop
+                        )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }

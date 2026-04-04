@@ -43,6 +43,7 @@ struct FilesView: View {
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(backToParentGesture, including: .subviews)
         }
         .navigationTitle("我的文件")
         .task {
@@ -220,6 +221,18 @@ struct FilesView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(MetrologyPalette.stroke, lineWidth: 1)
         )
+    }
+
+    private var backToParentGesture: some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
+            .onEnded { value in
+                guard viewModel.currentFolderId != nil else { return }
+                let fromLeftEdge = value.startLocation.x <= 28
+                let horizontalEnough = value.translation.width >= 80
+                let mostlyHorizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
+                guard fromLeftEdge, horizontalEnough, mostlyHorizontal else { return }
+                Task { await viewModel.goBack() }
+            }
     }
 
     private func fileRow(item: UserFileItemDto) -> some View {
