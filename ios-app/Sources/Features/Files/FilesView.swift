@@ -3,12 +3,10 @@ import UniformTypeIdentifiers
 
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
-    @Environment(\.dismiss) private var dismiss
     @State private var fileImporterOpen = false
     @State private var createFolderDialogOpen = false
     @State private var createFolderName = ""
     @State private var searchText = ""
-    @State private var edgeBackTriggered = false
 
     var body: some View {
         ZStack {
@@ -44,7 +42,6 @@ struct FilesView: View {
                 .padding(.bottom, 14)
             }
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(edgeBackGesture)
         }
         .navigationTitle("我的文件")
         .task {
@@ -52,7 +49,6 @@ struct FilesView: View {
         }
         .onChange(of: viewModel.currentFolderId) { _, _ in
             searchText = ""
-            edgeBackTriggered = false
         }
         .fileImporter(
             isPresented: $fileImporterOpen,
@@ -284,28 +280,6 @@ struct FilesView: View {
             return "筛选结果：\(fileRows.count)/\(viewModel.items.count)"
         }
         return viewModel.hint
-    }
-
-    private var edgeBackGesture: some Gesture {
-        DragGesture(minimumDistance: 16, coordinateSpace: .local)
-            .onChanged { value in
-                guard !edgeBackTriggered else { return }
-                guard value.startLocation.x <= 24 else { return }
-
-                let horizontal = value.translation.width
-                let vertical = abs(value.translation.height)
-                guard horizontal > 70, horizontal > vertical * 1.4 else { return }
-
-                edgeBackTriggered = true
-                if viewModel.currentFolderId != nil {
-                    Task { await viewModel.goBack() }
-                } else {
-                    dismiss()
-                }
-            }
-            .onEnded { _ in
-                edgeBackTriggered = false
-            }
     }
 
     private func baseFileRowID(_ item: UserFileItemDto) -> String {
