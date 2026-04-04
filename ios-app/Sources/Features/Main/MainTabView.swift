@@ -1,6 +1,4 @@
 ﻿import SwiftUI
-import UIKit
-import ObjectiveC
 
 private enum MainTab: String, CaseIterable, Hashable {
     case ledger
@@ -70,11 +68,55 @@ private enum MainTab: String, CaseIterable, Hashable {
     }
 }
 
+private enum MoreModuleEntry: String, Identifiable, Hashable {
+    case files
+    case webdav
+    case changeRecord
+    case deviceStatus
+    case department
+    case userManagement
+    case systemMaintenance
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .files: return "我的文件"
+        case .webdav: return "网络挂载"
+        case .changeRecord: return "变更记录"
+        case .deviceStatus: return "使用状态"
+        case .department: return "部门管理"
+        case .userManagement: return "用户管理"
+        case .systemMaintenance: return "系统维护"
+        }
+    }
+
+    @ViewBuilder
+    func makeView() -> some View {
+        switch self {
+        case .files:
+            FilesView()
+        case .webdav:
+            WebDavView()
+        case .changeRecord:
+            ChangeRecordView()
+        case .deviceStatus:
+            DeviceStatusView()
+        case .department:
+            DepartmentView()
+        case .userManagement:
+            UserManagementView()
+        case .systemMaintenance:
+            SystemMaintenanceView()
+        }
+    }
+}
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .ledger
     @State private var loadedTabs: Set<MainTab> = [.ledger]
     @State private var dashboardSheetOpen = false
     @State private var moreSubmoduleTitle: String?
+    @State private var activeMoreEntry: MoreModuleEntry?
 
     var body: some View {
         GeometryReader { proxy in
@@ -121,6 +163,7 @@ struct MainTabView: View {
             .onChange(of: selectedTab) { _, newValue in
                 if newValue != .more {
                     moreSubmoduleTitle = nil
+                    activeMoreEntry = nil
                 }
             }
             .sheet(isPresented: $dashboardSheetOpen) {
@@ -154,9 +197,21 @@ struct MainTabView: View {
                     .allowsHitTesting(selectedTab == .audit)
             }
             if loadedTabs.contains(.more) {
-                MoreHubView(submoduleTitle: $moreSubmoduleTitle)
+                if let activeMoreEntry {
+                    MoreModuleEntryHost(entry: activeMoreEntry)
+                        .opacity(selectedTab == .more ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .more)
+                } else {
+                    MoreHubView(
+                        submoduleTitle: $moreSubmoduleTitle,
+                        onOpenModule: { entry in
+                            activeMoreEntry = entry
+                            moreSubmoduleTitle = entry.title
+                        }
+                    )
                     .opacity(selectedTab == .more ? 1 : 0)
                     .allowsHitTesting(selectedTab == .more)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -186,6 +241,29 @@ struct MainTabView: View {
             if selectedTab.showBackToBoard {
                 Button("回看板") {
                     dashboardSheetOpen = true
+                }
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(MetrologyPalette.navActive)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white, Color(hex: 0xF4F8FE)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color(hex: 0xCFDAEB), lineWidth: 1)
+                )
+            } else if selectedTab == .more, activeMoreEntry != nil {
+                Button("返回更多") {
+                    activeMoreEntry = nil
+                    moreSubmoduleTitle = nil
                 }
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(MetrologyPalette.navActive)
@@ -320,118 +398,104 @@ private struct MoreHubView: View {
     }
 
     @Binding var submoduleTitle: String?
+    let onOpenModule: (MoreModuleEntry) -> Void
     @EnvironmentObject private var appState: AppState
     @State private var logoutConfirmOpen = false
 
     var body: some View {
-        NavigationStack {
-            GeometryReader { proxy in
-                let scale = AndroidScale(containerWidth: proxy.size.width, containerHeight: proxy.size.height)
-                let gridSpacing = max(scale.px(10), 8)
-                let columns: [GridItem] = Array(
-                    repeating: GridItem(.flexible(), spacing: gridSpacing),
-                    count: 4
-                )
+        GeometryReader { proxy in
+            let scale = AndroidScale(containerWidth: proxy.size.width, containerHeight: proxy.size.height)
+            let gridSpacing = max(scale.px(10), 8)
+            let columns: [GridItem] = Array(
+                repeating: GridItem(.flexible(), spacing: gridSpacing),
+                count: 4
+            )
 
-                ZStack {
-                    MetrologyPalette.background.ignoresSafeArea()
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
 
-                    ScrollViewReader { reader in
-                        ScrollView {
-                            Color.clear
-                                .frame(height: 0)
-                                .id(ScrollAnchor.top)
+                ScrollViewReader { reader in
+                    ScrollView {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(ScrollAnchor.top)
 
-                            VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
-                                section(title: "协作与数据", scale: scale) {
-                                    LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                        NavigationLink { moduleDestination(title: "我的文件") { FilesView() } } label: {
-                                            moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
-                                        }
-                                        NavigationLink { moduleDestination(title: "网络挂载") { WebDavView() } } label: {
-                                            moduleCardContent(icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
-                                        }
-                                        NavigationLink { moduleDestination(title: "变更记录") { ChangeRecordView() } } label: {
-                                            moduleCardContent(icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
-                                        }
-                                        NavigationLink { moduleDestination(title: "使用状态") { DeviceStatusView() } } label: {
-                                            moduleCardContent(icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
-                                        }
-                                    }
+                        VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
+                            section(title: "协作与数据", scale: scale) {
+                                LazyVGrid(columns: columns, spacing: gridSpacing) {
+                                    moduleEntryButton(entry: .files, icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
+                                    moduleEntryButton(entry: .webdav, icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
+                                    moduleEntryButton(entry: .changeRecord, icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
+                                    moduleEntryButton(entry: .deviceStatus, icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
                                 }
-
-                                section(title: "管理与配置", scale: scale) {
-                                    LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                        NavigationLink { moduleDestination(title: "部门管理") { DepartmentView() } } label: {
-                                            moduleCardContent(icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309), scale: scale)
-                                        }
-                                        NavigationLink { moduleDestination(title: "用户管理") { UserManagementView() } } label: {
-                                            moduleCardContent(icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9), scale: scale)
-                                        }
-                                        NavigationLink { moduleDestination(title: "系统维护") { SystemMaintenanceView() } } label: {
-                                            moduleCardContent(icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155), scale: scale)
-                                        }
-                                    }
-                                }
-
-                                Button {
-                                    logoutConfirmOpen = true
-                                } label: {
-                                    Text("退出登录")
-                                        .font(.system(size: max(scale.px(14), 13), weight: .bold))
-                                        .foregroundStyle(MetrologyPalette.textPrimary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, max(scale.vertical(12), 10))
-                                }
-                                .buttonStyle(MetrologySecondaryButtonStyle())
                             }
-                            .padding(.horizontal, max(scale.px(14), 12))
-                            .padding(.top, max(scale.vertical(8), 6))
-                            .padding(.bottom, max(scale.vertical(24), 18))
-                        }
-                        .onAppear {
-                            DispatchQueue.main.async {
-                                reader.scrollTo(ScrollAnchor.top, anchor: .top)
+
+                            section(title: "管理与配置", scale: scale) {
+                                LazyVGrid(columns: columns, spacing: gridSpacing) {
+                                    moduleEntryButton(entry: .department, icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309), scale: scale)
+                                    moduleEntryButton(entry: .userManagement, icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9), scale: scale)
+                                    moduleEntryButton(entry: .systemMaintenance, icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155), scale: scale)
+                                }
                             }
+
+                            Button {
+                                logoutConfirmOpen = true
+                            } label: {
+                                Text("退出登录")
+                                    .font(.system(size: max(scale.px(14), 13), weight: .bold))
+                                    .foregroundStyle(MetrologyPalette.textPrimary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, max(scale.vertical(12), 10))
+                            }
+                            .buttonStyle(MetrologySecondaryButtonStyle())
                         }
+                        .padding(.horizontal, max(scale.px(14), 12))
+                        .padding(.top, max(scale.vertical(8), 6))
+                        .padding(.bottom, max(scale.vertical(24), 18))
                     }
-
-                    if logoutConfirmOpen {
-                        MetrologyConfirmDialog(
-                            title: "退出登录",
-                            message: "确认退出当前账号？",
-                            cancelTitle: "取消",
-                            confirmTitle: "退出",
-                            destructive: true,
-                            onCancel: {
-                                logoutConfirmOpen = false
-                            },
-                            onConfirm: {
-                                logoutConfirmOpen = false
-                                appState.logout()
-                            }
-                        )
+                    .onAppear {
+                        DispatchQueue.main.async {
+                            reader.scrollTo(ScrollAnchor.top, anchor: .top)
+                        }
                     }
                 }
+
+                if logoutConfirmOpen {
+                    MetrologyConfirmDialog(
+                        title: "退出登录",
+                        message: "确认退出当前账号？",
+                        cancelTitle: "取消",
+                        confirmTitle: "退出",
+                        destructive: true,
+                        onCancel: {
+                            logoutConfirmOpen = false
+                        },
+                        onConfirm: {
+                            logoutConfirmOpen = false
+                            appState.logout()
+                        }
+                    )
+                }
             }
-            .toolbar(.hidden, for: .navigationBar)
         }
         .onAppear {
             submoduleTitle = nil
         }
     }
 
-    @ViewBuilder
-    private func moduleDestination<Content: View>(
+    private func moduleEntryButton(
+        entry: MoreModuleEntry,
+        icon: String,
         title: String,
-        @ViewBuilder _ destination: () -> Content
+        tint: Color,
+        scale: AndroidScale
     ) -> some View {
-        destination()
-            .background(MetrologyPalette.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
-            .background(MoreSubmoduleSystemBackSwipeEnabler())
-            .onAppear { submoduleTitle = title }
+        Button {
+            onOpenModule(entry)
+        } label: {
+            moduleCardContent(icon: icon, title: title, tint: tint, scale: scale)
+        }
+        .buttonStyle(.plain)
     }
 
     private func section<Content: View>(title: String, scale: AndroidScale, @ViewBuilder content: () -> Content) -> some View {
@@ -518,71 +582,15 @@ private struct MoreHubView: View {
     }
 }
 
-private struct MoreSubmoduleSystemBackSwipeEnabler: UIViewControllerRepresentable {
-    private static var popGestureDelegateKey: UInt8 = 0
+private struct MoreModuleEntryHost: View {
+    let entry: MoreModuleEntry
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        let controller = UIViewController()
-        controller.view.backgroundColor = .clear
-        controller.view.isUserInteractionEnabled = false
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        DispatchQueue.main.async {
-            guard let navigationController = uiViewController.navigationController else { return }
-            guard let popGesture = navigationController.interactivePopGestureRecognizer else { return }
-
-            // Keep push/pop transition backdrop consistent with app page background.
-            navigationController.view.backgroundColor = UIColor(
-                red: 238.0 / 255.0,
-                green: 244.0 / 255.0,
-                blue: 251.0 / 255.0,
-                alpha: 1.0
-            )
-
-            let delegate: MoreSubmodulePopGestureDelegate
-            if let existing = objc_getAssociatedObject(
-                navigationController,
-                &Self.popGestureDelegateKey
-            ) as? MoreSubmodulePopGestureDelegate {
-                delegate = existing
-                delegate.navigationController = navigationController
-            } else {
-                delegate = MoreSubmodulePopGestureDelegate(navigationController: navigationController)
-                objc_setAssociatedObject(
-                    navigationController,
-                    &Self.popGestureDelegateKey,
-                    delegate,
-                    .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-                )
-            }
-
-            popGesture.isEnabled = navigationController.viewControllers.count > 1
-            popGesture.delegate = delegate
-            popGesture.cancelsTouchesInView = false
+    var body: some View {
+        NavigationStack {
+            entry.makeView()
+                .background(MetrologyPalette.background.ignoresSafeArea())
         }
-    }
-}
-
-private final class MoreSubmodulePopGestureDelegate: NSObject, UIGestureRecognizerDelegate {
-    weak var navigationController: UINavigationController?
-
-    init(navigationController: UINavigationController) {
-        self.navigationController = navigationController
-    }
-
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard let navigationController else { return false }
-        guard navigationController.transitionCoordinator == nil else { return false }
-        return navigationController.viewControllers.count > 1
-    }
-
-    func gestureRecognizer(
-        _ gestureRecognizer: UIGestureRecognizer,
-        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
-    ) -> Bool {
-        true
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -594,5 +602,7 @@ private extension Color {
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 }
+
+
 
 
