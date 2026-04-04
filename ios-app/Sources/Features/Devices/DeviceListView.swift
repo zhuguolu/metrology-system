@@ -44,10 +44,6 @@ struct DeviceListView: View {
                 }
                 .scrollIndicators(.hidden)
 
-                if viewModel.isLoading {
-                    loadingOverlay
-                }
-
                 if let errorMessage = viewModel.errorMessage {
                     MetrologyNoticeDialog(
                         title: "\u{63d0}\u{793a}",
@@ -288,9 +284,19 @@ struct DeviceListView: View {
     }
 
     private var summaryTiles: some View {
-        let columns: [GridItem] = viewModel.mode == .ledger
-            ? Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 5)
-            : Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4)
+        let columnsCount: Int
+        switch viewModel.mode {
+        case .ledger:
+            columnsCount = 5
+        case .calibration:
+            columnsCount = 4
+        case .todo:
+            columnsCount = 3
+        }
+        let columns: [GridItem] = Array(
+            repeating: GridItem(.flexible(minimum: 0), spacing: 6),
+            count: columnsCount
+        )
 
         return LazyVGrid(columns: columns, spacing: 8) {
             if viewModel.mode == .ledger {
@@ -339,7 +345,7 @@ struct DeviceListView: View {
                 ) {
                     applySummaryFilter("其他")
                 }
-            } else {
+            } else if viewModel.mode == .calibration {
                 summaryTile(
                     title: "共",
                     valueText: "\(formatCount(displayedOverallTotal))台",
@@ -357,6 +363,34 @@ struct DeviceListView: View {
                     compact: true
                 ) {
                     applySummaryFilter("有效")
+                }
+                summaryTile(
+                    title: "即将过期",
+                    value: displayedOverallValidity("即将过期"),
+                    style: .warning,
+                    isSelected: viewModel.validityFilter == "即将过期",
+                    compact: true
+                ) {
+                    applySummaryFilter("即将过期")
+                }
+                summaryTile(
+                    title: "失效",
+                    value: displayedOverallValidity("失效"),
+                    style: .expired,
+                    isSelected: viewModel.validityFilter == "失效",
+                    compact: true
+                ) {
+                    applySummaryFilter("失效")
+                }
+            } else {
+                summaryTile(
+                    title: "共",
+                    valueText: "\(formatCount(displayedOverallTotal))台",
+                    style: .neutral,
+                    isSelected: validitySummaryAllSelected,
+                    compact: true
+                ) {
+                    applySummaryFilter(nil)
                 }
                 summaryTile(
                     title: "即将过期",
@@ -487,9 +521,7 @@ struct DeviceListView: View {
 
     private var statusLine: some View {
         Group {
-            if viewModel.isLoading {
-                Text("加载中...")
-            } else if deviceRows.isEmpty {
+            if deviceRows.isEmpty {
                 Text("暂无数据")
             } else {
                 Text("共 \(formatCount(viewModel.total)) 条")
@@ -670,25 +702,6 @@ struct DeviceListView: View {
         guard value.wrappedValue != resolved else { return }
         value.wrappedValue = resolved
         Task { await viewModel.load(page: 1) }
-    }
-
-    private var loadingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.18).ignoresSafeArea()
-            ProgressView("加载中...")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(MetrologyPalette.textPrimary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(MetrologyPalette.surface)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                )
-        }
     }
 
     private var deviceRows: [DeviceListRow] {

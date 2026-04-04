@@ -116,6 +116,8 @@ struct LoginView: View {
                 }
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(

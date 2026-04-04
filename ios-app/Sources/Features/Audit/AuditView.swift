@@ -7,6 +7,7 @@ struct AuditView: View {
 
     @State private var detailSheetItem: AuditDetailSheetItem?
     @State private var rejectSheetItem: AuditRejectSheetItem?
+    @State private var historyFilterDebounceTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -52,9 +53,6 @@ struct AuditView: View {
                 auditListPanel
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                if viewModel.mode == .history {
-                    historyPagerBar
-                }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -68,17 +66,11 @@ struct AuditView: View {
             Task { await viewModel.loadCurrent() }
         }
         .onChange(of: viewModel.mode) {
+            historyFilterDebounceTask?.cancel()
             Task { await viewModel.loadCurrent() }
         }
-        .overlay {
-            if viewModel.isLoading {
-                ProgressView("\u{52a0}\u{8f7d}\u{4e2d}\u{2e}\u{2e}\u{2e}")
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(MetrologyPalette.surface)
-                    )
-            }
+        .onChange(of: viewModel.historyKeyword) { _, _ in
+            scheduleHistoryKeywordFilter()
         }
         .sheet(item: $detailSheetItem) { item in
             AuditDetailView(record: item.record)
@@ -134,10 +126,10 @@ struct AuditView: View {
 
             HStack(spacing: 8) {
                 Menu {
-                    Button("\u{5168}\u{90e8}\u{72b6}\u{6001}") { viewModel.historyStatusFilter = "" }
-                    Button("\u{5f85}\u{5ba1}\u{6279}") { viewModel.historyStatusFilter = "PENDING" }
-                    Button("\u{5df2}\u{901a}\u{8fc7}") { viewModel.historyStatusFilter = "APPROVED" }
-                    Button("\u{5df2}\u{9a73}\u{56de}") { viewModel.historyStatusFilter = "REJECTED" }
+                    Button("\u{5168}\u{90e8}\u{72b6}\u{6001}") { applyHistoryStatusFilter("") }
+                    Button("\u{5f85}\u{5ba1}\u{6279}") { applyHistoryStatusFilter("PENDING") }
+                    Button("\u{5df2}\u{901a}\u{8fc7}") { applyHistoryStatusFilter("APPROVED") }
+                    Button("\u{5df2}\u{9a73}\u{56de}") { applyHistoryStatusFilter("REJECTED") }
                 } label: {
                     MetrologySelectField(
                         title: "\u{72b6}\u{6001}",
@@ -147,10 +139,10 @@ struct AuditView: View {
                 }
 
                 Menu {
-                    Button("\u{5168}\u{90e8}\u{7c7b}\u{578b}") { viewModel.historyTypeFilter = "" }
-                    Button("\u{65b0}\u{589e}") { viewModel.historyTypeFilter = "CREATE" }
-                    Button("\u{4fee}\u{6539}") { viewModel.historyTypeFilter = "UPDATE" }
-                    Button("\u{5220}\u{9664}") { viewModel.historyTypeFilter = "DELETE" }
+                    Button("\u{5168}\u{90e8}\u{7c7b}\u{578b}") { applyHistoryTypeFilter("") }
+                    Button("\u{65b0}\u{589e}") { applyHistoryTypeFilter("CREATE") }
+                    Button("\u{4fee}\u{6539}") { applyHistoryTypeFilter("UPDATE") }
+                    Button("\u{5220}\u{9664}") { applyHistoryTypeFilter("DELETE") }
                 } label: {
                     MetrologySelectField(
                         title: "\u{7c7b}\u{578b}",
@@ -161,23 +153,33 @@ struct AuditView: View {
 
                 Spacer(minLength: 0)
             }
-
-            HStack(spacing: 10) {
-                Button("\u{67e5}\u{8be2}") {
-                    Task { await viewModel.applyHistoryFilters() }
-                }
-                .buttonStyle(MetrologyPrimaryButtonStyle())
-
-                Button("\u{91cd}\u{7f6e}") {
-                    Task { await viewModel.resetHistoryFilters() }
-                }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-
-                Spacer(minLength: 0)
-            }
         }
         .padding(10)
         .metrologyCard()
+    }
+
+    private func applyHistoryStatusFilter(_ value: String) {
+        let resolved = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard viewModel.historyStatusFilter != resolved else { return }
+        viewModel.historyStatusFilter = resolved
+        Task { await viewModel.applyHistoryFilters() }
+    }
+
+    private func applyHistoryTypeFilter(_ value: String) {
+        let resolved = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard viewModel.historyTypeFilter != resolved else { return }
+        viewModel.historyTypeFilter = resolved
+        Task { await viewModel.applyHistoryFilters() }
+    }
+
+    private func scheduleHistoryKeywordFilter() {
+        historyFilterDebounceTask?.cancel()
+        guard viewModel.mode == .history else { return }
+        historyFilterDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard !Task.isCancelled else { return }
+            await viewModel.applyHistoryFilters()
+        }
     }
 
     private func historyStatusLabel(_ value: String) -> String {
@@ -278,6 +280,10 @@ struct AuditView: View {
                             }
                         )
                     }
+                }
+
+                if viewModel.mode == .history {
+                    historyPagerBar
                 }
             }
             .padding(.bottom, 4)

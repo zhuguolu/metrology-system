@@ -302,6 +302,7 @@ private struct MoreHubView: View {
     @Binding var selectedTab: MainTab
     @Binding var showMainHeader: Bool
     @EnvironmentObject private var appState: AppState
+    @State private var logoutConfirmOpen = false
 
     var body: some View {
         NavigationStack {
@@ -355,7 +356,7 @@ private struct MoreHubView: View {
                             }
 
                             Button {
-                                appState.logout()
+                                logoutConfirmOpen = true
                             } label: {
                                 Text("退出登录")
                                     .font(.system(size: max(scale.px(14), 13), weight: .bold))
@@ -368,6 +369,23 @@ private struct MoreHubView: View {
                         .padding(.horizontal, max(scale.px(14), 12))
                         .padding(.top, max(scale.vertical(8), 6))
                         .padding(.bottom, max(scale.vertical(24), 18))
+                    }
+
+                    if logoutConfirmOpen {
+                        MetrologyConfirmDialog(
+                            title: "退出登录",
+                            message: "确认退出当前账号？",
+                            cancelTitle: "取消",
+                            confirmTitle: "退出",
+                            destructive: true,
+                            onCancel: {
+                                logoutConfirmOpen = false
+                            },
+                            onConfirm: {
+                                logoutConfirmOpen = false
+                                appState.logout()
+                            }
+                        )
                     }
                 }
             }
