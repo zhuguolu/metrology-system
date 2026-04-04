@@ -204,8 +204,6 @@ final class DeviceListViewModel: ObservableObject {
     }
 
     func createLedgerDevice(payload: DeviceUpdatePayload) async -> Bool {
-        guard mode == .ledger else { return false }
-
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }

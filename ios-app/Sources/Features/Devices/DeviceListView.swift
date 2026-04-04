@@ -18,8 +18,10 @@ struct DeviceListView: View {
     @StateObject private var viewModel: DeviceListViewModel
     @State private var selectedDevice: DeviceDto?
     @State private var quickEditDevice: DeviceDto?
+    @State private var createDeviceSheetOpen = false
     @State private var filterExpanded = false
-    @State private var moreActionsExpanded = false
+    @State private var activeFilterPicker: FilterPickerKind?
+    @State private var searchDebounceTask: Task<Void, Never>?
 
     init(mode: DeviceListMode) {
         _viewModel = StateObject(wrappedValue: DeviceListViewModel(mode: mode))
@@ -122,6 +124,19 @@ struct DeviceListView: View {
                 )
             }
         }
+        .sheet(item: $activeFilterPicker) { kind in
+            filterPickerSheet(kind: kind)
+        }
+        .sheet(isPresented: $createDeviceSheetOpen) {
+            DeviceEditView(device: .empty, title: "新增设备") { payload in
+                Task {
+                    let success = await viewModel.createLedgerDevice(payload: payload)
+                    if success {
+                        createDeviceSheetOpen = false
+                    }
+                }
+            }
+        }
     }
 
     private func filterCard(metrics: DeviceLayoutMetrics) -> some View {
@@ -132,6 +147,13 @@ struct DeviceListView: View {
                     .foregroundStyle(MetrologyPalette.textPrimary)
                     .padding(.horizontal, 12)
                     .frame(height: 40)
+                    .submitLabel(.search)
+                    .onSubmit {
+                        Task { await viewModel.load(page: 1) }
+                    }
+                    .onChange(of: viewModel.searchText) { _, _ in
+                        scheduleSearchReload()
+                    }
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(Color.white)
@@ -141,6 +163,13 @@ struct DeviceListView: View {
                             .stroke(Color(hex: 0xD6E2F2), lineWidth: 1)
                     )
 
+                Button("新增") {
+                    createDeviceSheetOpen = true
+                }
+                .font(.system(size: 14, weight: .bold))
+                .frame(width: 56, height: 40)
+                .buttonStyle(MetrologyPrimaryButtonStyle())
+
                 Button(filterExpanded ? "收起" : "筛选") {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         filterExpanded.toggle()
@@ -148,7 +177,16 @@ struct DeviceListView: View {
                 }
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(MetrologyPalette.textPrimary)
-                .frame(width: 64, height: 40)
+                .frame(width: 56, height: 40)
+                .buttonStyle(MetrologySecondaryButtonStyle())
+
+                Button("重置") {
+                    searchDebounceTask?.cancel()
+                    Task { await viewModel.resetFilters() }
+                }
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+                .frame(width: 56, height: 40)
                 .buttonStyle(MetrologySecondaryButtonStyle())
             }
 
@@ -156,14 +194,16 @@ struct DeviceListView: View {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
                         filterSelect(
+                            kind: .department,
                             title: "部门",
-                            value: $viewModel.deptFilter,
+                            value: viewModel.deptFilter,
                             allLabel: "全部部门",
                             options: departmentOptions
                         )
                         filterSelect(
+                            kind: .validity,
                             title: "有效性",
-                            value: $viewModel.validityFilter,
+                            value: viewModel.validityFilter,
                             allLabel: "全部有效性",
                             options: validityOptions
                         )
@@ -171,21 +211,14 @@ struct DeviceListView: View {
 
                     HStack(spacing: 8) {
                         filterSelect(
+                            kind: .useStatus,
                             title: "使用状态",
-                            value: $viewModel.useStatusFilter,
+                            value: viewModel.useStatusFilter,
                             allLabel: "全部状态",
                             options: useStatusOptions
                         )
 
-                        if viewModel.mode == .ledger {
-                            Button("重置筛选") {
-                                Task { await viewModel.resetFilters() }
-                            }
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(MetrologyPalette.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 38)
-                            .buttonStyle(MetrologySecondaryButtonStyle())
-                        } else {
+                        if viewModel.mode != .ledger {
                             HStack(spacing: 6) {
                                 field("起始日期", text: $viewModel.nextDateFrom, metrics: metrics)
                                 Text("~")
@@ -195,50 +228,6 @@ struct DeviceListView: View {
                             }
                             .frame(maxWidth: .infinity)
                         }
-                    }
-
-                    if viewModel.mode != .ledger {
-                        Divider().overlay(MetrologyPalette.stroke)
-
-                        Button(moreActionsExpanded ? "收起更多" : "更多功能") {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                moreActionsExpanded.toggle()
-                            }
-                        }
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(MetrologyPalette.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 40)
-                        .buttonStyle(MetrologySecondaryButtonStyle())
-
-                        if moreActionsExpanded {
-                            Button("重置筛选") {
-                                Task { await viewModel.resetFilters() }
-                            }
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(MetrologyPalette.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                            .buttonStyle(MetrologySecondaryButtonStyle())
-                        }
-                    }
-
-                    HStack(spacing: 10) {
-                        Button("查询") {
-                            Task { await viewModel.load(page: 1) }
-                        }
-                        .buttonStyle(MetrologyPrimaryButtonStyle())
-
-                        Button("重置") {
-                            Task { await viewModel.resetFilters() }
-                        }
-                        .buttonStyle(MetrologySecondaryButtonStyle())
-
-                        Spacer(minLength: 0)
-
-                        Text(viewModel.hintMessage)
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundStyle(MetrologyPalette.textSecondary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.trailing)
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -477,24 +466,18 @@ struct DeviceListView: View {
     }
 
     private func filterSelect(
+        kind: FilterPickerKind,
         title: String,
-        value: Binding<String>,
+        value: String,
         allLabel: String,
         options: [String]
     ) -> some View {
-        Menu {
-            Button(allLabel) {
-                value.wrappedValue = ""
-            }
-            ForEach(options, id: \.self) { option in
-                Button(option) {
-                    value.wrappedValue = option
-                }
-            }
+        Button {
+            activeFilterPicker = kind
         } label: {
             MetrologySelectField(
                 title: title,
-                value: value.wrappedValue.isEmpty ? allLabel : value.wrappedValue,
+                value: value.isEmpty ? allLabel : value,
                 compact: true
             )
         }
@@ -554,6 +537,145 @@ struct DeviceListView: View {
         Task { await viewModel.load(page: 1) }
     }
 
+    private func scheduleSearchReload() {
+        searchDebounceTask?.cancel()
+        searchDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard !Task.isCancelled else { return }
+            await viewModel.load(page: 1)
+        }
+    }
+
+    private func filterPickerSheet(kind: FilterPickerKind) -> some View {
+        let title = filterPickerTitle(kind: kind)
+        let allLabel = filterPickerAllLabel(kind: kind)
+        let selectedValue = filterPickerValue(kind: kind)
+        let options = filterPickerOptions(kind: kind)
+
+        return NavigationStack {
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        pickerRow(
+                            title: allLabel,
+                            selected: selectedValue.isEmpty
+                        ) {
+                            activeFilterPicker = nil
+                            applyFilterSelection(kind: kind, value: nil)
+                        }
+
+                        ForEach(options, id: \.self) { option in
+                            pickerRow(
+                                title: option,
+                                selected: selectedValue == option
+                            ) {
+                                activeFilterPicker = nil
+                                applyFilterSelection(kind: kind, value: option)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .padding(.bottom, 12)
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        activeFilterPicker = nil
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func pickerRow(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text(title)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.navActive)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .metrologyCard()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func filterPickerTitle(kind: FilterPickerKind) -> String {
+        switch kind {
+        case .department:
+            return "选择部门"
+        case .validity:
+            return "选择有效性"
+        case .useStatus:
+            return "选择使用状态"
+        }
+    }
+
+    private func filterPickerAllLabel(kind: FilterPickerKind) -> String {
+        switch kind {
+        case .department:
+            return "全部部门"
+        case .validity:
+            return "全部有效性"
+        case .useStatus:
+            return "全部状态"
+        }
+    }
+
+    private func filterPickerValue(kind: FilterPickerKind) -> String {
+        switch kind {
+        case .department:
+            return viewModel.deptFilter
+        case .validity:
+            return viewModel.validityFilter
+        case .useStatus:
+            return viewModel.useStatusFilter
+        }
+    }
+
+    private func filterPickerOptions(kind: FilterPickerKind) -> [String] {
+        switch kind {
+        case .department:
+            return departmentOptions
+        case .validity:
+            return validityOptions
+        case .useStatus:
+            return useStatusOptions
+        }
+    }
+
+    private func applyFilterSelection(kind: FilterPickerKind, value: String?) {
+        let selected = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch kind {
+        case .department:
+            guard viewModel.deptFilter != selected else { return }
+            viewModel.deptFilter = selected
+        case .validity:
+            guard viewModel.validityFilter != selected else { return }
+            viewModel.validityFilter = selected
+        case .useStatus:
+            guard viewModel.useStatusFilter != selected else { return }
+            viewModel.useStatusFilter = selected
+        }
+
+        Task { await viewModel.load(page: 1) }
+    }
+
     private var loadingOverlay: some View {
         ZStack {
             Color.black.opacity(0.18).ignoresSafeArea()
@@ -594,6 +716,14 @@ struct DeviceListView: View {
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
+}
+
+private enum FilterPickerKind: String, Identifiable {
+    case department
+    case validity
+    case useStatus
+
+    var id: String { rawValue }
 }
 
 private struct DeviceListRow: Identifiable {
