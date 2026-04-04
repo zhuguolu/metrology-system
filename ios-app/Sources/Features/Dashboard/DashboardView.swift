@@ -171,7 +171,7 @@ struct DashboardView: View {
             case .expired:
                 showDistributionDetail(title: "\u{5931}\u{6548}", value: viewModel.expired)
             }
-        )
+        }
         .frame(
             minWidth: 184,
             idealWidth: 210,
