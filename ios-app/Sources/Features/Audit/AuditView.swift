@@ -629,62 +629,20 @@ private enum AuditChangeStyle {
     case changed
 }
 
-private let auditOutputMinuteFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "zh_CN")
-    formatter.timeZone = .current
-    formatter.dateFormat = "yyyy-MM-dd HH:mm"
-    return formatter
-}()
-
-private let auditInputDateFormatters: [DateFormatter] = {
-    let patterns = [
-        "yyyy-MM-dd HH:mm:ss",
-        "yyyy-MM-dd HH:mm",
-        "yyyy/MM/dd HH:mm:ss",
-        "yyyy/MM/dd HH:mm",
-        "yyyy-MM-dd'T'HH:mm:ss",
-        "yyyy-MM-dd'T'HH:mm"
-    ]
-    return patterns.map { pattern in
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        formatter.dateFormat = pattern
-        return formatter
-    }
-}()
-
-private let auditISO8601FormatterWithFraction: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    formatter.timeZone = .current
-    return formatter
-}()
-
-private let auditISO8601Formatter: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    formatter.timeZone = .current
-    return formatter
-}()
-
 private func auditTimeToMinute(_ value: String?) -> String {
     let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     guard !raw.isEmpty else { return "-" }
 
-    if let parsed = auditISO8601FormatterWithFraction.date(from: raw)
-        ?? auditISO8601Formatter.date(from: raw) {
-        return auditOutputMinuteFormatter.string(from: parsed)
-    }
+    var normalized = raw.replacingOccurrences(of: "T", with: " ")
+    normalized = normalized.replacingOccurrences(of: "/", with: "-")
 
-    for formatter in auditInputDateFormatters {
-        if let parsed = formatter.date(from: raw) {
-            return auditOutputMinuteFormatter.string(from: parsed)
-        }
+    if let dotIndex = normalized.firstIndex(of: ".") {
+        normalized = String(normalized[..<dotIndex])
     }
-
-    let normalized = raw.replacingOccurrences(of: "T", with: " ")
+    if let zIndex = normalized.firstIndex(of: "Z") {
+        normalized = String(normalized[..<zIndex])
+    }
+    normalized = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
     if normalized.count >= 16 {
         return String(normalized.prefix(16))
     }
