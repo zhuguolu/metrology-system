@@ -348,7 +348,7 @@ private struct MoreHubView: View {
                             VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
                                 section(title: "协作与数据", scale: scale) {
                                     LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                        NavigationLink { moduleDestination(title: "我的文件") { FilesView() } } label: {
+                                        NavigationLink { moduleDestination(title: "我的文件", enableBackSwipe: false) { FilesView() } } label: {
                                             moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
                                         }
                                         NavigationLink { moduleDestination(title: "网络挂载") { WebDavView() } } label: {
@@ -427,11 +427,13 @@ private struct MoreHubView: View {
     @ViewBuilder
     private func moduleDestination<Content: View>(
         title: String,
+        enableBackSwipe: Bool = true,
         @ViewBuilder _ destination: () -> Content
     ) -> some View {
         destination()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
+            .modifier(MoreSubmoduleBackSwipeModifier(enabled: enableBackSwipe))
             .onAppear { submoduleTitle = title }
     }
 
@@ -515,6 +517,30 @@ private struct MoreHubView: View {
             return 1.06
         default:
             return 1.0
+        }
+    }
+}
+
+private struct MoreSubmoduleBackSwipeModifier: ViewModifier {
+    let enabled: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .contentShape(Rectangle())
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 18, coordinateSpace: .local)
+                        .onEnded { value in
+                            let horizontal = value.translation.width
+                            let vertical = abs(value.translation.height)
+                            guard value.startLocation.x <= 24 else { return }
+                            guard horizontal > 84, horizontal > vertical * 1.35 else { return }
+                            dismiss()
+                        }
+                )
+        } else {
+            content
         }
     }
 }

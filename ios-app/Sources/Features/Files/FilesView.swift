@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
+    @Environment(\.dismiss) private var dismiss
     @State private var fileImporterOpen = false
     @State private var createFolderDialogOpen = false
     @State private var createFolderName = ""
@@ -288,7 +289,6 @@ struct FilesView: View {
     private var edgeBackGesture: some Gesture {
         DragGesture(minimumDistance: 16, coordinateSpace: .local)
             .onChanged { value in
-                guard viewModel.currentFolderId != nil else { return }
                 guard !edgeBackTriggered else { return }
                 guard value.startLocation.x <= 24 else { return }
 
@@ -297,7 +297,11 @@ struct FilesView: View {
                 guard horizontal > 70, horizontal > vertical * 1.4 else { return }
 
                 edgeBackTriggered = true
-                Task { await viewModel.goBack() }
+                if viewModel.currentFolderId != nil {
+                    Task { await viewModel.goBack() }
+                } else {
+                    dismiss()
+                }
             }
             .onEnded { _ in
                 edgeBackTriggered = false
