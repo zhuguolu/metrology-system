@@ -9,6 +9,8 @@ final class DeviceListViewModel: ObservableObject {
     @Published var useStatusFilter: String = ""
     @Published var nextDateFrom: String = ""
     @Published var nextDateTo: String = ""
+    @Published private(set) var departmentFilterOptions: [String] = []
+    @Published private(set) var useStatusFilterOptions: [String] = []
 
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var items: [DeviceDto] = []
@@ -35,6 +37,7 @@ final class DeviceListViewModel: ObservableObject {
     }
 
     func initialLoad() async {
+        await refreshFilterSourceOptions()
         if !items.isEmpty { return }
         await load(page: 1)
     }
@@ -50,6 +53,7 @@ final class DeviceListViewModel: ObservableObject {
         useStatusFilter = mode == .calibration ? "正常" : ""
         nextDateFrom = ""
         nextDateTo = ""
+        await refreshFilterSourceOptions()
         await load(page: 1)
     }
 
@@ -92,38 +96,32 @@ final class DeviceListViewModel: ObservableObject {
             summaryCounts = resolvedValiditySummary
             useStatusSummary = resolvedUseStatusSummary
 
-            if hasSummaryFilterApplied {
-                do {
-                    let baselineResult = try await APIClient.shared.devicesPaged(
-                        mode: mode,
-                        search: searchText,
-                        dept: deptFilter,
-                        validity: nil,
-                        useStatus: baselineUseStatusFilter,
-                        nextDateFrom: mode == .ledger ? nil : nextDateFrom,
-                        nextDateTo: mode == .ledger ? nil : nextDateTo,
-                        page: 1,
-                        size: 1
-                    )
-                    guard shouldApplyResult(for: token) else { return }
+            do {
+                let baselineResult = try await APIClient.shared.devicesPaged(
+                    mode: mode,
+                    search: searchText,
+                    dept: deptFilter,
+                    validity: nil,
+                    useStatus: baselineUseStatusFilter,
+                    nextDateFrom: mode == .ledger ? nil : nextDateFrom,
+                    nextDateTo: mode == .ledger ? nil : nextDateTo,
+                    page: 1,
+                    size: 1
+                )
+                guard shouldApplyResult(for: token) else { return }
 
-                    let baselineItems = baselineResult.content ?? []
-                    overallTotal = baselineResult.totalElements ?? total
-                    overallSummaryCounts = resolveValiditySummary(
-                        serverSummary: baselineResult.summaryCounts,
-                        items: baselineItems
-                    )
-                    overallUseStatusSummary = resolveUseStatusSummary(
-                        serverSummary: baselineResult.useStatusSummary,
-                        items: baselineItems
-                    )
-                } catch {
-                    guard shouldApplyResult(for: token) else { return }
-                    overallTotal = total
-                    overallSummaryCounts = resolvedValiditySummary
-                    overallUseStatusSummary = resolvedUseStatusSummary
-                }
-            } else {
+                let baselineItems = baselineResult.content ?? []
+                overallTotal = baselineResult.totalElements ?? total
+                overallSummaryCounts = resolveValiditySummary(
+                    serverSummary: baselineResult.summaryCounts,
+                    items: baselineItems
+                )
+                overallUseStatusSummary = resolveUseStatusSummary(
+                    serverSummary: baselineResult.useStatusSummary,
+                    items: baselineItems
+                )
+            } catch {
+                guard shouldApplyResult(for: token) else { return }
                 overallTotal = total
                 overallSummaryCounts = resolvedValiditySummary
                 overallUseStatusSummary = resolvedUseStatusSummary
@@ -136,6 +134,35 @@ final class DeviceListViewModel: ObservableObject {
             }
             errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
             hintMessage = ""
+        }
+    }
+
+    func refreshFilterSourceOptions() async {
+        do {
+            async let departmentsTask = APIClient.shared.departments(search: "")
+            async let statusesTask = APIClient.shared.deviceStatuses()
+            let departments = try await departmentsTask
+            let statuses = try await statusesTask
+
+            let departmentNames = departments.compactMap {
+                $0.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            let statusNames = statuses
+                .sorted { lhs, rhs in
+                    let left = lhs.sortOrder ?? Int.max
+                    let right = rhs.sortOrder ?? Int.max
+                    if left != right { return left < right }
+                    return (lhs.id ?? Int64.max) < (rhs.id ?? Int64.max)
+                }
+                .compactMap { $0.name?.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+            departmentFilterOptions = normalizedOptions(departmentNames + [deptFilter])
+            useStatusFilterOptions = normalizedOptions(statusNames + [useStatusFilter])
+        } catch {
+            // Keep current options when lookup fails.
+            departmentFilterOptions = normalizedOptions(departmentFilterOptions + [deptFilter])
+            useStatusFilterOptions = normalizedOptions(useStatusFilterOptions + [useStatusFilter])
         }
     }
 
@@ -242,21 +269,6 @@ final class DeviceListViewModel: ObservableObject {
 
     private func shouldApplyResult(for token: UInt64) -> Bool {
         token == currentLoadToken && !Task.isCancelled
-    }
-
-    private var hasSummaryFilterApplied: Bool {
-        let normalizedValidity = normalizeStatusText(validityFilter)
-        let normalizedUseStatus = normalizeStatusText(useStatusFilter)
-        let normalizedBaselineUseStatus = normalizeStatusText(baselineUseStatusFilter ?? "")
-
-        switch mode {
-        case .ledger:
-            return !normalizedUseStatus.isEmpty
-        case .calibration:
-            return !normalizedValidity.isEmpty || normalizedUseStatus != normalizedBaselineUseStatus
-        case .todo:
-            return !normalizedValidity.isEmpty || !normalizedUseStatus.isEmpty
-        }
     }
 
     private var baselineUseStatusFilter: String? {
@@ -384,6 +396,18 @@ final class DeviceListViewModel: ObservableObject {
 
     private func normalizeStatusText(_ rawValue: String?) -> String {
         (rawValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizedOptions(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for raw in values {
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty, !seen.contains(value) else { continue }
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
     }
 }
 
