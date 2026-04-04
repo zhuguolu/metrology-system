@@ -318,14 +318,15 @@ final class DeviceListViewModel: ObservableObject {
 
         if let serverSummary, !serverSummary.isEmpty {
             for (rawKey, rawValue) in serverSummary {
-                let bucket = useStatusBucket(for: rawKey)
+                let bucket = useStatusBucketFromServerSummary(for: rawKey)
                 summary[bucket, default: 0] += max(rawValue, 0)
             }
+            return summary
         }
 
-        if summary.values.reduce(0, +) == 0, !items.isEmpty {
+        if !items.isEmpty {
             for item in items {
-                let bucket = useStatusBucket(for: item.useStatus)
+                let bucket = useStatusBucketFromItem(for: item.useStatus)
                 summary[bucket, default: 0] += 1
             }
         }
@@ -360,7 +361,49 @@ final class DeviceListViewModel: ObservableObject {
         return nil
     }
 
-    private func useStatusBucket(for rawValue: String?) -> String {
+    private func useStatusBucketFromServerSummary(for rawValue: String?) -> String {
+        let text = normalizeStatusText(rawValue)
+        if text.isEmpty { return "其他" }
+        let upper = text.uppercased()
+
+        if text == "正常"
+            || text == "在用"
+            || text == "使用中"
+            || upper == "NORMAL"
+            || upper == "IN_USE"
+            || upper == "INUSE"
+            || upper == "ACTIVE" {
+            return "正常"
+        }
+
+        if text == "故障"
+            || text == "维修"
+            || text == "保养"
+            || upper == "FAULT"
+            || upper == "BROKEN"
+            || upper == "REPAIR"
+            || upper == "MAINTENANCE" {
+            return "故障"
+        }
+
+        if text == "报废"
+            || upper == "SCRAP"
+            || upper == "DISCARD" {
+            return "报废"
+        }
+
+        if text == "其他"
+            || upper == "OTHER"
+            || upper == "OTHERS"
+            || upper == "UNKNOWN"
+            || upper == "UNCLASSIFIED" {
+            return "其他"
+        }
+
+        return "其他"
+    }
+
+    private func useStatusBucketFromItem(for rawValue: String?) -> String {
         let text = normalizeStatusText(rawValue)
         if text.isEmpty { return "其他" }
         let upper = text.uppercased()

@@ -403,6 +403,12 @@ struct DeviceListView: View {
     }
 
     private var displayedLedgerOtherCount: Int64 {
+        if let overallOther = viewModel.overallUseStatusSummary["其他"] {
+            return max(0, overallOther)
+        }
+        if let pageOther = viewModel.useStatusSummary["其他"] {
+            return max(0, pageOther)
+        }
         let known = displayedOverallUseStatus("正常")
             + displayedOverallUseStatus("故障")
             + displayedOverallUseStatus("报废")
