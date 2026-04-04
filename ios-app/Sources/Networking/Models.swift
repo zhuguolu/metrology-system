@@ -98,6 +98,42 @@ struct DeviceDto: Codable, Identifiable {
     }
 }
 
+extension DeviceDto {
+    static let empty = DeviceDto(
+        id: nil,
+        name: nil,
+        metricNo: nil,
+        assetNo: nil,
+        abcClass: nil,
+        dept: nil,
+        location: nil,
+        cycle: nil,
+        serialNo: nil,
+        purchasePrice: nil,
+        purchaseDate: nil,
+        calibrationResult: nil,
+        responsiblePerson: nil,
+        manufacturer: nil,
+        model: nil,
+        graduationValue: nil,
+        testRange: nil,
+        allowableError: nil,
+        serviceLife: nil,
+        calDate: nil,
+        nextDate: nil,
+        validity: nil,
+        daysPassed: nil,
+        status: nil,
+        remark: nil,
+        useStatus: nil
+    )
+}
+
+enum DeviceCreateResult {
+    case created(DeviceDto)
+    case submitted(message: String)
+}
+
 struct DeviceCalibrationPayload: Codable {
     let calDate: String?
     let cycle: Int?
@@ -206,6 +242,27 @@ struct BreadcrumbItemDto: Codable {
     let id: Int64?
     let name: String?
     let readOnly: Bool?
+}
+
+struct CreateFolderRequest: Codable {
+    let name: String
+    let parentId: Int64?
+}
+
+struct ParentFolderRequest: Codable {
+    let parentId: Int64?
+}
+
+struct ScanSyncResultDto: Codable {
+    let path: String?
+    let foldersCreated: Int?
+    let foldersUpdated: Int?
+    let filesCreated: Int?
+    let filesUpdated: Int?
+    let foldersDeleted: Int?
+    let filesDeleted: Int?
+    let unchanged: Int?
+    let conflicts: Int?
 }
 
 struct SettingsDto: Codable {

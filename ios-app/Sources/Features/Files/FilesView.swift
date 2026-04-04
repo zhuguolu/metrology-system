@@ -1,7 +1,11 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
+    @State private var fileImporterOpen = false
+    @State private var createFolderDialogOpen = false
+    @State private var createFolderName = ""
 
     var body: some View {
         ZStack {
@@ -36,27 +40,42 @@ struct FilesView: View {
                 .padding(14)
                 .padding(.bottom, 14)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .navigationTitle("我的文件")
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button("根目录") {
-                    Task { await viewModel.goRoot() }
-                }
-                Button("上级") {
-                    Task { await viewModel.goBack() }
-                }
-                Button("刷新") {
-                    Task { await viewModel.load() }
-                }
-            }
-        }
         .task {
             await viewModel.load()
         }
+        .fileImporter(
+            isPresented: $fileImporterOpen,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case let .success(urls):
+                Task { await viewModel.uploadFiles(urls: urls) }
+            case let .failure(error):
+                viewModel.errorMessage = error.localizedDescription
+            }
+        }
+        .alert("新建文件夹", isPresented: $createFolderDialogOpen) {
+            TextField("请输入文件夹名称", text: $createFolderName)
+            Button("取消", role: .cancel) {
+                createFolderName = ""
+            }
+            Button("创建") {
+                let pendingName = createFolderName
+                createFolderName = ""
+                Task {
+                    _ = await viewModel.createFolder(name: pendingName)
+                }
+            }
+        } message: {
+            Text("将在当前目录创建子文件夹")
+        }
         .overlay {
             if viewModel.isLoading {
-                ProgressView("处理中...")
+                ProgressView(viewModel.isUploading ? "正在上传..." : "处理中...")
                     .padding(12)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -80,7 +99,7 @@ struct FilesView: View {
     }
 
     private var headerPanel: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("路径")
                     .foregroundStyle(MetrologyPalette.textSecondary)
@@ -96,10 +115,65 @@ struct FilesView: View {
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
 
+            if let scanSyncMessage = viewModel.scanSyncMessage, !scanSyncMessage.isEmpty {
+                Text(scanSyncMessage)
+                    .font(.footnote)
+                    .foregroundStyle(MetrologyPalette.navActive)
+            }
+
+            if viewModel.readOnlyFolder {
+                Text("当前目录为只读，已禁用上传/新建/扫描同步")
+                    .font(.footnote)
+                    .foregroundStyle(MetrologyPalette.statusWarning)
+            }
+
             if let message = viewModel.errorMessage {
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(MetrologyPalette.statusExpired)
+            }
+
+            HStack(spacing: 8) {
+                Button("根目录") {
+                    Task { await viewModel.goRoot() }
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+
+                Button("上级") {
+                    Task { await viewModel.goBack() }
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+                .disabled(viewModel.currentFolderId == nil)
+                .opacity(viewModel.currentFolderId == nil ? 0.45 : 1)
+
+                Button("刷新") {
+                    Task { await viewModel.load() }
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+            }
+
+            HStack(spacing: 8) {
+                Button("上传文件") {
+                    fileImporterOpen = true
+                }
+                .buttonStyle(MetrologyPrimaryButtonStyle())
+                .disabled(!viewModel.canWrite)
+                .opacity(viewModel.canWrite ? 1 : 0.45)
+
+                Button("新建文件夹") {
+                    createFolderName = ""
+                    createFolderDialogOpen = true
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+                .disabled(!viewModel.canWrite)
+                .opacity(viewModel.canWrite ? 1 : 0.45)
+
+                Button("扫描同步") {
+                    Task { await viewModel.scanSync() }
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+                .disabled(!viewModel.canWrite)
+                .opacity(viewModel.canWrite ? 1 : 0.45)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

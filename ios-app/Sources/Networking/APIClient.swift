@@ -113,6 +113,27 @@ final class APIClient {
         try await send(path: "api/devices/\(id)", method: "PUT", body: payload, authorized: true)
     }
 
+    func createDevice(payload: DeviceUpdatePayload) async throws -> DeviceCreateResult {
+        let bodyData = try encoder.encode(payload)
+        let request = try makeRequest(
+            path: "api/devices",
+            method: "POST",
+            queryItems: [],
+            bodyData: bodyData,
+            authorized: true
+        )
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+
+        if let created = try? decoder.decode(DeviceDto.self, from: data) {
+            return .created(created)
+        }
+
+        let fallbackMessage = "新增申请已提交，等待审核"
+        let message = extractErrorMessage(from: data) ?? fallbackMessage
+        return .submitted(message: message)
+    }
+
     func pendingAudit() async throws -> [AuditRecordDto] {
         try await send(path: "api/audit/pending", method: "GET", authorized: true)
     }
@@ -162,6 +183,39 @@ final class APIClient {
             query.append(URLQueryItem(name: "parentId", value: String(parentId)))
         }
         return try await send(path: "api/files", method: "GET", queryItems: query, authorized: true)
+    }
+
+    func createFolder(name: String, parentId: Int64?) async throws -> UserFileItemDto {
+        let payload = CreateFolderRequest(name: name, parentId: parentId)
+        return try await send(path: "api/files/folder", method: "POST", body: payload, authorized: true)
+    }
+
+    func uploadFile(parentId: Int64?, fileName: String, mimeType: String?, bytes: Data) async throws -> UserFileItemDto {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let body = makeMultipartBody(
+            boundary: boundary,
+            fileField: "file",
+            fileName: fileName,
+            mimeType: mimeType ?? "application/octet-stream",
+            fileBytes: bytes
+        )
+        var query: [URLQueryItem] = []
+        if let parentId {
+            query.append(URLQueryItem(name: "parentId", value: String(parentId)))
+        }
+
+        var request = try makeRequest(path: "api/files/upload", method: "POST", queryItems: query, bodyData: body, authorized: true)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(UserFileItemDto.self, from: data)
+    }
+
+    func scanSync(parentId: Int64?) async throws -> ScanSyncResultDto {
+        let payload = ParentFolderRequest(parentId: parentId)
+        return try await send(path: "api/files/scan-sync", method: "POST", body: payload, authorized: true)
     }
 
     func fileBreadcrumb(folderId: Int64) async throws -> [BreadcrumbItemDto] {

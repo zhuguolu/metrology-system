@@ -1,5 +1,6 @@
-﻿import Foundation
+import Foundation
 import Combine
+import UniformTypeIdentifiers
 
 struct PreviewItem: Identifiable {
     let id = UUID()
@@ -10,12 +11,16 @@ struct PreviewItem: Identifiable {
 @MainActor
 final class FilesViewModel: ObservableObject {
     @Published var isLoading: Bool = false
+    @Published var isUploading: Bool = false
     @Published var errorMessage: String?
     @Published var hint: String = ""
+    @Published var scanSyncMessage: String?
     @Published var items: [UserFileItemDto] = []
     @Published var currentFolderId: Int64?
     @Published var currentPath: String = "/"
     @Published var previewItem: PreviewItem?
+    @Published var canWrite: Bool = true
+    @Published var readOnlyFolder: Bool = false
 
     private var currentLoadToken: UInt64 = 0
     private var currentPreviewURL: URL?
@@ -32,18 +37,16 @@ final class FilesViewModel: ObservableObject {
         do {
             let result = try await APIClient.shared.files(parentId: currentFolderId)
             guard shouldApplyResult(for: token) else { return }
+
             items = result.items ?? []
-            hint = "共 \(items.count) 项"
+            applyAccess(result.access)
+            hint = "共 \(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
         } catch {
             guard shouldApplyResult(for: token) else { return }
             if error is CancellationError {
                 return
             }
-            if let apiError = error as? APIError {
-                errorMessage = apiError.localizedDescription
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = localizedMessage(from: error)
         }
     }
 
@@ -68,7 +71,7 @@ final class FilesViewModel: ObservableObject {
             }
             await load()
         } catch {
-            errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            errorMessage = localizedMessage(from: error)
         }
     }
 
@@ -102,7 +105,103 @@ final class FilesViewModel: ObservableObject {
             currentPreviewURL = url
             previewItem = PreviewItem(url: url, title: item.displayName)
         } catch {
-            errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            errorMessage = localizedMessage(from: error)
+        }
+    }
+
+    func createFolder(name: String) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "文件夹名称不能为空"
+            return false
+        }
+        guard canWrite else {
+            errorMessage = "当前目录为只读，不能新建文件夹"
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            _ = try await APIClient.shared.createFolder(name: trimmed, parentId: currentFolderId)
+            scanSyncMessage = "文件夹创建成功"
+            await load()
+            return true
+        } catch {
+            if error is CancellationError {
+                return false
+            }
+            errorMessage = localizedMessage(from: error)
+            return false
+        }
+    }
+
+    func uploadFiles(urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+        guard canWrite else {
+            errorMessage = "当前目录为只读，不能上传文件"
+            return
+        }
+
+        isLoading = true
+        isUploading = true
+        errorMessage = nil
+        defer {
+            isUploading = false
+            isLoading = false
+        }
+
+        var successCount = 0
+        var failCount = 0
+
+        for url in urls {
+            guard let payload = resolveUploadPayload(from: url) else {
+                failCount += 1
+                continue
+            }
+
+            do {
+                _ = try await APIClient.shared.uploadFile(
+                    parentId: currentFolderId,
+                    fileName: payload.name,
+                    mimeType: payload.mimeType,
+                    bytes: payload.bytes
+                )
+                successCount += 1
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+                failCount += 1
+            }
+        }
+
+        scanSyncMessage = "上传完成：成功 \(successCount)，失败 \(failCount)"
+        await load()
+    }
+
+    func scanSync() async {
+        guard canWrite else {
+            errorMessage = "当前目录为只读，不能扫描同步"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let result = try await APIClient.shared.scanSync(parentId: currentFolderId)
+            scanSyncMessage = scanSyncSummary(from: result)
+            await load()
+        } catch {
+            if error is CancellationError {
+                return
+            }
+            errorMessage = localizedMessage(from: error)
+            scanSyncMessage = "扫描同步失败，可继续浏览当前目录并稍后重试"
         }
     }
 
@@ -124,6 +223,48 @@ final class FilesViewModel: ObservableObject {
         token == currentLoadToken && !Task.isCancelled
     }
 
+    private func applyAccess(_ access: FileAccessDto?) {
+        guard let access else {
+            readOnlyFolder = false
+            canWrite = true
+            return
+        }
+        readOnlyFolder = access.readOnly == true
+        canWrite = (access.canWrite ?? false) && !readOnlyFolder
+    }
+
+    private func scanSyncSummary(from result: ScanSyncResultDto) -> String {
+        let foldersCreated = result.foldersCreated ?? 0
+        let filesCreated = result.filesCreated ?? 0
+        let foldersDeleted = result.foldersDeleted ?? 0
+        let filesDeleted = result.filesDeleted ?? 0
+        return "扫描同步完成：新增目录 \(foldersCreated)，新增文件 \(filesCreated)，删除目录 \(foldersDeleted)，删除文件 \(filesDeleted)"
+    }
+
+    private func resolveUploadPayload(from url: URL) -> UploadPayload? {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let name = url.lastPathComponent.isEmpty
+                ? "upload_\(Int(Date().timeIntervalSince1970)).bin"
+                : url.lastPathComponent
+            let mimeType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType?.preferredMIMEType
+            return UploadPayload(name: name, mimeType: mimeType, bytes: data)
+        } catch {
+            return nil
+        }
+    }
+
+    private func localizedMessage(from error: Error) -> String {
+        (error as? APIError)?.localizedDescription ?? error.localizedDescription
+    }
+
     private func registerPreviewTempFile(_ url: URL) {
         cachedPreviewURLs.insert(url)
     }
@@ -138,4 +279,10 @@ final class FilesViewModel: ObservableObject {
             // Ignore cleanup failures to avoid blocking user flow.
         }
     }
+}
+
+private struct UploadPayload {
+    let name: String
+    let mimeType: String?
+    let bytes: Data
 }
