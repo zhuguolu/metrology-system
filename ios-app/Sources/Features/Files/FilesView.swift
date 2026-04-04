@@ -6,6 +6,8 @@ struct FilesView: View {
     @State private var fileImporterOpen = false
     @State private var createFolderDialogOpen = false
     @State private var createFolderName = ""
+    @State private var searchText = ""
+    @State private var edgeBackTriggered = false
 
     var body: some View {
         ZStack {
@@ -41,10 +43,15 @@ struct FilesView: View {
                 .padding(.bottom, 14)
             }
             .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(edgeBackGesture)
         }
         .navigationTitle("我的文件")
         .task {
             await viewModel.load()
+        }
+        .onChange(of: viewModel.currentFolderId) { _, _ in
+            searchText = ""
+            edgeBackTriggered = false
         }
         .fileImporter(
             isPresented: $fileImporterOpen,
@@ -100,6 +107,7 @@ struct FilesView: View {
 
     private var headerPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
+            searchField
             HStack {
                 Text("路径")
                     .foregroundStyle(MetrologyPalette.textSecondary)
@@ -109,8 +117,8 @@ struct FilesView: View {
                     .lineLimit(1)
             }
 
-            if !viewModel.hint.isEmpty {
-                Text(viewModel.hint)
+            if isSearching || !viewModel.hint.isEmpty {
+                Text(searchHint)
                     .font(.footnote)
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
@@ -181,6 +189,41 @@ struct FilesView: View {
         .metrologyCard()
     }
 
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(MetrologyPalette.textMuted)
+
+            TextField("搜索文件/文件夹", text: $searchText)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            if isSearching {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textMuted)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 38)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
+    }
+
     private func fileRow(item: UserFileItemDto) -> some View {
         HStack(spacing: 12) {
             Image(systemName: item.isFolder ? "folder.fill" : "doc.fill")
@@ -212,13 +255,53 @@ struct FilesView: View {
 
     private var fileRows: [FileListRow] {
         var duplicated: [String: Int] = [:]
-        return viewModel.items.map { item in
+        return filteredItems.map { item in
             let base = baseFileRowID(item)
             let count = duplicated[base, default: 0]
             duplicated[base] = count + 1
             let id = count == 0 ? base : "\(base)#\(count)"
             return FileListRow(id: id, item: item)
         }
+    }
+
+    private var filteredItems: [UserFileItemDto] {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return viewModel.items }
+        return viewModel.items.filter { item in
+            let rawName = (item.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return item.displayName.localizedCaseInsensitiveContains(keyword)
+                || rawName.localizedCaseInsensitiveContains(keyword)
+        }
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var searchHint: String {
+        if isSearching {
+            return "筛选结果：\(fileRows.count)/\(viewModel.items.count)"
+        }
+        return viewModel.hint
+    }
+
+    private var edgeBackGesture: some Gesture {
+        DragGesture(minimumDistance: 16, coordinateSpace: .local)
+            .onChanged { value in
+                guard viewModel.currentFolderId != nil else { return }
+                guard !edgeBackTriggered else { return }
+                guard value.startLocation.x <= 24 else { return }
+
+                let horizontal = value.translation.width
+                let vertical = abs(value.translation.height)
+                guard horizontal > 70, horizontal > vertical * 1.4 else { return }
+
+                edgeBackTriggered = true
+                Task { await viewModel.goBack() }
+            }
+            .onEnded { _ in
+                edgeBackTriggered = false
+            }
     }
 
     private func baseFileRowID(_ item: UserFileItemDto) -> String {

@@ -495,11 +495,9 @@ final class DeviceListViewModel: ObservableObject {
             return "故障"
         }
 
-        if text.contains("报废") || text.contains("停用") || text.contains("禁用") || text.contains("丢失")
+        if text.contains("报废")
             || upper.contains("SCRAP")
-            || upper.contains("DISCARD")
-            || upper.contains("DISABLE")
-            || upper.contains("LOST") {
+            || upper.contains("DISCARD") {
             return "报废"
         }
 

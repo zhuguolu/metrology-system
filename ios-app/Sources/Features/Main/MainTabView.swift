@@ -299,6 +299,10 @@ private struct AndroidStyleTabBar: View {
 }
 
 private struct MoreHubView: View {
+    private enum ScrollAnchor: String {
+        case top
+    }
+
     @Binding var selectedTab: MainTab
     @Binding var showMainHeader: Bool
     @EnvironmentObject private var appState: AppState
@@ -322,53 +326,70 @@ private struct MoreHubView: View {
                     )
                     .ignoresSafeArea()
 
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
-                            section(title: "协作与数据", scale: scale) {
-                                LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    NavigationLink { moduleDestination { FilesView() } } label: {
-                                        moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
-                                    }
-                                    NavigationLink { moduleDestination { WebDavView() } } label: {
-                                        moduleCardContent(icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
-                                    }
-                                    NavigationLink { moduleDestination { ChangeRecordView() } } label: {
-                                        moduleCardContent(icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
-                                    }
-                                    NavigationLink { moduleDestination { DeviceStatusView() } } label: {
-                                        moduleCardContent(icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
+                    ScrollViewReader { reader in
+                        ScrollView {
+                            Color.clear
+                                .frame(height: 0)
+                                .id(ScrollAnchor.top)
+
+                            VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
+                                section(title: "协作与数据", scale: scale) {
+                                    LazyVGrid(columns: columns, spacing: gridSpacing) {
+                                        NavigationLink { moduleDestination { FilesView() } } label: {
+                                            moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
+                                        }
+                                        NavigationLink { moduleDestination { WebDavView() } } label: {
+                                            moduleCardContent(icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
+                                        }
+                                        NavigationLink { moduleDestination { ChangeRecordView() } } label: {
+                                            moduleCardContent(icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
+                                        }
+                                        NavigationLink { moduleDestination { DeviceStatusView() } } label: {
+                                            moduleCardContent(icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
+                                        }
                                     }
                                 }
-                            }
 
-                            section(title: "管理与配置", scale: scale) {
-                                LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    NavigationLink { moduleDestination { DepartmentView() } } label: {
-                                        moduleCardContent(icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309), scale: scale)
-                                    }
-                                    NavigationLink { moduleDestination { UserManagementView() } } label: {
-                                        moduleCardContent(icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9), scale: scale)
-                                    }
-                                    NavigationLink { moduleDestination { SystemMaintenanceView() } } label: {
-                                        moduleCardContent(icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155), scale: scale)
+                                section(title: "管理与配置", scale: scale) {
+                                    LazyVGrid(columns: columns, spacing: gridSpacing) {
+                                        NavigationLink { moduleDestination { DepartmentView() } } label: {
+                                            moduleCardContent(icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309), scale: scale)
+                                        }
+                                        NavigationLink { moduleDestination { UserManagementView() } } label: {
+                                            moduleCardContent(icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9), scale: scale)
+                                        }
+                                        NavigationLink { moduleDestination { SystemMaintenanceView() } } label: {
+                                            moduleCardContent(icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155), scale: scale)
+                                        }
                                     }
                                 }
-                            }
 
-                            Button {
-                                logoutConfirmOpen = true
-                            } label: {
-                                Text("退出登录")
-                                    .font(.system(size: max(scale.px(14), 13), weight: .bold))
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, max(scale.vertical(12), 10))
+                                Button {
+                                    logoutConfirmOpen = true
+                                } label: {
+                                    Text("退出登录")
+                                        .font(.system(size: max(scale.px(14), 13), weight: .bold))
+                                        .foregroundStyle(MetrologyPalette.textPrimary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, max(scale.vertical(12), 10))
+                                }
+                                .buttonStyle(MetrologySecondaryButtonStyle())
                             }
-                            .buttonStyle(MetrologySecondaryButtonStyle())
+                            .padding(.horizontal, max(scale.px(14), 12))
+                            .padding(.top, max(scale.vertical(8), 6))
+                            .padding(.bottom, max(scale.vertical(24), 18))
                         }
-                        .padding(.horizontal, max(scale.px(14), 12))
-                        .padding(.top, max(scale.vertical(8), 6))
-                        .padding(.bottom, max(scale.vertical(24), 18))
+                        .onAppear {
+                            DispatchQueue.main.async {
+                                reader.scrollTo(ScrollAnchor.top, anchor: .top)
+                            }
+                        }
+                        .onChange(of: showMainHeader) { _, visible in
+                            guard visible else { return }
+                            DispatchQueue.main.async {
+                                reader.scrollTo(ScrollAnchor.top, anchor: .top)
+                            }
+                        }
                     }
 
                     if logoutConfirmOpen {
@@ -399,6 +420,7 @@ private struct MoreHubView: View {
     @ViewBuilder
     private func moduleDestination<Content: View>(@ViewBuilder _ destination: () -> Content) -> some View {
         destination()
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear { showMainHeader = false }
             .onDisappear { showMainHeader = true }
     }
