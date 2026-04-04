@@ -42,13 +42,13 @@
                                             <constraint firstAttribute="width" constant="92" id="logoChipWidth"/>
                                         </constraints>
                                     </view>
-                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="璁￠噺绠＄悊绯荤粺" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TitleLabel">
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="计量管理系统" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TitleLabel">
                                         <rect key="frame" x="82.5" y="136" width="176" height="34"/>
                                         <fontDescription key="fontDescription" type="boldSystem" pointSize="28"/>
                                         <color key="textColor" red="0.0392156863" green="0.1176470588" blue="0.2352941176" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                         <nil key="highlightedColor"/>
                                     </label>
-                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="璁惧銆佹牎鍑嗐€佸鏍镐笌璧勬枡缁熶竴绠＄悊" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="SubtitleLabel">
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="设备、校准、审核与资料统一管理" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="SubtitleLabel">
                                         <rect key="frame" x="50.5" y="176" width="240" height="19.5"/>
                                         <fontDescription key="fontDescription" type="system" weight="medium" pointSize="13"/>
                                         <color key="textColor" red="0.2274509804" green="0.3725490196" blue="0.5294117647" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
@@ -61,7 +61,7 @@
                                                 <rect key="frame" x="12" y="10" width="16" height="16"/>
                                                 <color key="color" red="0.1450980392" green="0.3882352941" blue="0.9215686275" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                             </activityIndicatorView>
-                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="姝ｅ湪鍚姩..." lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LoadingLabel">
+                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="正在启动..." lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LoadingLabel">
                                                 <rect key="frame" x="36" y="11" width="71" height="14"/>
                                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="11"/>
                                                 <color key="textColor" red="0.2274509804" green="0.3725490196" blue="0.5294117647" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
@@ -122,3 +122,4 @@
         <image name="SplashMark" width="96" height="96"/>
     </resources>
 </document>
+
