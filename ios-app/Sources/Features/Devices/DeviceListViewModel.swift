@@ -15,8 +15,11 @@ final class DeviceListViewModel: ObservableObject {
     @Published private(set) var total: Int64 = 0
     @Published private(set) var page: Int = 1
     @Published private(set) var totalPages: Int = 1
+    @Published private(set) var overallTotal: Int64 = 0
     @Published private(set) var summaryCounts: [String: Int64] = [:]
     @Published private(set) var useStatusSummary: [String: Int64] = [:]
+    @Published private(set) var overallSummaryCounts: [String: Int64] = [:]
+    @Published private(set) var overallUseStatusSummary: [String: Int64] = [:]
     @Published var errorMessage: String?
     @Published var hintMessage: String = ""
 
@@ -88,6 +91,43 @@ final class DeviceListViewModel: ObservableObject {
             totalPages = max(1, result.totalPages ?? 1)
             summaryCounts = resolvedValiditySummary
             useStatusSummary = resolvedUseStatusSummary
+
+            if hasSummaryFilterApplied {
+                do {
+                    let baselineResult = try await APIClient.shared.devicesPaged(
+                        mode: mode,
+                        search: searchText,
+                        dept: deptFilter,
+                        validity: nil,
+                        useStatus: baselineUseStatusFilter,
+                        nextDateFrom: mode == .ledger ? nil : nextDateFrom,
+                        nextDateTo: mode == .ledger ? nil : nextDateTo,
+                        page: 1,
+                        size: 1
+                    )
+                    guard shouldApplyResult(for: token) else { return }
+
+                    let baselineItems = baselineResult.content ?? []
+                    overallTotal = baselineResult.totalElements ?? total
+                    overallSummaryCounts = resolveValiditySummary(
+                        serverSummary: baselineResult.summaryCounts,
+                        items: baselineItems
+                    )
+                    overallUseStatusSummary = resolveUseStatusSummary(
+                        serverSummary: baselineResult.useStatusSummary,
+                        items: baselineItems
+                    )
+                } catch {
+                    guard shouldApplyResult(for: token) else { return }
+                    overallTotal = total
+                    overallSummaryCounts = resolvedValiditySummary
+                    overallUseStatusSummary = resolvedUseStatusSummary
+                }
+            } else {
+                overallTotal = total
+                overallSummaryCounts = resolvedValiditySummary
+                overallUseStatusSummary = resolvedUseStatusSummary
+            }
             hintMessage = "共 \(total) 条，当前第 \(page)/\(totalPages) 页"
         } catch {
             guard shouldApplyResult(for: token) else { return }
@@ -163,6 +203,30 @@ final class DeviceListViewModel: ObservableObject {
         }
     }
 
+    func createLedgerDevice(payload: DeviceUpdatePayload) async -> Bool {
+        guard mode == .ledger else { return false }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let result = try await APIClient.shared.createDevice(payload: payload)
+            switch result {
+            case .created:
+                hintMessage = "设备新增成功"
+            case let .submitted(message):
+                let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                hintMessage = trimmed.isEmpty ? "新增申请已提交，等待审核" : trimmed
+            }
+            await load(page: 1)
+            return true
+        } catch {
+            errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
     private func todayDateString() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
@@ -180,6 +244,30 @@ final class DeviceListViewModel: ObservableObject {
 
     private func shouldApplyResult(for token: UInt64) -> Bool {
         token == currentLoadToken && !Task.isCancelled
+    }
+
+    private var hasSummaryFilterApplied: Bool {
+        let normalizedValidity = normalizeStatusText(validityFilter)
+        let normalizedUseStatus = normalizeStatusText(useStatusFilter)
+        let normalizedBaselineUseStatus = normalizeStatusText(baselineUseStatusFilter ?? "")
+
+        switch mode {
+        case .ledger:
+            return !normalizedUseStatus.isEmpty
+        case .calibration:
+            return !normalizedValidity.isEmpty || normalizedUseStatus != normalizedBaselineUseStatus
+        case .todo:
+            return !normalizedValidity.isEmpty || !normalizedUseStatus.isEmpty
+        }
+    }
+
+    private var baselineUseStatusFilter: String? {
+        switch mode {
+        case .ledger, .todo:
+            return nil
+        case .calibration:
+            return "正常"
+        }
     }
 
     private func resolveValiditySummary(

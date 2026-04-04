@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DeviceEditView: View {
     let device: DeviceDto
+    let screenTitle: String
     let onSave: (DeviceUpdatePayload) -> Void
 
     @EnvironmentObject private var appState: AppState
@@ -28,9 +29,22 @@ struct DeviceEditView: View {
     @State private var calDate: String
     @State private var calibrationResult: String
     @State private var remark: String
+    @State private var activeDatePicker: DatePickerField?
 
-    init(device: DeviceDto, onSave: @escaping (DeviceUpdatePayload) -> Void) {
+    private enum DatePickerField: String, Identifiable {
+        case calDate
+        case purchaseDate
+
+        var id: String { rawValue }
+    }
+
+    init(
+        device: DeviceDto,
+        title: String = "编辑台账",
+        onSave: @escaping (DeviceUpdatePayload) -> Void
+    ) {
         self.device = device
+        self.screenTitle = title
         self.onSave = onSave
 
         _name = State(initialValue: device.name ?? "")
@@ -70,42 +84,46 @@ struct DeviceEditView: View {
                                 .padding(.horizontal, 2)
                         }
 
-                        sectionCard(title: "\u{5fc5}\u{586b}\u{4fe1}\u{606f}") {
-                            field("\u{8bbe}\u{5907}\u{540d}\u{79f0}", text: $name)
-                            field("\u{8ba1}\u{91cf}\u{7f16}\u{53f7}", text: $metricNo)
+                        sectionCard(title: "必填信息") {
+                            field("设备名称", text: $name)
+                            field("计量编号", text: $metricNo)
                         }
 
-                        sectionCard(title: "\u{53f0}\u{8d26}\u{4fe1}\u{606f}") {
-                            field("\u{8d44}\u{4ea7}\u{7f16}\u{53f7}", text: $assetNo)
-                            field("\u{51fa}\u{5382}\u{7f16}\u{53f7}", text: $serialNo)
-                            selectField("\u{41}\u{42}\u{43}\u{5206}\u{7c7b}", text: $abcClass, options: ["A", "B", "C"])
+                        sectionCard(title: "台账信息") {
+                            field("资产编号", text: $assetNo)
+                            field("出厂编号", text: $serialNo)
+                            selectField("ABC分类", text: $abcClass, options: ["A", "B", "C"])
                             if departmentOptions.isEmpty {
-                                field("\u{90e8}\u{95e8}", text: $dept)
+                                field("部门", text: $dept)
                             } else {
-                                selectField("\u{90e8}\u{95e8}", text: $dept, options: departmentOptions)
+                                selectField("部门", text: $dept, options: departmentOptions)
                             }
-                            field("\u{8bbe}\u{5907}\u{4f4d}\u{7f6e}", text: $location)
-                            field("\u{8d23}\u{4efb}\u{4eba}", text: $responsiblePerson)
-                            selectField("\u{4f7f}\u{7528}\u{72b6}\u{6001}", text: $useStatus, options: ["正常", "故障", "报废", "其他"])
+                            field("设备位置", text: $location)
+                            field("责任人", text: $responsiblePerson)
+                            selectField("使用状态", text: $useStatus, options: ["正常", "故障", "报废", "其他"])
                         }
 
-                        sectionCard(title: "\u{6821}\u{51c6}\u{4fe1}\u{606f}") {
-                            selectField("\u{68c0}\u{5b9a}\u{5468}\u{671f}", text: $cycleText, options: ["半年", "一年", "24"])
-                            field("\u{4e0a}\u{6b21}\u{6821}\u{51c6}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $calDate)
-                            selectField("\u{6821}\u{51c6}\u{7ed3}\u{679c}", text: $calibrationResult, options: ["合格", "不合格"])
+                        sectionCard(title: "校准信息") {
+                            selectField("检定周期", text: $cycleText, options: ["半年", "一年", "两年", "24"])
+                            dateField("上次校准日期", value: calDate) {
+                                activeDatePicker = .calDate
+                            }
+                            selectField("校准结果", text: $calibrationResult, options: ["合格", "不合格"])
                         }
 
-                        sectionCard(title: "\u{6269}\u{5c55}\u{4fe1}\u{606f}") {
-                            field("\u{5236}\u{9020}\u{5382}", text: $manufacturer)
-                            field("\u{8bbe}\u{5907}\u{578b}\u{53f7}", text: $model)
-                            field("\u{91c7}\u{8d2d}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $purchaseDate)
-                            field("\u{91c7}\u{8d2d}\u{4ef7}\u{683c}", text: $purchasePriceText, keyboard: .decimalPad)
-                            field("\u{5206}\u{5ea6}\u{503c}", text: $graduationValue)
-                            field("\u{6d4b}\u{8bd5}\u{8303}\u{56f4}", text: $testRange)
-                            field("\u{5141}\u{8bb8}\u{8bef}\u{5dee}", text: $allowableError)
+                        sectionCard(title: "扩展信息") {
+                            field("制造厂", text: $manufacturer)
+                            field("设备型号", text: $model)
+                            dateField("采购日期", value: purchaseDate) {
+                                activeDatePicker = .purchaseDate
+                            }
+                            field("采购价格", text: $purchasePriceText, keyboard: .decimalPad)
+                            field("分度值", text: $graduationValue)
+                            field("测试范围", text: $testRange)
+                            field("允许误差", text: $allowableError)
 
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("\u{5907}\u{6ce8}")
+                                Text("备注")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(MetrologyPalette.textPrimary)
                                 TextEditor(text: $remark)
@@ -126,17 +144,30 @@ struct DeviceEditView: View {
                         }
 
                         HStack(spacing: 10) {
-                            Button("\u{53d6}\u{6d88}") { dismiss() }
+                            Button("取消") { dismiss() }
                                 .buttonStyle(MetrologySecondaryButtonStyle())
-                            Button("\u{4fdd}\u{5b58}") { handleSave() }
+                            Button("保存") { handleSave() }
                                 .buttonStyle(MetrologyPrimaryButtonStyle())
                         }
                     }
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("\u{7f16}\u{8f91}\u{53f0}\u{8d26}")
+            .navigationTitle(screenTitle)
+        }
+        .sheet(item: $activeDatePicker) { field in
+            DeviceEditDatePickerSheet(
+                title: field == .calDate ? "上次校准日期" : "采购日期",
+                initialDate: parsedDate(for: field) ?? Date(),
+                onClear: {
+                    setDateValue(nil, for: field)
+                },
+                onSelect: { date in
+                    setDateValue(date, for: field)
+                }
+            )
         }
     }
 
@@ -159,6 +190,37 @@ struct DeviceEditView: View {
             TextField(title, text: text)
                 .keyboardType(keyboard)
                 .metrologyInput()
+        }
+    }
+
+    private func dateField(_ title: String, value: String, onTap: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+            Button(action: onTap) {
+                HStack(spacing: 6) {
+                    Text(normalized(value).isEmpty ? "请选择日期" : value)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(normalized(value).isEmpty ? MetrologyPalette.textMuted : MetrologyPalette.textPrimary)
+                    Spacer(minLength: 0)
+                    Image(systemName: "calendar")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textMuted)
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 38)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -190,7 +252,7 @@ struct DeviceEditView: View {
         let resolvedName = normalized(name)
         let resolvedMetricNo = normalized(metricNo)
         if resolvedName.isEmpty || resolvedMetricNo.isEmpty {
-            validationMessage = "\u{8bbe}\u{5907}\u{540d}\u{79f0}\u{548c}\u{8ba1}\u{91cf}\u{7f16}\u{53f7}\u{4e0d}\u{80fd}\u{4e3a}\u{7a7a}"
+            validationMessage = "设备名称和计量编号不能为空"
             return
         }
 
@@ -201,13 +263,13 @@ struct DeviceEditView: View {
         } else if let value = Double(trimmedPrice) {
             resolvedPurchasePrice = value
         } else {
-            validationMessage = "\u{91c7}\u{8d2d}\u{4ef7}\u{683c}\u{683c}\u{5f0f}\u{4e0d}\u{6b63}\u{786e}"
+            validationMessage = "采购价格格式不正确"
             return
         }
 
         let parsedCycle = parseCycle(cycleText)
         if !normalized(cycleText).isEmpty && parsedCycle == nil {
-            validationMessage = "\u{68c0}\u{5b9a}\u{5468}\u{671f}\u{4ec5}\u{652f}\u{6301}\u{534a}\u{5e74}\u{3001}\u{4e00}\u{5e74}\u{6216}\u{6570}\u{5b57}\u{6708}\u{4efd}"
+            validationMessage = "检定周期仅支持半年、一年、两年或数字月份"
             return
         }
 
@@ -243,12 +305,46 @@ struct DeviceEditView: View {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func parsedDate(for field: DatePickerField) -> Date? {
+        let text: String
+        switch field {
+        case .calDate:
+            text = calDate
+        case .purchaseDate:
+            text = purchaseDate
+        }
+        let trimmed = normalized(text)
+        guard !trimmed.isEmpty else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: trimmed)
+    }
+
+    private func setDateValue(_ date: Date?, for field: DatePickerField) {
+        let text = date.map(formatDate) ?? ""
+        switch field {
+        case .calDate:
+            calDate = text
+        case .purchaseDate:
+            purchaseDate = text
+        }
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
     private func parseCycle(_ text: String) -> Int? {
         let value = normalized(text)
         if value.isEmpty { return nil }
-        if value == "\u{534a}\u{5e74}" { return 6 }
-        if value == "\u{4e00}\u{5e74}" { return 12 }
-        if value == "\u{4e24}\u{5e74}" { return 24 }
+        if value == "半年" { return 6 }
+        if value == "一年" { return 12 }
+        if value == "两年" { return 24 }
         return Int(value)
     }
 
@@ -266,8 +362,9 @@ struct DeviceEditView: View {
 
     private static func formatCycle(_ cycle: Int?) -> String {
         guard let cycle else { return "" }
-        if cycle == 6 { return "\u{534a}\u{5e74}" }
-        if cycle == 12 { return "\u{4e00}\u{5e74}" }
+        if cycle == 6 { return "半年" }
+        if cycle == 12 { return "一年" }
+        if cycle == 24 { return "两年" }
         return String(cycle)
     }
 
@@ -277,5 +374,57 @@ struct DeviceEditView: View {
             return String(Int(value))
         }
         return String(value)
+    }
+}
+
+private struct DeviceEditDatePickerSheet: View {
+    let title: String
+    let initialDate: Date
+    let onClear: () -> Void
+    let onSelect: (Date) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedDate: Date
+
+    init(
+        title: String,
+        initialDate: Date,
+        onClear: @escaping () -> Void,
+        onSelect: @escaping (Date) -> Void
+    ) {
+        self.title = title
+        self.initialDate = initialDate
+        self.onClear = onClear
+        self.onSelect = onSelect
+        _selectedDate = State(initialValue: initialDate)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 14) {
+                DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+
+                HStack(spacing: 10) {
+                    Button("清空") {
+                        onClear()
+                        dismiss()
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+
+                    Button("确定") {
+                        onSelect(selectedDate)
+                        dismiss()
+                    }
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+                }
+            }
+            .padding(14)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 }

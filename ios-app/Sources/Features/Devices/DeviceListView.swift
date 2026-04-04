@@ -978,34 +978,97 @@ private struct DeviceDetailView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("基础信息") {
-                    DetailRow(label: "设备名称", value: device.displayName)
-                    DetailRow(label: "计量编号", value: device.metricNo ?? "-")
-                    DetailRow(label: "资产编号", value: device.assetNo ?? "-")
-                    DetailRow(label: "ABC分类", value: device.abcClass ?? "-")
-                    DetailRow(label: "使用部门", value: device.dept ?? "-")
-                    DetailRow(label: "责任人", value: device.responsiblePerson ?? "-")
-                    DetailRow(label: "使用状态", value: device.useStatus ?? "-")
+                if mode == .ledger {
+                    detailSection(title: "基本信息") {
+                        detailPairRow(
+                            leftLabel: "仪器名称",
+                            leftValue: device.displayName,
+                            rightLabel: "计量编号",
+                            rightValue: device.metricNo
+                        )
+                        detailPairRow(
+                            leftLabel: "资产编号",
+                            leftValue: device.assetNo,
+                            rightLabel: "出厂编号",
+                            rightValue: device.serialNo
+                        )
+                        detailPairRow(
+                            leftLabel: "ABC分类",
+                            leftValue: device.abcClass,
+                            rightLabel: "设备型号",
+                            rightValue: device.model
+                        )
+                        detailPairRow(
+                            leftLabel: "制造厂",
+                            leftValue: device.manufacturer,
+                            rightLabel: "使用部门",
+                            rightValue: device.dept
+                        )
+                        detailPairRow(
+                            leftLabel: "设备位置",
+                            leftValue: device.location,
+                            rightLabel: "使用责任人",
+                            rightValue: device.responsiblePerson
+                        )
+                        detailPairRow(
+                            leftLabel: "使用状态",
+                            leftValue: device.useStatus,
+                            leftStyle: .useStatus
+                        )
+                    }
+
+                    detailSection(title: "采购信息") {
+                        detailPairRow(
+                            leftLabel: "采购时间",
+                            leftValue: device.purchaseDate,
+                            rightLabel: "采购价格",
+                            rightValue: purchasePriceText
+                        )
+                        detailPairRow(
+                            leftLabel: "使用年限",
+                            leftValue: serviceLifeText
+                        )
+                    }
+
+                    detailSection(title: "技术参数") {
+                        detailPairRow(
+                            leftLabel: "分度值",
+                            leftValue: device.graduationValue,
+                            rightLabel: "测试范围",
+                            rightValue: device.testRange
+                        )
+                        detailPairRow(
+                            leftLabel: "允许误差",
+                            leftValue: device.allowableError
+                        )
+                    }
                 }
 
-                Section("校准信息") {
-                    DetailRow(label: "检定周期", value: formatCycle(device.cycle))
-                    DetailRow(label: "上次校准", value: device.calDate ?? "-")
-                    DetailRow(label: "下次校准", value: device.nextDate ?? "-")
-                    DetailRow(label: "校准结果", value: device.calibrationResult ?? "-")
-                    DetailRow(label: "有效性", value: device.validity ?? "-")
-                }
-
-                Section("扩展信息") {
-                    DetailRow(label: "设备型号", value: device.model ?? "-")
-                    DetailRow(label: "制造厂", value: device.manufacturer ?? "-")
-                    DetailRow(label: "设备位置", value: device.location ?? "-")
-                    DetailRow(label: "备注", value: device.remark ?? "-")
+                detailSection(title: "校准信息") {
+                    detailPairRow(
+                        leftLabel: "检定周期",
+                        leftValue: formatCycle(device.cycle),
+                        rightLabel: "上次校准",
+                        rightValue: device.calDate
+                    )
+                    detailPairRow(
+                        leftLabel: "下次校准",
+                        leftValue: device.nextDate,
+                        leftStyle: .nextDate,
+                        rightLabel: "有效状态",
+                        rightValue: device.validity,
+                        rightStyle: .validity
+                    )
+                    detailPairRow(
+                        leftLabel: "校准结果",
+                        leftValue: device.calibrationResult
+                    )
                 }
             }
             .scrollContentBackground(.hidden)
             .background(MetrologyPalette.background)
-            .navigationTitle("设备详情")
+            .navigationTitle(mode == .ledger ? "设备详情" : "校准信息详情")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") { dismiss() }
@@ -1045,6 +1108,152 @@ private struct DeviceDetailView: View {
         .presentationDetents([.large])
     }
 
+    private func detailSection<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Section {
+            VStack(spacing: 10) {
+                content()
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text(title)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .textCase(nil)
+        }
+    }
+
+    private func detailPairRow(
+        leftLabel: String,
+        leftValue: String?,
+        leftStyle: DetailValueStyle = .normal,
+        rightLabel: String? = nil,
+        rightValue: String? = nil,
+        rightStyle: DetailValueStyle = .normal
+    ) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            detailField(label: leftLabel, value: leftValue, style: leftStyle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let rightLabel {
+                detailField(label: rightLabel, value: rightValue, style: rightStyle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func detailField(
+        label: String,
+        value: String?,
+        style: DetailValueStyle
+    ) -> some View {
+        let text = normalized(value)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+            detailValueView(text.isEmpty ? "-" : text, style: style)
+        }
+    }
+
+    @ViewBuilder
+    private func detailValueView(_ text: String, style: DetailValueStyle) -> some View {
+        switch style {
+        case .normal:
+            Text(text)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+        case .nextDate:
+            Text(text)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(nextDateColor)
+        case .useStatus:
+            statusBadge(text: text, tint: useStatusColor)
+        case .validity:
+            statusBadge(text: text, tint: validityColor)
+        }
+    }
+
+    private func statusBadge(text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(tint.opacity(0.13))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(tint.opacity(0.30), lineWidth: 1)
+            )
+    }
+
+    private var nextDateColor: Color {
+        let validity = normalized(device.validity)
+        if validity.contains("失效") || validity.contains("过期") {
+            return MetrologyPalette.statusExpired
+        }
+        if validity.contains("即将过期") || validity.contains("预警") {
+            return MetrologyPalette.statusWarning
+        }
+        if validity.contains("有效") {
+            return MetrologyPalette.statusValid
+        }
+        return MetrologyPalette.textPrimary
+    }
+
+    private var useStatusColor: Color {
+        let status = normalized(device.useStatus)
+        if status.contains("报废") {
+            return MetrologyPalette.statusExpired
+        }
+        if status.contains("故障") {
+            return MetrologyPalette.statusWarning
+        }
+        if status.contains("正常") {
+            return MetrologyPalette.statusValid
+        }
+        return MetrologyPalette.navActive
+    }
+
+    private var validityColor: Color {
+        let validity = normalized(device.validity)
+        if validity.contains("失效") || validity.contains("过期") {
+            return MetrologyPalette.statusExpired
+        }
+        if validity.contains("即将过期") || validity.contains("预警") {
+            return MetrologyPalette.statusWarning
+        }
+        if validity.contains("有效") {
+            return MetrologyPalette.statusValid
+        }
+        return MetrologyPalette.navActive
+    }
+
+    private var purchasePriceText: String {
+        guard let value = device.purchasePrice else { return "-" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let number = formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        return "¥\(number)"
+    }
+
+    private var serviceLifeText: String {
+        guard let value = device.serviceLife else { return "-" }
+        return "\(value) 年"
+    }
+
+    private func normalized(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
     private func formatCycle(_ cycle: Int?) -> String {
         guard let cycle else { return "-" }
         if cycle == 6 { return "半年" }
@@ -1053,19 +1262,11 @@ private struct DeviceDetailView: View {
     }
 }
 
-private struct DetailRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 12)
-            Text(value)
-                .multilineTextAlignment(.trailing)
-        }
-    }
+private enum DetailValueStyle {
+    case normal
+    case nextDate
+    case useStatus
+    case validity
 }
 
 private enum ChipStyle {

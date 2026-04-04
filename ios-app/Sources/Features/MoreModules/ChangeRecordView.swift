@@ -1,9 +1,17 @@
-﻿import SwiftUI
+import SwiftUI
 
 struct ChangeRecordView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel = ChangeRecordViewModel()
     @State private var detailItem: ChangeRecordDetailItem?
+    @State private var activeDatePicker: DatePickerKind?
+
+    private enum DatePickerKind: String, Identifiable {
+        case from
+        case to
+
+        var id: String { rawValue }
+    }
 
     private var isAdmin: Bool {
         (appState.session?.role ?? "").uppercased() == "ADMIN"
@@ -23,6 +31,7 @@ struct ChangeRecordView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollDismissesKeyboard(.interactively)
 
             if let errorMessage = viewModel.errorMessage {
                 MetrologyNoticeDialog(
@@ -50,6 +59,20 @@ struct ChangeRecordView: View {
         }
         .sheet(item: $detailItem) { item in
             AuditDetailView(record: item.record)
+        }
+        .sheet(item: $activeDatePicker) { kind in
+            ChangeRecordDatePickerSheet(
+                title: kind == .from ? "开始日期" : "结束日期",
+                initialDate: dateValue(for: kind),
+                onClear: {
+                    setDate(nil, for: kind)
+                    Task { await viewModel.applyFilters() }
+                },
+                onSelect: { date in
+                    setDate(date, for: kind)
+                    Task { await viewModel.applyFilters() }
+                }
+            )
         }
         .overlay {
             if viewModel.isLoading {
@@ -117,12 +140,12 @@ struct ChangeRecordView: View {
             }
 
             HStack(spacing: 8) {
-                TextField("开始日期 yyyy-MM-dd", text: $viewModel.dateFrom)
-                    .metrologyInput()
-                    .keyboardType(.numbersAndPunctuation)
-                TextField("结束日期 yyyy-MM-dd", text: $viewModel.dateTo)
-                    .metrologyInput()
-                    .keyboardType(.numbersAndPunctuation)
+                dateFilterField(title: "开始日期", value: viewModel.dateFrom) {
+                    activeDatePicker = .from
+                }
+                dateFilterField(title: "结束日期", value: viewModel.dateTo) {
+                    activeDatePicker = .to
+                }
             }
 
             if isAdmin {
@@ -262,6 +285,130 @@ struct ChangeRecordView: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    private func dateFilterField(
+        title: String,
+        value: String,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Text(value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? title : value)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(
+                        value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? MetrologyPalette.textMuted
+                            : MetrologyPalette.textPrimary
+                    )
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(MetrologyPalette.textMuted)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 38)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dateValue(for kind: DatePickerKind) -> Date {
+        let raw: String
+        switch kind {
+        case .from:
+            raw = viewModel.dateFrom
+        case .to:
+            raw = viewModel.dateTo
+        }
+        return Self.parseDate(raw) ?? Date()
+    }
+
+    private func setDate(_ date: Date?, for kind: DatePickerKind) {
+        let value = date.map(Self.formatDate) ?? ""
+        switch kind {
+        case .from:
+            viewModel.dateFrom = value
+        case .to:
+            viewModel.dateTo = value
+        }
+    }
+
+    private static func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private static func parseDate(_ value: String) -> Date? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: trimmed)
+    }
+}
+
+private struct ChangeRecordDatePickerSheet: View {
+    let title: String
+    let initialDate: Date
+    let onClear: () -> Void
+    let onSelect: (Date) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedDate: Date
+
+    init(
+        title: String,
+        initialDate: Date,
+        onClear: @escaping () -> Void,
+        onSelect: @escaping (Date) -> Void
+    ) {
+        self.title = title
+        self.initialDate = initialDate
+        self.onClear = onClear
+        self.onSelect = onSelect
+        _selectedDate = State(initialValue: initialDate)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 14) {
+                DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+
+                HStack(spacing: 10) {
+                    Button("清空") {
+                        onClear()
+                        dismiss()
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+
+                    Button("确定") {
+                        onSelect(selectedDate)
+                        dismiss()
+                    }
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+                }
+            }
+            .padding(14)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 }
 

@@ -7,13 +7,13 @@ struct AuditView: View {
 
     @State private var detailSheetItem: AuditDetailSheetItem?
     @State private var rejectSheetItem: AuditRejectSheetItem?
+    let externalRefreshToken: Int
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+        ZStack {
+            MetrologyPalette.background.ignoresSafeArea()
 
-                VStack(spacing: 10) {
+            VStack(spacing: 10) {
                 if viewModel.isAdmin {
                     Picker("\u{5ba1}\u{6838}\u{6a21}\u{5f0f}", selection: $viewModel.mode) {
                         Text(AuditListMode.pending.title).tag(AuditListMode.pending)
@@ -76,6 +76,7 @@ struct AuditView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.interactively)
 
                 if viewModel.mode == .history {
                     historyPagerBar
@@ -83,53 +84,47 @@ struct AuditView: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
+        }
+        .task {
+            viewModel.configure(role: appState.session?.role, username: appState.session?.username)
+            await viewModel.loadCurrent()
+        }
+        .onChange(of: sessionIdentity) {
+            viewModel.configure(role: appState.session?.role, username: appState.session?.username)
+            Task { await viewModel.loadCurrent() }
+        }
+        .onChange(of: viewModel.mode) {
+            Task { await viewModel.loadCurrent() }
+        }
+        .onChange(of: externalRefreshToken) {
+            Task { await viewModel.loadCurrent() }
+        }
+        .overlay {
+            if viewModel.isLoading {
+                ProgressView("\u{52a0}\u{8f7d}\u{4e2d}\u{2e}\u{2e}\u{2e}")
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(MetrologyPalette.surface)
+                    )
             }
-            .navigationTitle("\u{6570}\u{636e}\u{5ba1}\u{6838}")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("\u{5237}\u{65b0}") {
-                        Task { await viewModel.loadCurrent() }
-                    }
-                }
-            }
-            .task {
-                viewModel.configure(role: appState.session?.role, username: appState.session?.username)
-                await viewModel.loadCurrent()
-            }
-            .onChange(of: sessionIdentity) {
-                viewModel.configure(role: appState.session?.role, username: appState.session?.username)
-                Task { await viewModel.loadCurrent() }
-            }
-            .onChange(of: viewModel.mode) {
-                Task { await viewModel.loadCurrent() }
-            }
-            .overlay {
-                if viewModel.isLoading {
-                    ProgressView("\u{52a0}\u{8f7d}\u{4e2d}\u{2e}\u{2e}\u{2e}")
-                        .padding(14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(MetrologyPalette.surface)
-                        )
-                }
-            }
-            .sheet(item: $detailSheetItem) { item in
-                AuditDetailView(record: item.record)
-            }
-            .sheet(item: $rejectSheetItem) { item in
-                AuditRejectReasonSheet(
-                    record: item.record,
-                    onSubmit: { reason in
-                        Task {
-                            await viewModel.reject(item.record, reason: reason)
-                            rejectSheetItem = nil
-                        }
-                    },
-                    onCancel: {
+        }
+        .sheet(item: $detailSheetItem) { item in
+            AuditDetailView(record: item.record)
+        }
+        .sheet(item: $rejectSheetItem) { item in
+            AuditRejectReasonSheet(
+                record: item.record,
+                onSubmit: { reason in
+                    Task {
+                        await viewModel.reject(item.record, reason: reason)
                         rejectSheetItem = nil
                     }
-                )
-            }
+                },
+                onCancel: {
+                    rejectSheetItem = nil
+                }
+            )
         }
     }
 

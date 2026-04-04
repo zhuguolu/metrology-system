@@ -69,30 +69,27 @@ private enum MainTab: String, CaseIterable, Hashable {
 }
 
 struct MainTabView: View {
-    @EnvironmentObject private var appState: AppState
     @State private var selectedTab: MainTab = .ledger
     @State private var loadedTabs: Set<MainTab> = [.ledger]
     @State private var dashboardSheetOpen = false
+    @State private var auditRefreshToken: Int = 0
 
     var body: some View {
         GeometryReader { proxy in
             let scale = AndroidScale(containerWidth: proxy.size.width, containerHeight: proxy.size.height)
             let horizontal = max(scale.px(16), 12)
-            let topPadding = max(scale.vertical(12), 8)
-            let contentTop = max(scale.vertical(10), 6)
-            let bottomInset = proxy.safeAreaInsets.bottom
-            let tabTopSpacing = max(scale.vertical(4), 2)
-            let tabBottomSpacing: CGFloat = bottomInset > 0 ? 2 : 6
+            let topPadding: CGFloat = 0
+            let contentTop = max(scale.vertical(6), 3)
+            let tabTopSpacing = max(scale.vertical(2), 1)
+            let tabBottomSpacing: CGFloat = 0
 
             ZStack {
                 MetrologyPalette.background.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    if selectedTab != .more {
-                        topBar
-                            .padding(.horizontal, horizontal)
-                            .padding(.top, topPadding)
-                    }
+                    topBar
+                        .padding(.horizontal, horizontal)
+                        .padding(.top, topPadding)
 
                     tabContainer
                         .padding(.horizontal, selectedTab == .more ? 0 : horizontal)
@@ -101,13 +98,18 @@ struct MainTabView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                AndroidStyleTabBar(selectedTab: $selectedTab) { tab in
-                    loadedTabs.insert(tab)
+                VStack(spacing: 0) {
+                    AndroidStyleTabBar(selectedTab: $selectedTab) { tab in
+                        loadedTabs.insert(tab)
+                    }
+                    .padding(.horizontal, horizontal)
+                    .padding(.top, tabTopSpacing)
+                    .padding(.bottom, tabBottomSpacing)
                 }
-                .padding(.horizontal, horizontal)
-                .padding(.top, tabTopSpacing)
-                .padding(.bottom, tabBottomSpacing)
-                .background(MetrologyPalette.background)
+                .background(
+                    MetrologyPalette.background
+                        .ignoresSafeArea(edges: .bottom)
+                )
             }
             .animation(.easeOut(duration: 0.16), value: selectedTab)
             .sheet(isPresented: $dashboardSheetOpen) {
@@ -136,7 +138,7 @@ struct MainTabView: View {
                     .allowsHitTesting(selectedTab == .todo)
             }
             if loadedTabs.contains(.audit) {
-                AuditView()
+                AuditView(externalRefreshToken: auditRefreshToken)
                     .opacity(selectedTab == .audit ? 1 : 0)
                     .allowsHitTesting(selectedTab == .audit)
             }
@@ -151,15 +153,32 @@ struct MainTabView: View {
 
     private var topBar: some View {
         HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(selectedTab.navTitle)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                if selectedTab == .audit {
-                    Text("当前用户：\(appState.session?.username ?? "-")")
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(MetrologyPalette.textSecondary)
+            Text(selectedTab.navTitle)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+
+            if selectedTab == .audit {
+                Button("刷新") {
+                    auditRefreshToken += 1
                 }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.navActive)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white, Color(hex: 0xF4F8FE)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color(hex: 0xCFDAEB), lineWidth: 1)
+                )
             }
 
             Spacer(minLength: 6)
@@ -319,7 +338,6 @@ private struct MoreHubView: View {
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
-                            header(scale: scale)
                             section(title: "协作与数据", scale: scale) {
                                 LazyVGrid(columns: columns, spacing: gridSpacing) {
                                     NavigationLink { FilesView() } label: {
@@ -369,29 +387,6 @@ private struct MoreHubView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-        }
-    }
-
-    private func header(scale: AndroidScale) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("更多模块")
-                    .font(.system(size: max(scale.px(22), 20), weight: .bold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                Text("点击图标快速进入模块")
-                    .font(.system(size: max(scale.px(12), 11), weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-            }
-            Spacer(minLength: 8)
-            Text("用户：\(appState.session?.username ?? "-")")
-                .font(.system(size: max(scale.px(12), 11), weight: .medium))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color(hex: 0xE9F1FF))
-                )
         }
     }
 

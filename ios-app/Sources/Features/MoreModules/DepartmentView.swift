@@ -18,6 +18,7 @@ struct DepartmentView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollDismissesKeyboard(.interactively)
 
             if let deletingItem {
                 MetrologyConfirmDialog(
@@ -308,6 +309,7 @@ private struct DepartmentEditorSheet: View {
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(title)
         }
