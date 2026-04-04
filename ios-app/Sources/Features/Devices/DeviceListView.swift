@@ -727,6 +727,7 @@ private struct QuickCalibrationEditView: View {
     @State private var cycle: Int
     @State private var calibrationResult: String
     @State private var remark: String
+    @FocusState private var focusedField: QuickField?
 
     init(device: DeviceDto, mode: DeviceListMode, onSave: @escaping (DeviceCalibrationPayload) -> Void) {
         self.device = device
@@ -740,91 +741,156 @@ private struct QuickCalibrationEditView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+            GeometryReader { proxy in
+                let horizontalPadding = min(max(proxy.size.width * 0.045, 12), 22)
+                let editorMinHeight = min(max(proxy.size.height * 0.20, 96), 170)
 
-                ScrollView {
-                    VStack(spacing: 10) {
-                        if let validationMessage {
-                            Text(validationMessage)
-                                .font(.footnote)
-                                .foregroundStyle(MetrologyPalette.statusExpired)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 2)
+                ZStack {
+                    MetrologyPalette.background.ignoresSafeArea()
+
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            if let validationMessage {
+                                Text(validationMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(MetrologyPalette.statusExpired)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 2)
+                            }
+
+                            quickHeaderCard
+                            quickFormCard(editorMinHeight: editorMinHeight)
                         }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(device.displayName)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-
-                            Text("编号: \(device.metricNo ?? "-")")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(MetrologyPalette.textSecondary)
-
-                            quickMenuField(
-                                title: "检定周期",
-                                value: cycleLabel(cycle),
-                                options: cycleOptions.map { $0.title }
-                            ) { selected in
-                                if let matched = cycleOptions.first(where: { $0.title == selected }) {
-                                    cycle = matched.months
-                                }
-                            }
-
-                            quickMenuField(
-                                title: "校准结果",
-                                value: calibrationResult,
-                                options: calibrationResultOptions
-                            ) { selected in
-                                calibrationResult = selected
-                            }
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("校准日期")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
-                                TextField("YYYY-MM-DD", text: $calDate)
-                                    .metrologyInput()
-                            }
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("备注")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
-                                TextEditor(text: $remark)
-                                    .font(.system(size: 15, weight: .regular))
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
-                                    .frame(minHeight: 88)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color.white)
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                                    )
-                            }
-                        }
-                        .padding(10)
-                        .metrologyCard()
-
-                        HStack(spacing: 10) {
-                            Button("取消") { dismiss() }
-                                .buttonStyle(MetrologySecondaryButtonStyle())
-                            Button("保存") { handleSave() }
-                                .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        .padding(.horizontal, horizontalPadding)
+                        .padding(.top, 10)
+                        .padding(.bottom, 14)
                     }
-                    .padding(12)
-                    .padding(.bottom, 18)
+                    .scrollIndicators(.hidden)
+                    .scrollDismissesKeyboard(.interactively)
+                }
+                .safeAreaInset(edge: .bottom) {
+                    quickActionBar(horizontalPadding: horizontalPadding)
                 }
             }
             .navigationTitle(mode == .todo ? "待办快改" : "校准快改")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("关闭") { dismiss() }
+                        .font(.system(size: 13, weight: .semibold))
+                }
+            }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(22)
+    }
+
+    private var quickHeaderCard: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(device.displayName)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .lineLimit(2)
+                Text("编号: \(device.metricNo ?? "-")")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+            }
+            Spacer(minLength: 8)
+            Text(mode == .todo ? "待办" : "校准")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(mode == .todo ? Color(hex: 0x0EA5E9) : MetrologyPalette.navActive)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(mode == .todo ? Color(hex: 0xE0F2FE) : Color(hex: 0xE9F1FF))
+                )
+        }
+        .padding(12)
+        .metrologyCard()
+    }
+
+    private func quickFormCard(editorMinHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            quickMenuField(
+                title: "检定周期",
+                value: cycleLabel(cycle),
+                options: cycleOptions.map { $0.title }
+            ) { selected in
+                if let matched = cycleOptions.first(where: { $0.title == selected }) {
+                    cycle = matched.months
+                }
+            }
+
+            quickMenuField(
+                title: "校准结果",
+                value: calibrationResult,
+                options: calibrationResultOptions
+            ) { selected in
+                calibrationResult = selected
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("校准日期")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                HStack(spacing: 8) {
+                    TextField("YYYY-MM-DD", text: $calDate)
+                        .keyboardType(.numbersAndPunctuation)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedField, equals: .calDate)
+                        .metrologyInput()
+                    Button("今天") {
+                        calDate = Self.todayDateString()
+                        focusedField = nil
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                    .frame(width: 70)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("备注")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                TextEditor(text: $remark)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(minHeight: editorMinHeight)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .focused($focusedField, equals: .remark)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                    )
+            }
+        }
+        .padding(12)
+        .metrologyCard()
+    }
+
+    private func quickActionBar(horizontalPadding: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            Divider().overlay(Color(hex: 0xD5E2F2))
+            HStack(spacing: 10) {
+                Button("取消") { dismiss() }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                Button("保存") { handleSave() }
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .background(MetrologyPalette.background)
+        }
     }
 
     private let cycleOptions: [(title: String, months: Int)] = [
@@ -832,6 +898,11 @@ private struct QuickCalibrationEditView: View {
         ("一年", 12),
         ("两年", 24)
     ]
+
+    private enum QuickField: Hashable {
+        case calDate
+        case remark
+    }
 
     private let calibrationResultOptions: [String] = ["合格", "不合格"]
 

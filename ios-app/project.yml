@@ -28,6 +28,8 @@ targets:
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+        INFOPLIST_KEY_CFBundleDisplayName: 校准管理系统
+        INFOPLIST_KEY_CFBundleName: 校准管理系统
     info:
       path: Sources/Resources/Info.plist
 schemes:

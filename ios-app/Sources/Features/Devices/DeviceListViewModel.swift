@@ -72,12 +72,22 @@ final class DeviceListViewModel: ObservableObject {
             )
             guard shouldApplyResult(for: token) else { return }
 
-            items = result.content ?? []
+            let resolvedItems = result.content ?? []
+            let resolvedValiditySummary = resolveValiditySummary(
+                serverSummary: result.summaryCounts,
+                items: resolvedItems
+            )
+            let resolvedUseStatusSummary = resolveUseStatusSummary(
+                serverSummary: result.useStatusSummary,
+                items: resolvedItems
+            )
+
+            items = resolvedItems
             total = result.totalElements ?? 0
             page = max(1, result.page ?? requestedPage)
             totalPages = max(1, result.totalPages ?? 1)
-            summaryCounts = result.summaryCounts ?? [:]
-            useStatusSummary = result.useStatusSummary ?? [:]
+            summaryCounts = resolvedValiditySummary
+            useStatusSummary = resolvedUseStatusSummary
             hintMessage = "共 \(total) 条，当前第 \(page)/\(totalPages) 页"
         } catch {
             guard shouldApplyResult(for: token) else { return }
@@ -170,6 +180,124 @@ final class DeviceListViewModel: ObservableObject {
 
     private func shouldApplyResult(for token: UInt64) -> Bool {
         token == currentLoadToken && !Task.isCancelled
+    }
+
+    private func resolveValiditySummary(
+        serverSummary: [String: Int64]?,
+        items: [DeviceDto]
+    ) -> [String: Int64] {
+        var summary: [String: Int64] = [
+            "有效": 0,
+            "即将过期": 0,
+            "失效": 0
+        ]
+
+        if let serverSummary, !serverSummary.isEmpty {
+            for (rawKey, rawValue) in serverSummary {
+                guard let bucket = validityBucket(for: rawKey) else { continue }
+                summary[bucket, default: 0] += max(rawValue, 0)
+            }
+        }
+
+        if summary.values.reduce(0, +) == 0, !items.isEmpty {
+            for item in items {
+                guard let bucket = validityBucket(for: item.validity ?? item.status) else { continue }
+                summary[bucket, default: 0] += 1
+            }
+        }
+
+        return summary
+    }
+
+    private func resolveUseStatusSummary(
+        serverSummary: [String: Int64]?,
+        items: [DeviceDto]
+    ) -> [String: Int64] {
+        var summary: [String: Int64] = [
+            "正常": 0,
+            "故障": 0,
+            "报废": 0,
+            "其他": 0
+        ]
+
+        if let serverSummary, !serverSummary.isEmpty {
+            for (rawKey, rawValue) in serverSummary {
+                let bucket = useStatusBucket(for: rawKey)
+                summary[bucket, default: 0] += max(rawValue, 0)
+            }
+        }
+
+        if summary.values.reduce(0, +) == 0, !items.isEmpty {
+            for item in items {
+                let bucket = useStatusBucket(for: item.useStatus)
+                summary[bucket, default: 0] += 1
+            }
+        }
+
+        return summary
+    }
+
+    private func validityBucket(for rawValue: String?) -> String? {
+        let text = normalizeStatusText(rawValue)
+        guard !text.isEmpty else { return nil }
+        let upper = text.uppercased()
+
+        if text.contains("即将过期") || text.contains("即将到期")
+            || upper.contains("WARNING")
+            || upper.contains("EXPIRING")
+            || upper.contains("NEAR_EXPIRY")
+            || upper.contains("NEAR-EXPIRY")
+            || upper.contains("NEAR EXPIRY") {
+            return "即将过期"
+        }
+
+        if text.contains("有效") || upper == "VALID" || upper == "NORMAL" {
+            return "有效"
+        }
+
+        if text.contains("失效") || text.contains("过期")
+            || upper.contains("EXPIRED")
+            || upper.contains("INVALID") {
+            return "失效"
+        }
+
+        return nil
+    }
+
+    private func useStatusBucket(for rawValue: String?) -> String {
+        let text = normalizeStatusText(rawValue)
+        if text.isEmpty { return "其他" }
+        let upper = text.uppercased()
+
+        if text.contains("正常") || text.contains("在用") || text.contains("使用中")
+            || upper.contains("NORMAL")
+            || upper.contains("IN_USE")
+            || upper.contains("INUSE")
+            || upper.contains("ACTIVE") {
+            return "正常"
+        }
+
+        if text.contains("故障") || text.contains("维修") || text.contains("保养")
+            || upper.contains("FAULT")
+            || upper.contains("BROKEN")
+            || upper.contains("REPAIR")
+            || upper.contains("MAINTENANCE") {
+            return "故障"
+        }
+
+        if text.contains("报废") || text.contains("停用") || text.contains("禁用") || text.contains("丢失")
+            || upper.contains("SCRAP")
+            || upper.contains("DISCARD")
+            || upper.contains("DISABLE")
+            || upper.contains("LOST") {
+            return "报废"
+        }
+
+        return "其他"
+    }
+
+    private func normalizeStatusText(_ rawValue: String?) -> String {
+        (rawValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

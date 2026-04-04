@@ -192,17 +192,23 @@ SOURCE_LAUNCH_STORYBOARD_NAME=""
 SOURCE_REQUIRES_FULLSCREEN=""
 SOURCE_DEVICE_FAMILY_FIRST=""
 SOURCE_DEVICE_FAMILY_SECOND=""
+SOURCE_DISPLAY_NAME=""
+SOURCE_BUNDLE_NAME=""
 if [ -f "$SOURCE_INFO_PLIST" ]; then
   SOURCE_LAUNCH_STORYBOARD_NAME="$(plist_value "$SOURCE_INFO_PLIST" "UILaunchStoryboardName")"
   SOURCE_REQUIRES_FULLSCREEN="$(plist_value "$SOURCE_INFO_PLIST" "UIRequiresFullScreen")"
   SOURCE_DEVICE_FAMILY_FIRST="$(plist_value "$SOURCE_INFO_PLIST" "UIDeviceFamily:0")"
   SOURCE_DEVICE_FAMILY_SECOND="$(plist_value "$SOURCE_INFO_PLIST" "UIDeviceFamily:1")"
+  SOURCE_DISPLAY_NAME="$(plist_value "$SOURCE_INFO_PLIST" "CFBundleDisplayName")"
+  SOURCE_BUNDLE_NAME="$(plist_value "$SOURCE_INFO_PLIST" "CFBundleName")"
 fi
 
 LAUNCH_STORYBOARD_NAME="$(coalesce_non_empty "$BUILT_LAUNCH_STORYBOARD_NAME" "$SOURCE_LAUNCH_STORYBOARD_NAME")"
 REQUIRES_FULLSCREEN="$(coalesce_non_empty "$BUILT_REQUIRES_FULLSCREEN" "$SOURCE_REQUIRES_FULLSCREEN")"
 DEVICE_FAMILY_FIRST="$(coalesce_non_empty "$BUILT_DEVICE_FAMILY_FIRST" "$SOURCE_DEVICE_FAMILY_FIRST")"
 DEVICE_FAMILY_SECOND="$(coalesce_non_empty "$BUILT_DEVICE_FAMILY_SECOND" "$SOURCE_DEVICE_FAMILY_SECOND")"
+APP_DISPLAY_NAME="$(coalesce_non_empty "$SOURCE_DISPLAY_NAME" "校准管理系统")"
+APP_BUNDLE_NAME="$(coalesce_non_empty "$SOURCE_BUNDLE_NAME" "$APP_DISPLAY_NAME")"
 
 if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
   DETECTED_STORYBOARD_PATH="$(find "$APP_PATH" -maxdepth 1 -type d -name "*.storyboardc" | head -n 1 || true)"
@@ -218,6 +224,8 @@ fi
 
 # Normalize built Info.plist to avoid runtime letterboxing.
 upsert_plist_string "$APP_INFO_PLIST" "UILaunchStoryboardName" "$LAUNCH_STORYBOARD_NAME"
+upsert_plist_string "$APP_INFO_PLIST" "CFBundleDisplayName" "$APP_DISPLAY_NAME"
+upsert_plist_string "$APP_INFO_PLIST" "CFBundleName" "$APP_BUNDLE_NAME"
 if ! is_truthy "$REQUIRES_FULLSCREEN"; then
   upsert_plist_bool "$APP_INFO_PLIST" "UIRequiresFullScreen" "true"
   REQUIRES_FULLSCREEN="true"
@@ -283,6 +291,8 @@ fi
   echo "executable_name=$EXECUTABLE_NAME"
   echo "executable_size_bytes=$EXECUTABLE_SIZE_BYTES"
   echo "launch_storyboard_name=$LAUNCH_STORYBOARD_NAME"
+  echo "app_display_name=$APP_DISPLAY_NAME"
+  echo "app_bundle_name=$APP_BUNDLE_NAME"
   echo "ui_requires_full_screen=$REQUIRES_FULLSCREEN"
   echo "ui_device_family_first=$DEVICE_FAMILY_FIRST"
   echo "ui_device_family_second=$DEVICE_FAMILY_SECOND"
