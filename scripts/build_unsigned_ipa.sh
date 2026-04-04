@@ -138,6 +138,17 @@ DEVICE_FAMILY_FIRST="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:0")"
 DEVICE_FAMILY_SECOND="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:1")"
 
 if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
+  LAUNCH_STORYBOARD_NAME="$(plist_value "$ROOT_DIR/Sources/Resources/Info.plist" "UILaunchStoryboardName")"
+fi
+
+if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
+  DETECTED_STORYBOARD_PATH="$(find "$APP_PATH" -maxdepth 1 -type d -name "*.storyboardc" | head -n 1 || true)"
+  if [ -n "$DETECTED_STORYBOARD_PATH" ]; then
+    LAUNCH_STORYBOARD_NAME="$(basename "$DETECTED_STORYBOARD_PATH" ".storyboardc")"
+  fi
+fi
+
+if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
   echo "Compatibility check failed: UILaunchStoryboardName missing. This can cause non-full-screen rendering on modern iPhone."
   exit 68
 fi
