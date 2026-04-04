@@ -72,7 +72,7 @@ struct MainTabView: View {
     @State private var selectedTab: MainTab = .ledger
     @State private var loadedTabs: Set<MainTab> = [.ledger]
     @State private var dashboardSheetOpen = false
-    @State private var auditRefreshToken: Int = 0
+    @State private var moreHeaderVisible = true
 
     var body: some View {
         GeometryReader { proxy in
@@ -87,9 +87,11 @@ struct MainTabView: View {
                 MetrologyPalette.background.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    topBar
-                        .padding(.horizontal, horizontal)
-                        .padding(.top, topPadding)
+                    if shouldShowTopBar {
+                        topBar
+                            .padding(.horizontal, horizontal)
+                            .padding(.top, topPadding)
+                    }
 
                     tabContainer
                         .padding(.horizontal, selectedTab == .more ? 0 : horizontal)
@@ -138,17 +140,21 @@ struct MainTabView: View {
                     .allowsHitTesting(selectedTab == .todo)
             }
             if loadedTabs.contains(.audit) {
-                AuditView(externalRefreshToken: auditRefreshToken)
+                AuditView()
                     .opacity(selectedTab == .audit ? 1 : 0)
                     .allowsHitTesting(selectedTab == .audit)
             }
             if loadedTabs.contains(.more) {
-                MoreHubView(selectedTab: $selectedTab)
+                MoreHubView(selectedTab: $selectedTab, showMainHeader: $moreHeaderVisible)
                     .opacity(selectedTab == .more ? 1 : 0)
                     .allowsHitTesting(selectedTab == .more)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var shouldShowTopBar: Bool {
+        selectedTab != .more || moreHeaderVisible
     }
 
     private var topBar: some View {
@@ -157,40 +163,16 @@ struct MainTabView: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(MetrologyPalette.textPrimary)
 
-            if selectedTab == .audit {
-                Button("刷新") {
-                    auditRefreshToken += 1
-                }
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(MetrologyPalette.navActive)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white, Color(hex: 0xF4F8FE)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color(hex: 0xCFDAEB), lineWidth: 1)
-                )
-            }
-
             Spacer(minLength: 6)
 
             if selectedTab.showBackToBoard {
                 Button("回看板") {
                     dashboardSheetOpen = true
                 }
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(MetrologyPalette.navActive)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(
@@ -316,6 +298,7 @@ private struct AndroidStyleTabBar: View {
 
 private struct MoreHubView: View {
     @Binding var selectedTab: MainTab
+    @Binding var showMainHeader: Bool
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
@@ -340,16 +323,16 @@ private struct MoreHubView: View {
                         VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
                             section(title: "协作与数据", scale: scale) {
                                 LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    NavigationLink { FilesView() } label: {
+                                    NavigationLink { moduleDestination { FilesView() } } label: {
                                         moduleCardContent(icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
                                     }
-                                    NavigationLink { WebDavView() } label: {
+                                    NavigationLink { moduleDestination { WebDavView() } } label: {
                                         moduleCardContent(icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
                                     }
-                                    NavigationLink { ChangeRecordView() } label: {
+                                    NavigationLink { moduleDestination { ChangeRecordView() } } label: {
                                         moduleCardContent(icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
                                     }
-                                    NavigationLink { DeviceStatusView() } label: {
+                                    NavigationLink { moduleDestination { DeviceStatusView() } } label: {
                                         moduleCardContent(icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
                                     }
                                 }
@@ -357,13 +340,13 @@ private struct MoreHubView: View {
 
                             section(title: "管理与配置", scale: scale) {
                                 LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    NavigationLink { DepartmentView() } label: {
+                                    NavigationLink { moduleDestination { DepartmentView() } } label: {
                                         moduleCardContent(icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309), scale: scale)
                                     }
-                                    NavigationLink { UserManagementView() } label: {
+                                    NavigationLink { moduleDestination { UserManagementView() } } label: {
                                         moduleCardContent(icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9), scale: scale)
                                     }
-                                    NavigationLink { SystemMaintenanceView() } label: {
+                                    NavigationLink { moduleDestination { SystemMaintenanceView() } } label: {
                                         moduleCardContent(icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155), scale: scale)
                                     }
                                 }
@@ -388,6 +371,16 @@ private struct MoreHubView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
+        .onAppear {
+            showMainHeader = true
+        }
+    }
+
+    @ViewBuilder
+    private func moduleDestination<Content: View>(@ViewBuilder _ destination: () -> Content) -> some View {
+        destination()
+            .onAppear { showMainHeader = false }
+            .onDisappear { showMainHeader = true }
     }
 
     private func section<Content: View>(title: String, scale: AndroidScale, @ViewBuilder content: () -> Content) -> some View {

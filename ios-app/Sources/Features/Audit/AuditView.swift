@@ -7,7 +7,6 @@ struct AuditView: View {
 
     @State private var detailSheetItem: AuditDetailSheetItem?
     @State private var rejectSheetItem: AuditRejectSheetItem?
-    let externalRefreshToken: Int
 
     var body: some View {
         ZStack {
@@ -94,9 +93,6 @@ struct AuditView: View {
             Task { await viewModel.loadCurrent() }
         }
         .onChange(of: viewModel.mode) {
-            Task { await viewModel.loadCurrent() }
-        }
-        .onChange(of: externalRefreshToken) {
             Task { await viewModel.loadCurrent() }
         }
         .overlay {

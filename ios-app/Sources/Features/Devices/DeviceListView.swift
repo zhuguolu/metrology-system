@@ -17,6 +17,7 @@ struct DeviceListView: View {
     @StateObject private var viewModel: DeviceListViewModel
     @State private var selectedDevice: DeviceDto?
     @State private var ledgerEditDevice: DeviceDto?
+    @State private var quickEditDevice: DeviceDto?
     @State private var createDeviceSheetOpen = false
     @State private var filterExpanded = false
     @State private var searchDebounceTask: Task<Void, Never>?
@@ -110,6 +111,31 @@ struct DeviceListView: View {
                         if success { ledgerEditDevice = nil }
                     }
                 }
+            }
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { quickEditDevice != nil },
+                set: { value in
+                    if !value { quickEditDevice = nil }
+                }
+            )
+        ) {
+            if let device = quickEditDevice {
+                QuickCalibrationEditView(
+                    device: device,
+                    mode: viewModel.mode,
+                    onSave: { payload in
+                        guard let id = device.id else {
+                            viewModel.errorMessage = "设备ID无效"
+                            return
+                        }
+                        Task {
+                            let success = await viewModel.quickEditCalibration(id: id, payload: payload)
+                            if success { quickEditDevice = nil }
+                        }
+                    }
+                )
             }
         }
         .sheet(isPresented: $createDeviceSheetOpen) {
@@ -503,7 +529,11 @@ struct DeviceListView: View {
                         mode: viewModel.mode,
                         onTap: { selectedDevice = row.item },
                         onQuickAction: {
-                            ledgerEditDevice = row.item
+                            if viewModel.mode == .ledger {
+                                ledgerEditDevice = row.item
+                            } else {
+                                quickEditDevice = row.item
+                            }
                         }
                     )
                 }

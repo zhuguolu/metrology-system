@@ -107,6 +107,7 @@ struct DeviceEditView: View {
                                 activeDatePicker = .calDate
                             }
                             selectField("校准结果", text: $calibrationResult, options: ["合格", "不合格"])
+                            remarkEditor(minHeight: 90)
                         }
 
                         sectionCard(title: "扩展信息") {
@@ -119,26 +120,6 @@ struct DeviceEditView: View {
                             field("分度值", text: $graduationValue)
                             field("测试范围", text: $testRange)
                             field("允许误差", text: $allowableError)
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("备注")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
-                                TextEditor(text: $remark)
-                                    .font(.system(size: 15, weight: .regular))
-                                    .foregroundStyle(MetrologyPalette.textPrimary)
-                                    .frame(minHeight: 90)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color.white)
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                                    )
-                            }
                         }
 
                         HStack(spacing: 10) {
@@ -290,6 +271,28 @@ struct DeviceEditView: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(MetrologyPalette.stroke, lineWidth: 1)
             )
+        }
+    }
+
+    private func remarkEditor(minHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("备注")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+            TextEditor(text: $remark)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+                .frame(minHeight: minHeight)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                )
         }
     }
 
