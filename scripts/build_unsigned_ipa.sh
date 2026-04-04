@@ -81,6 +81,35 @@ plist_value() {
   /usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true
 }
 
+upsert_plist_string() {
+  local plist="$1"
+  local key="$2"
+  local value="$3"
+  if /usr/libexec/PlistBuddy -c "Print :$key" "$plist" >/dev/null 2>&1; then
+    /usr/libexec/PlistBuddy -c "Set :$key $value" "$plist" >/dev/null
+  else
+    /usr/libexec/PlistBuddy -c "Add :$key string $value" "$plist" >/dev/null
+  fi
+}
+
+upsert_plist_bool() {
+  local plist="$1"
+  local key="$2"
+  local value="$3"
+  if /usr/libexec/PlistBuddy -c "Print :$key" "$plist" >/dev/null 2>&1; then
+    /usr/libexec/PlistBuddy -c "Set :$key $value" "$plist" >/dev/null
+  else
+    /usr/libexec/PlistBuddy -c "Add :$key bool $value" "$plist" >/dev/null
+  fi
+}
+
+set_device_family_iphone_only() {
+  local plist="$1"
+  /usr/libexec/PlistBuddy -c "Delete :UIDeviceFamily" "$plist" >/dev/null 2>&1 || true
+  /usr/libexec/PlistBuddy -c "Add :UIDeviceFamily array" "$plist" >/dev/null
+  /usr/libexec/PlistBuddy -c "Add :UIDeviceFamily:0 integer 1" "$plist" >/dev/null
+}
+
 normalize_token() {
   local raw="${1:-}"
   printf '%s' "$raw" | tr -d '\r[:space:]' | tr '[:upper:]' '[:lower:]'
@@ -187,19 +216,17 @@ if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
   exit 68
 fi
 
+# Normalize built Info.plist to avoid runtime letterboxing.
+upsert_plist_string "$APP_INFO_PLIST" "UILaunchStoryboardName" "$LAUNCH_STORYBOARD_NAME"
 if ! is_truthy "$REQUIRES_FULLSCREEN"; then
-  if [ "$(normalize_token "$DEVICE_FAMILY_FIRST")" = "1" ] && [ -z "$(normalize_token "$DEVICE_FAMILY_SECOND")" ]; then
-    echo "Compatibility warning: UIRequiresFullScreen is not explicitly true, but app is iPhone-only (UIDeviceFamily=[1])."
-    REQUIRES_FULLSCREEN="${REQUIRES_FULLSCREEN:-iPhone-only}"
-  else
-    echo "Compatibility check failed: UIRequiresFullScreen is not true."
-    exit 68
-  fi
+  upsert_plist_bool "$APP_INFO_PLIST" "UIRequiresFullScreen" "true"
+  REQUIRES_FULLSCREEN="true"
 fi
 
 if [ "$(normalize_token "$DEVICE_FAMILY_FIRST")" != "1" ] || [ -n "$(normalize_token "$DEVICE_FAMILY_SECOND")" ]; then
-  echo "Compatibility check failed: UIDeviceFamily must be iPhone-only [1], got first='$DEVICE_FAMILY_FIRST' second='$DEVICE_FAMILY_SECOND'."
-  exit 68
+  set_device_family_iphone_only "$APP_INFO_PLIST"
+  DEVICE_FAMILY_FIRST="1"
+  DEVICE_FAMILY_SECOND=""
 fi
 
 if [ ! -d "$APP_PATH/${LAUNCH_STORYBOARD_NAME}.storyboardc" ]; then
