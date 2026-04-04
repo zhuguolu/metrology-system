@@ -586,11 +586,8 @@ private struct MoreModuleEntryHost: View {
     let entry: MoreModuleEntry
 
     var body: some View {
-        NavigationStack {
-            entry.makeView()
-                .background(MetrologyPalette.background.ignoresSafeArea())
-        }
-        .toolbar(.hidden, for: .navigationBar)
+        entry.makeView()
+            .background(MetrologyPalette.background.ignoresSafeArea())
     }
 }
 

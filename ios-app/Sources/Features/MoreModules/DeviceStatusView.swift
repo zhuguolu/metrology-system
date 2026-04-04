@@ -15,7 +15,7 @@ struct DeviceStatusView: View {
                     hintLine
                     statusList
                 }
-                .padding(12)
+                .padding(.horizontal, 12)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)
@@ -53,13 +53,6 @@ struct DeviceStatusView: View {
             }
         }
         .navigationTitle("使用状态")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("刷新") {
-                    Task { await viewModel.load() }
-                }
-            }
-        }
         .task {
             await viewModel.initialLoad()
         }

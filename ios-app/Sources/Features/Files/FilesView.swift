@@ -38,7 +38,7 @@ struct FilesView: View {
                         }
                     }
                 }
-                .padding(14)
+                .padding(.horizontal, 14)
                 .padding(.bottom, 14)
             }
             .scrollIndicators(.hidden)

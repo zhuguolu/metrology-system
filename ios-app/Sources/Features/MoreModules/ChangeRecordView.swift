@@ -28,7 +28,7 @@ struct ChangeRecordView: View {
                     recordsList
                     pagerBar
                 }
-                .padding(12)
+                .padding(.horizontal, 12)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)

@@ -19,7 +19,7 @@ struct WebDavView: View {
                     hintLine
                     fileList
                 }
-                .padding(12)
+                .padding(.horizontal, 12)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)
