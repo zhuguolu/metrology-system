@@ -81,6 +81,27 @@ plist_value() {
   /usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true
 }
 
+normalize_token() {
+  local raw="${1:-}"
+  printf '%s' "$raw" | tr -d '\r[:space:]' | tr '[:upper:]' '[:lower:]'
+}
+
+is_truthy() {
+  local normalized
+  normalized="$(normalize_token "${1:-}")"
+  [ "$normalized" = "true" ] || [ "$normalized" = "1" ] || [ "$normalized" = "yes" ]
+}
+
+coalesce_non_empty() {
+  local first="${1:-}"
+  local second="${2:-}"
+  if [ -n "$(normalize_token "$first")" ]; then
+    printf '%s' "$first"
+  else
+    printf '%s' "$second"
+  fi
+}
+
 if [ -z "$SCHEME" ]; then
   SCHEME="$(resolve_scheme_from_project_yml "$PROJECT_YML_PATH")"
 fi
@@ -131,15 +152,28 @@ if [ ! -f "$APP_INFO_PLIST" ]; then
   echo "Built app Info.plist not found: $APP_INFO_PLIST"
   exit 67
 fi
+SOURCE_INFO_PLIST="$ROOT_DIR/Sources/Resources/Info.plist"
 
-LAUNCH_STORYBOARD_NAME="$(plist_value "$APP_INFO_PLIST" "UILaunchStoryboardName")"
-REQUIRES_FULLSCREEN="$(plist_value "$APP_INFO_PLIST" "UIRequiresFullScreen")"
-DEVICE_FAMILY_FIRST="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:0")"
-DEVICE_FAMILY_SECOND="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:1")"
+BUILT_LAUNCH_STORYBOARD_NAME="$(plist_value "$APP_INFO_PLIST" "UILaunchStoryboardName")"
+BUILT_REQUIRES_FULLSCREEN="$(plist_value "$APP_INFO_PLIST" "UIRequiresFullScreen")"
+BUILT_DEVICE_FAMILY_FIRST="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:0")"
+BUILT_DEVICE_FAMILY_SECOND="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:1")"
 
-if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
-  LAUNCH_STORYBOARD_NAME="$(plist_value "$ROOT_DIR/Sources/Resources/Info.plist" "UILaunchStoryboardName")"
+SOURCE_LAUNCH_STORYBOARD_NAME=""
+SOURCE_REQUIRES_FULLSCREEN=""
+SOURCE_DEVICE_FAMILY_FIRST=""
+SOURCE_DEVICE_FAMILY_SECOND=""
+if [ -f "$SOURCE_INFO_PLIST" ]; then
+  SOURCE_LAUNCH_STORYBOARD_NAME="$(plist_value "$SOURCE_INFO_PLIST" "UILaunchStoryboardName")"
+  SOURCE_REQUIRES_FULLSCREEN="$(plist_value "$SOURCE_INFO_PLIST" "UIRequiresFullScreen")"
+  SOURCE_DEVICE_FAMILY_FIRST="$(plist_value "$SOURCE_INFO_PLIST" "UIDeviceFamily:0")"
+  SOURCE_DEVICE_FAMILY_SECOND="$(plist_value "$SOURCE_INFO_PLIST" "UIDeviceFamily:1")"
 fi
+
+LAUNCH_STORYBOARD_NAME="$(coalesce_non_empty "$BUILT_LAUNCH_STORYBOARD_NAME" "$SOURCE_LAUNCH_STORYBOARD_NAME")"
+REQUIRES_FULLSCREEN="$(coalesce_non_empty "$BUILT_REQUIRES_FULLSCREEN" "$SOURCE_REQUIRES_FULLSCREEN")"
+DEVICE_FAMILY_FIRST="$(coalesce_non_empty "$BUILT_DEVICE_FAMILY_FIRST" "$SOURCE_DEVICE_FAMILY_FIRST")"
+DEVICE_FAMILY_SECOND="$(coalesce_non_empty "$BUILT_DEVICE_FAMILY_SECOND" "$SOURCE_DEVICE_FAMILY_SECOND")"
 
 if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
   DETECTED_STORYBOARD_PATH="$(find "$APP_PATH" -maxdepth 1 -type d -name "*.storyboardc" | head -n 1 || true)"
@@ -153,12 +187,17 @@ if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
   exit 68
 fi
 
-if [ "$REQUIRES_FULLSCREEN" != "true" ] && [ "$REQUIRES_FULLSCREEN" != "1" ]; then
-  echo "Compatibility check failed: UIRequiresFullScreen is not true."
-  exit 68
+if ! is_truthy "$REQUIRES_FULLSCREEN"; then
+  if [ "$(normalize_token "$DEVICE_FAMILY_FIRST")" = "1" ] && [ -z "$(normalize_token "$DEVICE_FAMILY_SECOND")" ]; then
+    echo "Compatibility warning: UIRequiresFullScreen is not explicitly true, but app is iPhone-only (UIDeviceFamily=[1])."
+    REQUIRES_FULLSCREEN="${REQUIRES_FULLSCREEN:-iPhone-only}"
+  else
+    echo "Compatibility check failed: UIRequiresFullScreen is not true."
+    exit 68
+  fi
 fi
 
-if [ "$DEVICE_FAMILY_FIRST" != "1" ] || [ -n "$DEVICE_FAMILY_SECOND" ]; then
+if [ "$(normalize_token "$DEVICE_FAMILY_FIRST")" != "1" ] || [ -n "$(normalize_token "$DEVICE_FAMILY_SECOND")" ]; then
   echo "Compatibility check failed: UIDeviceFamily must be iPhone-only [1], got first='$DEVICE_FAMILY_FIRST' second='$DEVICE_FAMILY_SECOND'."
   exit 68
 fi
