@@ -4,6 +4,7 @@ struct DeviceEditView: View {
     let device: DeviceDto
     let onSave: (DeviceUpdatePayload) -> Void
 
+    @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var validationMessage: String?
 
@@ -77,17 +78,21 @@ struct DeviceEditView: View {
                         sectionCard(title: "\u{53f0}\u{8d26}\u{4fe1}\u{606f}") {
                             field("\u{8d44}\u{4ea7}\u{7f16}\u{53f7}", text: $assetNo)
                             field("\u{51fa}\u{5382}\u{7f16}\u{53f7}", text: $serialNo)
-                            field("\u{41}\u{42}\u{43}\u{5206}\u{7c7b}", text: $abcClass)
-                            field("\u{90e8}\u{95e8}", text: $dept)
+                            selectField("\u{41}\u{42}\u{43}\u{5206}\u{7c7b}", text: $abcClass, options: ["A", "B", "C"])
+                            if departmentOptions.isEmpty {
+                                field("\u{90e8}\u{95e8}", text: $dept)
+                            } else {
+                                selectField("\u{90e8}\u{95e8}", text: $dept, options: departmentOptions)
+                            }
                             field("\u{8bbe}\u{5907}\u{4f4d}\u{7f6e}", text: $location)
                             field("\u{8d23}\u{4efb}\u{4eba}", text: $responsiblePerson)
-                            field("\u{4f7f}\u{7528}\u{72b6}\u{6001}", text: $useStatus)
+                            selectField("\u{4f7f}\u{7528}\u{72b6}\u{6001}", text: $useStatus, options: ["正常", "故障", "报废", "其他"])
                         }
 
                         sectionCard(title: "\u{6821}\u{51c6}\u{4fe1}\u{606f}") {
-                            field("\u{68c0}\u{5b9a}\u{5468}\u{671f}\u{ff08}\u{534a}\u{5e74}\u{2f}\u{4e00}\u{5e74}\u{2f}\u{6570}\u{5b57}\u{ff09}", text: $cycleText, keyboard: .numbersAndPunctuation)
+                            selectField("\u{68c0}\u{5b9a}\u{5468}\u{671f}", text: $cycleText, options: ["半年", "一年", "24"])
                             field("\u{4e0a}\u{6b21}\u{6821}\u{51c6}\u{65e5}\u{671f}\u{ff08}\u{59}\u{59}\u{59}\u{59}\u{2d}\u{4d}\u{4d}\u{2d}\u{44}\u{44}\u{ff09}", text: $calDate)
-                            field("\u{6821}\u{51c6}\u{7ed3}\u{679c}", text: $calibrationResult)
+                            selectField("\u{6821}\u{51c6}\u{7ed3}\u{679c}", text: $calibrationResult, options: ["合格", "不合格"])
                         }
 
                         sectionCard(title: "\u{6269}\u{5c55}\u{4fe1}\u{606f}") {
@@ -157,6 +162,28 @@ struct DeviceEditView: View {
         }
     }
 
+    private func selectField(_ title: String, text: Binding<String>, options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option) {
+                        text.wrappedValue = option
+                    }
+                }
+            } label: {
+                MetrologySelectField(
+                    title: title,
+                    value: normalized(text.wrappedValue).isEmpty ? "请选择" : text.wrappedValue
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private func handleSave() {
         validationMessage = nil
 
@@ -221,7 +248,20 @@ struct DeviceEditView: View {
         if value.isEmpty { return nil }
         if value == "\u{534a}\u{5e74}" { return 6 }
         if value == "\u{4e00}\u{5e74}" { return 12 }
+        if value == "\u{4e24}\u{5e74}" { return 24 }
         return Int(value)
+    }
+
+    private var departmentOptions: [String] {
+        let sessionDepartments = appState.session?.departments ?? []
+        let candidates = sessionDepartments + [dept]
+        var seen = Set<String>()
+        return candidates.compactMap { raw in
+            let value = normalized(raw)
+            guard !value.isEmpty, !seen.contains(value) else { return nil }
+            seen.insert(value)
+            return value
+        }
     }
 
     private static func formatCycle(_ cycle: Int?) -> String {

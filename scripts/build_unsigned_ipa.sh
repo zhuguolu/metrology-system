@@ -126,6 +126,37 @@ if [ -z "${APP_PATH:-}" ] || [ ! -d "$APP_PATH" ]; then
   exit 1
 fi
 
+APP_INFO_PLIST="$APP_PATH/Info.plist"
+if [ ! -f "$APP_INFO_PLIST" ]; then
+  echo "Built app Info.plist not found: $APP_INFO_PLIST"
+  exit 67
+fi
+
+LAUNCH_STORYBOARD_NAME="$(plist_value "$APP_INFO_PLIST" "UILaunchStoryboardName")"
+REQUIRES_FULLSCREEN="$(plist_value "$APP_INFO_PLIST" "UIRequiresFullScreen")"
+DEVICE_FAMILY_FIRST="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:0")"
+DEVICE_FAMILY_SECOND="$(plist_value "$APP_INFO_PLIST" "UIDeviceFamily:1")"
+
+if [ -z "$LAUNCH_STORYBOARD_NAME" ]; then
+  echo "Compatibility check failed: UILaunchStoryboardName missing. This can cause non-full-screen rendering on modern iPhone."
+  exit 68
+fi
+
+if [ "$REQUIRES_FULLSCREEN" != "true" ] && [ "$REQUIRES_FULLSCREEN" != "1" ]; then
+  echo "Compatibility check failed: UIRequiresFullScreen is not true."
+  exit 68
+fi
+
+if [ "$DEVICE_FAMILY_FIRST" != "1" ] || [ -n "$DEVICE_FAMILY_SECOND" ]; then
+  echo "Compatibility check failed: UIDeviceFamily must be iPhone-only [1], got first='$DEVICE_FAMILY_FIRST' second='$DEVICE_FAMILY_SECOND'."
+  exit 68
+fi
+
+if [ ! -d "$APP_PATH/${LAUNCH_STORYBOARD_NAME}.storyboardc" ]; then
+  echo "Compatibility check failed: launch storyboard bundle missing at $APP_PATH/${LAUNCH_STORYBOARD_NAME}.storyboardc."
+  exit 68
+fi
+
 rm -rf "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"
 
@@ -174,6 +205,10 @@ fi
   echo "app_file_count=$APP_FILE_COUNT"
   echo "executable_name=$EXECUTABLE_NAME"
   echo "executable_size_bytes=$EXECUTABLE_SIZE_BYTES"
+  echo "launch_storyboard_name=$LAUNCH_STORYBOARD_NAME"
+  echo "ui_requires_full_screen=$REQUIRES_FULLSCREEN"
+  echo "ui_device_family_first=$DEVICE_FAMILY_FIRST"
+  echo "ui_device_family_second=$DEVICE_FAMILY_SECOND"
   xcodebuild -version | tr '\n' '|' | sed 's/|$//'
 } > "$BUILD_INFO_PATH"
 

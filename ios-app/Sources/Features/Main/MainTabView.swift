@@ -60,9 +60,9 @@ private enum MainTab: String, CaseIterable, Hashable {
 
     var showBackToBoard: Bool {
         switch self {
-        case .ledger, .calibration, .todo:
+        case .ledger:
             return true
-        case .audit, .more:
+        case .calibration, .todo, .audit, .more:
             return false
         }
     }
@@ -80,6 +80,9 @@ struct MainTabView: View {
             let horizontal = max(scale.px(16), 12)
             let topPadding = max(scale.vertical(12), 8)
             let contentTop = max(scale.vertical(10), 6)
+            let bottomInset = proxy.safeAreaInsets.bottom
+            let tabTopSpacing = max(scale.vertical(4), 2)
+            let tabBottomSpacing: CGFloat = bottomInset > 0 ? 2 : 6
 
             ZStack {
                 MetrologyPalette.background.ignoresSafeArea()
@@ -102,8 +105,8 @@ struct MainTabView: View {
                     loadedTabs.insert(tab)
                 }
                 .padding(.horizontal, horizontal)
-                .padding(.top, max(scale.vertical(10), 8))
-                .padding(.bottom, max(scale.vertical(8), 6))
+                .padding(.top, tabTopSpacing)
+                .padding(.bottom, tabBottomSpacing)
                 .background(MetrologyPalette.background)
             }
             .animation(.easeOut(duration: 0.16), value: selectedTab)
@@ -213,8 +216,8 @@ private struct AndroidStyleTabBar: View {
         GeometryReader { proxy in
             let scale = AndroidScale(containerWidth: proxy.size.width, containerHeight: proxy.size.height)
             let horizontalPadding = max(scale.px(12), 10)
-            let verticalPadding = max(scale.px(8), 7)
-            let navHeight = max(scale.px(72), 68)
+            let verticalPadding = max(scale.px(5), 4)
+            let navHeight = max(scale.px(64), 60)
             let iconSize = max(scale.px(21), 19)
             let labelSize = max(scale.px(10.5), 10)
             let corner = max(scale.px(24), 20)
@@ -288,7 +291,7 @@ private struct AndroidStyleTabBar: View {
             )
             .shadow(color: Color(hex: 0x345A8F, alpha: 0.18), radius: 4, x: 0, y: 2)
         }
-        .frame(height: 90)
+        .frame(height: 80)
     }
 }
 
@@ -317,16 +320,6 @@ private struct MoreHubView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
                             header(scale: scale)
-                            section(title: "常用模块", scale: scale) {
-                                LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    moduleCard(icon: "rectangle.grid.1x2.fill", title: "总览看板", tint: Color(hex: 0x1D4ED8), scale: scale) { selectedTab = .ledger }
-                                    moduleCard(icon: "books.vertical.fill", title: "设备台账", tint: Color(hex: 0x047857), scale: scale) { selectedTab = .ledger }
-                                    moduleCard(icon: "checkmark.seal.fill", title: "校准管理", tint: Color(hex: 0xB45309), scale: scale) { selectedTab = .calibration }
-                                    moduleCard(icon: "clipboard.fill", title: "我的待办", tint: Color(hex: 0x6D28D9), scale: scale) { selectedTab = .todo }
-                                    moduleCard(icon: "doc.text.magnifyingglass", title: "数据审核", tint: Color(hex: 0x6D28D9), scale: scale) { selectedTab = .audit }
-                                }
-                            }
-
                             section(title: "协作与数据", scale: scale) {
                                 LazyVGrid(columns: columns, spacing: gridSpacing) {
                                     NavigationLink { FilesView() } label: {
@@ -415,13 +408,6 @@ private struct MoreHubView: View {
 
             content()
         }
-    }
-
-    private func moduleCard(icon: String, title: String, tint: Color, scale: AndroidScale, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            moduleCardContent(icon: icon, title: title, tint: tint, scale: scale)
-        }
-        .buttonStyle(.plain)
     }
 
     private func moduleCardContent(icon: String, title: String, tint: Color, scale: AndroidScale) -> some View {

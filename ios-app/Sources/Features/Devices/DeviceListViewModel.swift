@@ -106,10 +106,6 @@ final class DeviceListViewModel: ObservableObject {
             return
         }
 
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
         let payload = DeviceCalibrationPayload(
             calDate: todayDateString(),
             cycle: item.cycle ?? 12,
@@ -117,11 +113,26 @@ final class DeviceListViewModel: ObservableObject {
             remark: item.remark
         )
 
+        _ = await saveCalibrationEdit(id: id, payload: payload, targetPage: page)
+    }
+
+    func quickEditCalibration(id: Int64, payload: DeviceCalibrationPayload) async -> Bool {
+        guard mode != .ledger else { return false }
+        return await saveCalibrationEdit(id: id, payload: payload, targetPage: page)
+    }
+
+    private func saveCalibrationEdit(id: Int64, payload: DeviceCalibrationPayload, targetPage: Int) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
         do {
             _ = try await APIClient.shared.updateDeviceCalibration(id: id, payload: payload)
-            await load(page: page)
+            await load(page: targetPage)
+            return true
         } catch {
             errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
         }
     }
 

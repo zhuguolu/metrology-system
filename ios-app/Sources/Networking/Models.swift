@@ -21,6 +21,47 @@ struct DashboardStats: Codable {
     let expired: Int64?
     let warning: Int64?
     let valid: Int64?
+    let monthlyTrend: [DashboardTrendPointRaw]?
+    let deptStats: [DashboardDeptStatRaw]?
+}
+
+struct DashboardTrendPointRaw: Codable {
+    let month: String?
+    let label: String?
+    let period: String?
+    let name: String?
+    let x: String?
+    let count: Int64?
+    let total: Int64?
+    let value: Int64?
+    let num: Int64?
+    let deviceCount: Int64?
+}
+
+struct DashboardDeptStatRaw: Codable {
+    let dept: String?
+    let deptName: String?
+    let department: String?
+    let name: String?
+    let label: String?
+
+    let total: Int64?
+    let count: Int64?
+    let deviceCount: Int64?
+    let value: Int64?
+    let num: Int64?
+
+    let valid: Int64?
+    let validCount: Int64?
+    let normal: Int64?
+
+    let warning: Int64?
+    let warningCount: Int64?
+    let aboutToExpire: Int64?
+
+    let expired: Int64?
+    let expiredCount: Int64?
+    let invalid: Int64?
 }
 
 struct DeviceDto: Codable, Identifiable {

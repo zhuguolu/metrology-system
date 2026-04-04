@@ -20,6 +20,7 @@ struct MetrologyIOSApp: App {
                     LoginView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .environmentObject(appState)
             .task {
                 guard showsStartup else { return }
