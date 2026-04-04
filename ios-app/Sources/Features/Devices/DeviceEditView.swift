@@ -30,6 +30,8 @@ struct DeviceEditView: View {
     @State private var calibrationResult: String
     @State private var remark: String
     @State private var activeDatePicker: DatePickerField?
+    @State private var departmentLookupOptions: [String] = []
+    @State private var useStatusLookupOptions: [String] = []
 
     private enum DatePickerField: String, Identifiable {
         case calDate
@@ -93,14 +95,10 @@ struct DeviceEditView: View {
                             field("资产编号", text: $assetNo)
                             field("出厂编号", text: $serialNo)
                             selectField("ABC分类", text: $abcClass, options: ["A", "B", "C"])
-                            if departmentOptions.isEmpty {
-                                field("部门", text: $dept)
-                            } else {
-                                selectField("部门", text: $dept, options: departmentOptions)
-                            }
+                            selectField("部门", text: $dept, options: departmentOptions)
                             field("设备位置", text: $location)
                             field("责任人", text: $responsiblePerson)
-                            selectField("使用状态", text: $useStatus, options: ["正常", "故障", "报废", "其他"])
+                            selectField("使用状态", text: $useStatus, options: useStatusOptions)
                         }
 
                         sectionCard(title: "校准信息") {
@@ -156,6 +154,9 @@ struct DeviceEditView: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(screenTitle)
+        }
+        .task {
+            await refreshLookupOptions()
         }
         .sheet(item: $activeDatePicker) { field in
             DeviceEditDatePickerSheet(
@@ -350,14 +351,59 @@ struct DeviceEditView: View {
 
     private var departmentOptions: [String] {
         let sessionDepartments: [String] = appState.session?.departments ?? []
-        let candidates = sessionDepartments + [dept]
-        var seen = Set<String>()
-        return candidates.compactMap { raw in
-            let value = normalized(raw)
-            guard !value.isEmpty, !seen.contains(value) else { return nil }
-            seen.insert(value)
-            return value
+        return normalizedOptions(departmentLookupOptions + sessionDepartments + [dept])
+    }
+
+    private var useStatusOptions: [String] {
+        let fallback = ["正常", "故障", "报废", "其他"]
+        return normalizedOptions(useStatusLookupOptions + fallback + [useStatus])
+    }
+
+    @MainActor
+    private func refreshLookupOptions() async {
+        do {
+            async let departmentsTask = APIClient.shared.departments(search: "")
+            async let statusesTask = APIClient.shared.deviceStatuses()
+            let departments = try await departmentsTask
+            let statuses = try await statusesTask
+
+            let departmentNames = departments
+                .sorted { lhs, rhs in
+                    let left = lhs.sortOrder ?? Int.max
+                    let right = rhs.sortOrder ?? Int.max
+                    if left != right { return left < right }
+                    return (lhs.id ?? Int64.max) < (rhs.id ?? Int64.max)
+                }
+                .compactMap { $0.name?.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+            let statusNames = statuses
+                .sorted { lhs, rhs in
+                    let left = lhs.sortOrder ?? Int.max
+                    let right = rhs.sortOrder ?? Int.max
+                    if left != right { return left < right }
+                    return (lhs.id ?? Int64.max) < (rhs.id ?? Int64.max)
+                }
+                .compactMap { $0.name?.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+            departmentLookupOptions = normalizedOptions(departmentNames + [dept])
+            useStatusLookupOptions = normalizedOptions(statusNames + [useStatus])
+        } catch {
+            // Keep current values and fallback options when remote lookup fails.
+            departmentLookupOptions = normalizedOptions(departmentLookupOptions + [dept])
+            useStatusLookupOptions = normalizedOptions(useStatusLookupOptions + [useStatus])
         }
+    }
+
+    private func normalizedOptions(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for raw in values {
+            let value = normalized(raw)
+            guard !value.isEmpty, !seen.contains(value) else { continue }
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
     }
 
     private static func formatCycle(_ cycle: Int?) -> String {

@@ -289,18 +289,26 @@ struct DeviceListView: View {
 
     private var summaryTiles: some View {
         let columns: [GridItem] = viewModel.mode == .ledger
-            ? Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+            ? Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 5)
             : Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
         return LazyVGrid(columns: columns, spacing: 8) {
-            totalSummaryCapsule
-
             if viewModel.mode == .ledger {
+                summaryTile(
+                    title: "共",
+                    valueText: "\(formatCount(displayedOverallTotal))台",
+                    style: .neutral,
+                    isSelected: ledgerSummaryAllSelected,
+                    compact: true
+                ) {
+                    applySummaryFilter(nil)
+                }
                 summaryTile(
                     title: "正常",
                     value: displayedOverallUseStatus("正常"),
                     style: .valid,
-                    isSelected: viewModel.useStatusFilter == "正常"
+                    isSelected: viewModel.useStatusFilter == "正常",
+                    compact: true
                 ) {
                     applySummaryFilter("正常")
                 }
@@ -308,7 +316,8 @@ struct DeviceListView: View {
                     title: "故障",
                     value: displayedOverallUseStatus("故障"),
                     style: .warning,
-                    isSelected: viewModel.useStatusFilter == "故障"
+                    isSelected: viewModel.useStatusFilter == "故障",
+                    compact: true
                 ) {
                     applySummaryFilter("故障")
                 }
@@ -316,19 +325,22 @@ struct DeviceListView: View {
                     title: "报废",
                     value: displayedOverallUseStatus("报废"),
                     style: .expired,
-                    isSelected: viewModel.useStatusFilter == "报废"
+                    isSelected: viewModel.useStatusFilter == "报废",
+                    compact: true
                 ) {
                     applySummaryFilter("报废")
                 }
                 summaryTile(
                     title: "其他",
-                    value: displayedOverallUseStatus("其他"),
+                    value: displayedLedgerOtherCount,
                     style: .neutral,
-                    isSelected: viewModel.useStatusFilter == "其他"
+                    isSelected: viewModel.useStatusFilter == "其他",
+                    compact: true
                 ) {
                     applySummaryFilter("其他")
                 }
             } else {
+                totalSummaryCapsule
                 summaryTile(
                     title: "有效",
                     value: displayedOverallValidity("有效"),
@@ -355,6 +367,10 @@ struct DeviceListView: View {
                 }
             }
         }
+    }
+
+    private var ledgerSummaryAllSelected: Bool {
+        viewModel.useStatusFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var totalSummaryCapsule: some View {
@@ -407,6 +423,13 @@ struct DeviceListView: View {
         return viewModel.useStatusSummary[key] ?? 0
     }
 
+    private var displayedLedgerOtherCount: Int64 {
+        let known = displayedOverallUseStatus("正常")
+            + displayedOverallUseStatus("故障")
+            + displayedOverallUseStatus("报废")
+        return max(0, displayedOverallTotal - known)
+    }
+
     private func displayedOverallValidity(_ key: String) -> Int64 {
         if let value = viewModel.overallSummaryCounts[key] {
             return value
@@ -419,34 +442,56 @@ struct DeviceListView: View {
         value: Int64,
         style: ChipStyle,
         isSelected: Bool,
+        compact: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        summaryTile(
+            title: title,
+            valueText: formatCount(value),
+            style: style,
+            isSelected: isSelected,
+            compact: compact,
+            action: action
+        )
+    }
+
+    private func summaryTile(
+        title: String,
+        valueText: String,
+        style: ChipStyle,
+        isSelected: Bool,
+        compact: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: compact ? 2 : 4) {
+                HStack(spacing: compact ? 3 : 4) {
                     Text(title)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: compact ? 10 : 11, weight: .bold))
                         .foregroundStyle(style.textColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: compact ? 9 : 10, weight: .bold))
                             .foregroundStyle(style.textColor)
                     }
                 }
-                Text(formatCount(value))
-                    .font(.system(size: 12, weight: .bold))
+                Text(valueText)
+                    .font(.system(size: compact ? 11 : 12, weight: .bold))
                     .foregroundStyle(style.textColor)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, compact ? 6 : 10)
+            .padding(.vertical, compact ? 6 : 8)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 10 : 12, style: .continuous)
                     .fill(isSelected ? style.selectedBackground : style.background)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 10 : 12, style: .continuous)
                     .stroke(isSelected ? style.selectedStroke : style.stroke, lineWidth: isSelected ? 2 : 1)
             )
             .shadow(color: isSelected ? style.selectedStroke.opacity(0.22) : .clear, radius: 4, x: 0, y: 2)
@@ -716,6 +761,19 @@ private struct DeviceRowCard: View {
         return .neutral
     }
 
+    private var isExpiredDevice: Bool {
+        let validity = normalizeStatus(item.validity)
+        return validity.contains("失效") || validity.contains("过期")
+    }
+
+    private var nextDateColor: Color {
+        isExpiredDevice ? MetrologyPalette.statusExpired : MetrologyPalette.textSecondary
+    }
+
+    private var valueFont: Font {
+        .system(size: 12, weight: .bold)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 8) {
@@ -739,21 +797,33 @@ private struct DeviceRowCard: View {
             }
 
             Text("编号: \(item.metricNo ?? "-")")
-                .font(.system(size: 12))
+                .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 8)
                 .lineLimit(1)
 
             Text("部门: \(item.dept ?? "-")    责任人: \(item.responsiblePerson ?? "-")")
-                .font(.system(size: 12))
+                .font(valueFont)
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .padding(.top, 3)
+                .lineLimit(1)
+
+            Text("设备位置: \(item.location ?? "-")")
+                .font(valueFont)
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .padding(.top, 3)
+                .lineLimit(1)
+
+            Text("上次校准: \(item.calDate ?? "-")")
+                .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 3)
                 .lineLimit(1)
 
             HStack(alignment: .bottom, spacing: 8) {
                 Text("下次校准: \(item.nextDate ?? "-")")
-                    .font(.system(size: 12))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
+                    .font(valueFont)
+                    .foregroundStyle(nextDateColor)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
