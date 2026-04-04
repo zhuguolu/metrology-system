@@ -29,6 +29,13 @@ final class DeviceListViewModel: ObservableObject {
     private let pageSize: Int = 20
     private let ledgerOtherLocalFetchSize: Int = 5000
     private var currentLoadToken: UInt64 = 0
+    private var baselineSummaryCache: [String: BaselineSnapshot] = [:]
+
+    private struct BaselineSnapshot {
+        let total: Int64
+        let validitySummary: [String: Int64]
+        let useStatusSummary: [String: Int64]
+    }
 
     init(mode: DeviceListMode) {
         self.mode = mode
@@ -38,9 +45,14 @@ final class DeviceListViewModel: ObservableObject {
     }
 
     func initialLoad() async {
-        await refreshFilterSourceOptions()
-        if !items.isEmpty { return }
-        await load(page: 1)
+        if !items.isEmpty {
+            await refreshFilterSourceOptions()
+            return
+        }
+
+        async let loadTask: Void = load(page: 1)
+        async let optionsTask: Void = refreshFilterSourceOptions()
+        _ = await (loadTask, optionsTask)
     }
 
     func reloadCurrentPage() async {
@@ -140,35 +152,48 @@ final class DeviceListViewModel: ObservableObject {
             summaryCounts = resolvedValiditySummary
             useStatusSummary = resolvedUseStatusSummary
 
-            do {
-                let baselineResult = try await APIClient.shared.devicesPaged(
-                    mode: mode,
-                    search: searchText,
-                    dept: deptFilter,
-                    validity: nil,
-                    useStatus: baselineUseStatusFilter,
-                    nextDateFrom: mode == .ledger ? nil : nextDateFrom,
-                    nextDateTo: mode == .ledger ? nil : nextDateTo,
-                    page: 1,
-                    size: 1
-                )
-                guard shouldApplyResult(for: token) else { return }
+            let baselineCacheKey = currentBaselineCacheKey()
+            if let cached = baselineSummaryCache[baselineCacheKey] {
+                overallTotal = cached.total
+                overallSummaryCounts = cached.validitySummary
+                overallUseStatusSummary = cached.useStatusSummary
+            } else {
+                do {
+                    let baselineResult = try await APIClient.shared.devicesPaged(
+                        mode: mode,
+                        search: searchText,
+                        dept: deptFilter,
+                        validity: nil,
+                        useStatus: baselineUseStatusFilter,
+                        nextDateFrom: mode == .ledger ? nil : nextDateFrom,
+                        nextDateTo: mode == .ledger ? nil : nextDateTo,
+                        page: 1,
+                        size: 1
+                    )
+                    guard shouldApplyResult(for: token) else { return }
 
-                let baselineItems = baselineResult.content ?? []
-                overallTotal = baselineResult.totalElements ?? total
-                overallSummaryCounts = resolveValiditySummary(
-                    serverSummary: baselineResult.summaryCounts,
-                    items: baselineItems
-                )
-                overallUseStatusSummary = resolveUseStatusSummary(
-                    serverSummary: baselineResult.useStatusSummary,
-                    items: baselineItems
-                )
-            } catch {
-                guard shouldApplyResult(for: token) else { return }
-                overallTotal = total
-                overallSummaryCounts = resolvedValiditySummary
-                overallUseStatusSummary = resolvedUseStatusSummary
+                    let baselineItems = baselineResult.content ?? []
+                    let snapshot = BaselineSnapshot(
+                        total: baselineResult.totalElements ?? total,
+                        validitySummary: resolveValiditySummary(
+                            serverSummary: baselineResult.summaryCounts,
+                            items: baselineItems
+                        ),
+                        useStatusSummary: resolveUseStatusSummary(
+                            serverSummary: baselineResult.useStatusSummary,
+                            items: baselineItems
+                        )
+                    )
+                    baselineSummaryCache[baselineCacheKey] = snapshot
+                    overallTotal = snapshot.total
+                    overallSummaryCounts = snapshot.validitySummary
+                    overallUseStatusSummary = snapshot.useStatusSummary
+                } catch {
+                    guard shouldApplyResult(for: token) else { return }
+                    overallTotal = total
+                    overallSummaryCounts = resolvedValiditySummary
+                    overallUseStatusSummary = resolvedUseStatusSummary
+                }
             }
             hintMessage = "共 \(total) 条，当前第 \(page)/\(totalPages) 页"
         } catch {
@@ -249,6 +274,7 @@ final class DeviceListViewModel: ObservableObject {
 
         do {
             _ = try await APIClient.shared.updateDeviceCalibration(id: id, payload: payload)
+            invalidateBaselineCache()
             await load(page: targetPage)
             return true
         } catch {
@@ -264,6 +290,7 @@ final class DeviceListViewModel: ObservableObject {
 
         do {
             _ = try await APIClient.shared.updateDevice(id: id, payload: payload)
+            invalidateBaselineCache()
             await load(page: page)
             return true
         } catch {
@@ -279,6 +306,7 @@ final class DeviceListViewModel: ObservableObject {
 
         do {
             try await APIClient.shared.deleteDevice(id: id)
+            invalidateBaselineCache()
             let targetPage = (items.count <= 1 && page > 1) ? (page - 1) : page
             await load(page: targetPage)
             hintMessage = "删除已处理"
@@ -303,6 +331,7 @@ final class DeviceListViewModel: ObservableObject {
                 let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
                 hintMessage = trimmed.isEmpty ? "新增申请已提交，等待审核" : trimmed
             }
+            invalidateBaselineCache()
             await load(page: 1)
             return true
         } catch {
@@ -351,6 +380,38 @@ final class DeviceListViewModel: ObservableObject {
 
     private func shouldUseLedgerOtherLocalFallback() -> Bool {
         mode == .ledger && normalizeStatusText(useStatusFilter) == "其他"
+    }
+
+    private func currentBaselineCacheKey() -> String {
+        [
+            cacheModeKey,
+            normalizeCacheText(searchText),
+            normalizeCacheText(deptFilter),
+            mode == .ledger ? "" : normalizeCacheText(nextDateFrom),
+            mode == .ledger ? "" : normalizeCacheText(nextDateTo),
+            normalizeCacheText(baselineUseStatusFilter)
+        ].joined(separator: "|")
+    }
+
+    private var cacheModeKey: String {
+        switch mode {
+        case .ledger:
+            return "ledger"
+        case .calibration:
+            return "calibration"
+        case .todo:
+            return "todo"
+        }
+    }
+
+    private func normalizeCacheText(_ rawValue: String?) -> String {
+        (rawValue ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private func invalidateBaselineCache() {
+        baselineSummaryCache.removeAll(keepingCapacity: true)
     }
 
     private func paginateLocal(items: [DeviceDto], requestedPage: Int) -> (items: [DeviceDto], page: Int, totalPages: Int) {

@@ -25,7 +25,7 @@ struct MetrologyIOSApp: App {
             .environmentObject(appState)
             .task {
                 guard showsStartup else { return }
-                try? await Task.sleep(nanoseconds: 1_050_000_000)
+                try? await Task.sleep(nanoseconds: 280_000_000)
                 showsStartup = false
             }
         }
