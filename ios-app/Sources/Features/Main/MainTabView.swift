@@ -1,5 +1,6 @@
 ﻿import SwiftUI
 import UIKit
+import ObjectiveC
 
 private enum MainTab: String, CaseIterable, Hashable {
     case ledger
@@ -87,7 +88,7 @@ struct MainTabView: View {
             let tabDownOffset = min(max(bottomInset * 0.42, 0), 14)
 
             ZStack {
-                pageBackground
+                MetrologyPalette.background.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     if shouldShowTopBar {
@@ -112,7 +113,7 @@ struct MainTabView: View {
                     .padding(.bottom, tabBottomSpacing - tabDownOffset)
                 }
                 .background(
-                    bottomBackground
+                    MetrologyPalette.background
                         .ignoresSafeArea(edges: .bottom)
                 )
             }
@@ -163,33 +164,6 @@ struct MainTabView: View {
 
     private var shouldShowTopBar: Bool {
         true
-    }
-
-    @ViewBuilder
-    private var pageBackground: some View {
-        if selectedTab == .more {
-            LinearGradient(
-                colors: [MetrologyPalette.moreBgStart, MetrologyPalette.moreBgEnd],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-        } else {
-            MetrologyPalette.background.ignoresSafeArea()
-        }
-    }
-
-    @ViewBuilder
-    private var bottomBackground: some View {
-        if selectedTab == .more {
-            LinearGradient(
-                colors: [MetrologyPalette.moreBgStart, MetrologyPalette.moreBgEnd],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else {
-            MetrologyPalette.background
-        }
     }
 
     private var currentTopBarTitle: String {
@@ -360,7 +334,7 @@ private struct MoreHubView: View {
                 )
 
                 ZStack {
-                    Color.clear.ignoresSafeArea()
+                    MetrologyPalette.background.ignoresSafeArea()
 
                     ScrollViewReader { reader in
                         ScrollView {
@@ -453,6 +427,7 @@ private struct MoreHubView: View {
         @ViewBuilder _ destination: () -> Content
     ) -> some View {
         destination()
+            .background(MetrologyPalette.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
             .background(MoreSubmoduleSystemBackSwipeEnabler())
@@ -544,6 +519,8 @@ private struct MoreHubView: View {
 }
 
 private struct MoreSubmoduleSystemBackSwipeEnabler: UIViewControllerRepresentable {
+    private static var popGestureDelegateKey: UInt8 = 0
+
     func makeUIViewController(context: Context) -> UIViewController {
         let controller = UIViewController()
         controller.view.backgroundColor = .clear
@@ -556,9 +533,56 @@ private struct MoreSubmoduleSystemBackSwipeEnabler: UIViewControllerRepresentabl
             guard let navigationController = uiViewController.navigationController else { return }
             guard let popGesture = navigationController.interactivePopGestureRecognizer else { return }
 
+            // Keep push/pop transition backdrop consistent with app page background.
+            navigationController.view.backgroundColor = UIColor(
+                red: 238.0 / 255.0,
+                green: 244.0 / 255.0,
+                blue: 251.0 / 255.0,
+                alpha: 1.0
+            )
+
+            let delegate: MoreSubmodulePopGestureDelegate
+            if let existing = objc_getAssociatedObject(
+                navigationController,
+                &Self.popGestureDelegateKey
+            ) as? MoreSubmodulePopGestureDelegate {
+                delegate = existing
+                delegate.navigationController = navigationController
+            } else {
+                delegate = MoreSubmodulePopGestureDelegate(navigationController: navigationController)
+                objc_setAssociatedObject(
+                    navigationController,
+                    &Self.popGestureDelegateKey,
+                    delegate,
+                    .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+                )
+            }
+
             popGesture.isEnabled = navigationController.viewControllers.count > 1
-            popGesture.delegate = nil
+            popGesture.delegate = delegate
+            popGesture.cancelsTouchesInView = false
         }
+    }
+}
+
+private final class MoreSubmodulePopGestureDelegate: NSObject, UIGestureRecognizerDelegate {
+    weak var navigationController: UINavigationController?
+
+    init(navigationController: UINavigationController) {
+        self.navigationController = navigationController
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let navigationController else { return false }
+        guard navigationController.transitionCoordinator == nil else { return false }
+        return navigationController.viewControllers.count > 1
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        true
     }
 }
 
@@ -570,4 +594,5 @@ private extension Color {
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 }
+
 
