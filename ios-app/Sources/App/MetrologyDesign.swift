@@ -331,6 +331,7 @@ struct MetrologyNoticeDialog: View {
         }
         .transition(.opacity.combined(with: .scale(scale: 0.98)))
         .zIndex(1000)
+        .preferredColorScheme(.light)
     }
 }
 
@@ -395,6 +396,7 @@ struct MetrologyConfirmDialog: View {
         }
         .transition(.opacity.combined(with: .scale(scale: 0.98)))
         .zIndex(1000)
+        .preferredColorScheme(.light)
     }
 }
 

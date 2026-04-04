@@ -96,7 +96,7 @@ struct MainTabView: View {
                     }
 
                     tabContainer
-                        .padding(.horizontal, selectedTab == .more ? 0 : horizontal)
+                        .padding(.horizontal, horizontal)
                         .padding(.top, selectedTab == .more ? 0 : contentTop)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

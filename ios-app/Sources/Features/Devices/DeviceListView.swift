@@ -1137,94 +1137,98 @@ private struct DeviceDetailView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                detailSection(title: "基本信息") {
-                    detailPairRow(
-                        leftLabel: "仪器名称",
-                        leftValue: device.displayName,
-                        rightLabel: "计量编号",
-                        rightValue: device.metricNo
-                    )
-                    detailPairRow(
-                        leftLabel: "资产编号",
-                        leftValue: device.assetNo,
-                        rightLabel: "出厂编号",
-                        rightValue: device.serialNo
-                    )
-                    detailPairRow(
-                        leftLabel: "ABC分类",
-                        leftValue: device.abcClass,
-                        rightLabel: "设备型号",
-                        rightValue: device.model
-                    )
-                    detailPairRow(
-                        leftLabel: "制造厂",
-                        leftValue: device.manufacturer,
-                        rightLabel: "使用部门",
-                        rightValue: device.dept
-                    )
-                    detailPairRow(
-                        leftLabel: "设备位置",
-                        leftValue: device.location,
-                        rightLabel: "使用责任人",
-                        rightValue: device.responsiblePerson
-                    )
-                    detailPairRow(
-                        leftLabel: "使用状态",
-                        leftValue: device.useStatus,
-                        leftStyle: .useStatus
-                    )
-                }
+            ZStack {
+                MetrologyPalette.background.ignoresSafeArea()
 
-                detailSection(title: "采购信息") {
-                    detailPairRow(
-                        leftLabel: "采购时间",
-                        leftValue: device.purchaseDate,
-                        rightLabel: "采购价格",
-                        rightValue: purchasePriceText
-                    )
-                    detailPairRow(
-                        leftLabel: "使用年限",
-                        leftValue: serviceLifeText
-                    )
-                }
+                List {
+                    detailSection(title: "基本信息") {
+                        detailPairRow(
+                            leftLabel: "仪器名称",
+                            leftValue: device.displayName,
+                            rightLabel: "计量编号",
+                            rightValue: device.metricNo
+                        )
+                        detailPairRow(
+                            leftLabel: "资产编号",
+                            leftValue: device.assetNo,
+                            rightLabel: "出厂编号",
+                            rightValue: device.serialNo
+                        )
+                        detailPairRow(
+                            leftLabel: "ABC分类",
+                            leftValue: device.abcClass,
+                            rightLabel: "设备型号",
+                            rightValue: device.model
+                        )
+                        detailPairRow(
+                            leftLabel: "制造厂",
+                            leftValue: device.manufacturer,
+                            rightLabel: "使用部门",
+                            rightValue: device.dept
+                        )
+                        detailPairRow(
+                            leftLabel: "设备位置",
+                            leftValue: device.location,
+                            rightLabel: "使用责任人",
+                            rightValue: device.responsiblePerson
+                        )
+                        detailPairRow(
+                            leftLabel: "使用状态",
+                            leftValue: device.useStatus,
+                            leftStyle: .useStatus
+                        )
+                    }
 
-                detailSection(title: "技术参数") {
-                    detailPairRow(
-                        leftLabel: "分度值",
-                        leftValue: device.graduationValue,
-                        rightLabel: "测试范围",
-                        rightValue: device.testRange
-                    )
-                    detailPairRow(
-                        leftLabel: "允许误差",
-                        leftValue: device.allowableError
-                    )
-                }
+                    detailSection(title: "采购信息") {
+                        detailPairRow(
+                            leftLabel: "采购时间",
+                            leftValue: device.purchaseDate,
+                            rightLabel: "采购价格",
+                            rightValue: purchasePriceText
+                        )
+                        detailPairRow(
+                            leftLabel: "使用年限",
+                            leftValue: serviceLifeText
+                        )
+                    }
 
-                detailSection(title: "校准信息") {
-                    detailPairRow(
-                        leftLabel: "检定周期",
-                        leftValue: formatCycle(device.cycle),
-                        rightLabel: "上次校准",
-                        rightValue: device.calDate
-                    )
-                    detailPairRow(
-                        leftLabel: "下次校准",
-                        leftValue: device.nextDate,
-                        leftStyle: .nextDate,
-                        rightLabel: "有效状态",
-                        rightValue: device.validity,
-                        rightStyle: .validity
-                    )
-                    detailPairRow(
-                        leftLabel: "校准结果",
-                        leftValue: device.calibrationResult
-                    )
+                    detailSection(title: "技术参数") {
+                        detailPairRow(
+                            leftLabel: "分度值",
+                            leftValue: device.graduationValue,
+                            rightLabel: "测试范围",
+                            rightValue: device.testRange
+                        )
+                        detailPairRow(
+                            leftLabel: "允许误差",
+                            leftValue: device.allowableError
+                        )
+                    }
+
+                    detailSection(title: "校准信息") {
+                        detailPairRow(
+                            leftLabel: "检定周期",
+                            leftValue: formatCycle(device.cycle),
+                            rightLabel: "上次校准",
+                            rightValue: device.calDate
+                        )
+                        detailPairRow(
+                            leftLabel: "下次校准",
+                            leftValue: device.nextDate,
+                            leftStyle: .nextDate,
+                            rightLabel: "有效状态",
+                            rightValue: device.validity,
+                            rightStyle: .validity
+                        )
+                        detailPairRow(
+                            leftLabel: "校准结果",
+                            leftValue: device.calibrationResult
+                        )
+                    }
                 }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
-            .background(MetrologyPalette.background)
             .navigationTitle("设备详情")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1241,6 +1245,7 @@ private struct DeviceDetailView: View {
             }
         }
         .presentationDetents([.large])
+        .preferredColorScheme(.light)
     }
 
     private func detailSection<Content: View>(
@@ -1252,6 +1257,8 @@ private struct DeviceDetailView: View {
                 content()
             }
             .padding(.vertical, 2)
+            .listRowBackground(MetrologyPalette.background)
+            .listRowSeparator(.hidden)
         } header: {
             Text(title)
                 .font(.system(size: 13, weight: .bold))

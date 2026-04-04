@@ -20,6 +20,7 @@ struct MetrologyIOSApp: App {
                     LoginView()
                 }
             }
+            .preferredColorScheme(.light)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .environmentObject(appState)
             .task {
