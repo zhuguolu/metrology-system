@@ -514,19 +514,21 @@ private struct WebDavMountEditorSheet: View {
                                 .padding(.horizontal, 2)
                         }
 
-                        HStack(spacing: 10) {
-                            Button("测试连接") {
-                                guard validate() else { return }
-                                onTest(editing)
-                            }
-                            .buttonStyle(MetrologySecondaryButtonStyle())
+                        Button("测试连接") {
+                            metrologyDismissKeyboard()
+                            guard validate() else { return }
+                            onTest(editing)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 22)
+                        .buttonStyle(MetrologySecondaryButtonStyle())
 
-                            Button("保存") {
+                        MetrologySaveCancelRow(
+                            onCancel: onCancel,
+                            onSave: {
                                 guard validate() else { return }
                                 onSave(editing)
                             }
-                            .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        )
                     }
                     .padding(12)
                     .padding(.bottom, 18)
@@ -534,11 +536,6 @@ private struct WebDavMountEditorSheet: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消", action: onCancel)
-                }
-            }
         }
     }
 

@@ -52,11 +52,12 @@ struct DashboardView: View {
                     distributionSection
                     departmentSection
                 }
-                .padding(14)
+                .padding(.horizontal, 14)
                 .padding(.bottom, 14)
             }
         }
         .navigationTitle("\u{603B}\u{89C8}\u{770B}\u{677F}")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load()
         }
@@ -136,20 +137,19 @@ struct DashboardView: View {
     }
 
     private var distributionSection: some View {
-        let total = viewModel.total
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("\u{8BBE}\u{5907}\u{6709}\u{6548}\u{6027}\u{5206}\u{5E03}")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(MetrologyPalette.textPrimary)
 
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
+                HStack(spacing: 24) {
                     distributionChart
-                    distributionLegend(total: total)
+                    distributionLegend
                 }
                 VStack(spacing: 10) {
                     distributionChart
-                    distributionLegend(total: total)
+                    distributionLegend
                 }
             }
         }
@@ -182,33 +182,28 @@ struct DashboardView: View {
         )
     }
 
-    private func distributionLegend(total: Int64) -> some View {
+    private var distributionLegend: some View {
         VStack(alignment: .leading, spacing: 10) {
             legendRow(
                 color: MetrologyPalette.statusValid,
-                title: "\u{6709}\u{6548}",
-                value: viewModel.valid,
-                ratio: ratioText(viewModel.valid, total)
+                title: "\u{6709}\u{6548}"
             ) {
                 showDistributionDetail(title: "\u{6709}\u{6548}", value: viewModel.valid)
             }
             legendRow(
                 color: MetrologyPalette.statusWarning,
-                title: "\u{5373}\u{5C06}\u{8FC7}\u{671F}",
-                value: viewModel.warning,
-                ratio: ratioText(viewModel.warning, total)
+                title: "\u{5373}\u{5C06}\u{8FC7}\u{671F}"
             ) {
                 showDistributionDetail(title: "\u{5373}\u{5C06}\u{8FC7}\u{671F}", value: viewModel.warning)
             }
             legendRow(
                 color: MetrologyPalette.statusExpired,
-                title: "\u{5931}\u{6548}",
-                value: viewModel.expired,
-                ratio: ratioText(viewModel.expired, total)
+                title: "\u{5931}\u{6548}"
             ) {
                 showDistributionDetail(title: "\u{5931}\u{6548}", value: viewModel.expired)
             }
         }
+        .padding(.leading, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -246,19 +241,17 @@ struct DashboardView: View {
     private func legendRow(
         color: Color,
         title: String,
-        value: Int64,
-        ratio: String,
         onTap: (() -> Void)? = nil
     ) -> some View {
         Button {
             onTap?()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Circle()
                     .fill(color)
                     .frame(width: 10, height: 10)
-                Text("\(title) \(formatCount(value)) | \(ratio)")
-                    .font(.system(size: 12, weight: .regular))
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
                     .lineLimit(1)
             }

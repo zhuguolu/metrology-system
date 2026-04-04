@@ -205,6 +205,43 @@ struct MetrologyDangerButtonStyle: ButtonStyle {
     }
 }
 
+@MainActor
+func metrologyDismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+}
+
+struct MetrologySaveCancelRow: View {
+    var cancelTitle: String = "取消"
+    var saveTitle: String = "保存"
+    var saveDisabled: Bool = false
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                metrologyDismissKeyboard()
+                onCancel()
+            } label: {
+                Text(cancelTitle)
+                    .frame(maxWidth: .infinity, minHeight: 22)
+            }
+            .buttonStyle(MetrologySecondaryButtonStyle())
+
+            Button {
+                metrologyDismissKeyboard()
+                onSave()
+            } label: {
+                Text(saveTitle)
+                    .frame(maxWidth: .infinity, minHeight: 22)
+            }
+            .buttonStyle(MetrologyPrimaryButtonStyle())
+            .disabled(saveDisabled)
+            .opacity(saveDisabled ? 0.45 : 1)
+        }
+    }
+}
+
 struct MetrologySelectField: View {
     let title: String
     let value: String

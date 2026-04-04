@@ -287,11 +287,9 @@ private struct DepartmentEditorSheet: View {
                                 .padding(.horizontal, 2)
                         }
 
-                        HStack(spacing: 10) {
-                            Button("取消", action: onCancel)
-                                .buttonStyle(MetrologySecondaryButtonStyle())
-
-                            Button("保存") {
+                        MetrologySaveCancelRow(
+                            onCancel: onCancel,
+                            onSave: {
                                 let trimmed = editing.name.trimmingCharacters(in: .whitespacesAndNewlines)
                                 guard !trimmed.isEmpty else {
                                     validationMessage = "部门名称不能为空"
@@ -303,8 +301,7 @@ private struct DepartmentEditorSheet: View {
                                 editing.parentId = editing.parentId.trimmingCharacters(in: .whitespacesAndNewlines)
                                 onSave(editing)
                             }
-                            .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        )
                     }
                     .padding(12)
                     .padding(.bottom, 18)

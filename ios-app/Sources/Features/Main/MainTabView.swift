@@ -82,6 +82,8 @@ struct MainTabView: View {
             let contentTop = max(scale.vertical(6), 3)
             let tabTopSpacing = max(scale.vertical(2), 1)
             let tabBottomSpacing: CGFloat = 0
+            let bottomInset = proxy.safeAreaInsets.bottom
+            let tabDownOffset = min(max(bottomInset * 0.42, 0), 14)
 
             ZStack {
                 MetrologyPalette.background.ignoresSafeArea()
@@ -106,7 +108,7 @@ struct MainTabView: View {
                     }
                     .padding(.horizontal, horizontal)
                     .padding(.top, tabTopSpacing)
-                    .padding(.bottom, tabBottomSpacing)
+                    .padding(.bottom, tabBottomSpacing - tabDownOffset)
                 }
                 .background(
                     MetrologyPalette.background

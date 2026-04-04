@@ -122,12 +122,10 @@ struct DeviceEditView: View {
                             field("允许误差", text: $allowableError)
                         }
 
-                        HStack(spacing: 10) {
-                            Button("取消") { dismiss() }
-                                .buttonStyle(MetrologySecondaryButtonStyle())
-                            Button("保存") { handleSave() }
-                                .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        MetrologySaveCancelRow(
+                            onCancel: { dismiss() },
+                            onSave: { handleSave() }
+                        )
                     }
                     .padding(12)
                     .padding(.bottom, 18)

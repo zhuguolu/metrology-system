@@ -216,11 +216,9 @@ private struct DeviceStatusEditorSheet: View {
                             .padding(.horizontal, 2)
                     }
 
-                    HStack(spacing: 10) {
-                        Button("取消", action: onCancel)
-                            .buttonStyle(MetrologySecondaryButtonStyle())
-
-                        Button("保存") {
+                    MetrologySaveCancelRow(
+                        onCancel: onCancel,
+                        onSave: {
                             let text = name.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !text.isEmpty else {
                                 validationMessage = "状态名称不能为空"
@@ -229,8 +227,7 @@ private struct DeviceStatusEditorSheet: View {
                             validationMessage = nil
                             onSave(text)
                         }
-                        .buttonStyle(MetrologyPrimaryButtonStyle())
-                    }
+                    )
                 }
                 .padding(12)
                 .padding(.bottom, 18)

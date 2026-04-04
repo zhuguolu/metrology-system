@@ -120,15 +120,19 @@ struct SystemMaintenanceView: View {
     private var actionBar: some View {
         HStack(spacing: 10) {
             Button("保存") {
+                metrologyDismissKeyboard()
                 Task { await viewModel.save() }
             }
+            .frame(maxWidth: .infinity, minHeight: 22)
             .buttonStyle(MetrologyPrimaryButtonStyle())
             .disabled(viewModel.isLoading)
             .opacity(viewModel.isLoading ? 0.45 : 1)
 
             Button("立即执行一次") {
+                metrologyDismissKeyboard()
                 Task { await viewModel.runMaintenance() }
             }
+            .frame(maxWidth: .infinity, minHeight: 22)
             .buttonStyle(MetrologySecondaryButtonStyle())
             .disabled(viewModel.isLoading)
             .opacity(viewModel.isLoading ? 0.45 : 1)

@@ -382,11 +382,9 @@ private struct UserCreateSheet: View {
                                 .padding(.horizontal, 2)
                         }
 
-                        HStack(spacing: 10) {
-                            Button("取消", action: onCancel)
-                                .buttonStyle(MetrologySecondaryButtonStyle())
-
-                            Button("保存") {
+                        MetrologySaveCancelRow(
+                            onCancel: onCancel,
+                            onSave: {
                                 let username = draft.username.trimmingCharacters(in: .whitespacesAndNewlines)
                                 guard !username.isEmpty else {
                                     validationMessage = "用户名不能为空"
@@ -400,8 +398,7 @@ private struct UserCreateSheet: View {
                                 draft.username = username
                                 onSave(draft)
                             }
-                            .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        )
                     }
                     .padding(12)
                     .padding(.bottom, 18)
@@ -480,15 +477,12 @@ private struct UserPermissionSheet: View {
                         .padding(10)
                         .metrologyCard()
 
-                        HStack(spacing: 10) {
-                            Button("取消", action: onCancel)
-                                .buttonStyle(MetrologySecondaryButtonStyle())
-
-                            Button("保存") {
+                        MetrologySaveCancelRow(
+                            onCancel: onCancel,
+                            onSave: {
                                 onSave(editingPermissions)
                             }
-                            .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        )
                     }
                     .padding(12)
                     .padding(.bottom, 18)
@@ -538,11 +532,9 @@ private struct ResetPasswordSheet: View {
                                 .padding(.horizontal, 2)
                         }
 
-                        HStack(spacing: 10) {
-                            Button("取消", action: onCancel)
-                                .buttonStyle(MetrologySecondaryButtonStyle())
-
-                            Button("保存") {
+                        MetrologySaveCancelRow(
+                            onCancel: onCancel,
+                            onSave: {
                                 guard password.count >= 6 else {
                                     validationMessage = "密码至少 6 位"
                                     return
@@ -550,8 +542,7 @@ private struct ResetPasswordSheet: View {
                                 validationMessage = nil
                                 onSave(password)
                             }
-                            .buttonStyle(MetrologyPrimaryButtonStyle())
-                        }
+                        )
                     }
                     .padding(12)
                     .padding(.bottom, 18)

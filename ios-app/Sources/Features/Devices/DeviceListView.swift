@@ -905,8 +905,11 @@ private struct QuickCalibrationEditView: View {
                     .scrollIndicators(.hidden)
                     .scrollDismissesKeyboard(.interactively)
                 }
-                .safeAreaInset(edge: .bottom) {
-                    quickActionBar(horizontalPadding: horizontalPadding)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    quickActionBar(
+                        horizontalPadding: horizontalPadding,
+                        bottomInset: proxy.safeAreaInsets.bottom
+                    )
                 }
             }
             .navigationTitle(mode == .todo ? "待办快改" : "校准快改")
@@ -1014,18 +1017,22 @@ private struct QuickCalibrationEditView: View {
         .metrologyCard()
     }
 
-    private func quickActionBar(horizontalPadding: CGFloat) -> some View {
+    private func quickActionBar(horizontalPadding: CGFloat, bottomInset: CGFloat) -> some View {
         VStack(spacing: 0) {
             Divider().overlay(Color(hex: 0xD5E2F2))
-            HStack(spacing: 10) {
-                Button("取消") { dismiss() }
-                    .buttonStyle(MetrologySecondaryButtonStyle())
-                Button("保存") { handleSave() }
-                    .buttonStyle(MetrologyPrimaryButtonStyle())
-            }
+            MetrologySaveCancelRow(
+                onCancel: {
+                    focusedField = nil
+                    dismiss()
+                },
+                onSave: {
+                    focusedField = nil
+                    handleSave()
+                }
+            )
             .padding(.horizontal, horizontalPadding)
             .padding(.top, 10)
-            .padding(.bottom, 8)
+            .padding(.bottom, max(bottomInset, 8))
             .background(MetrologyPalette.background)
         }
     }

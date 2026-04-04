@@ -49,33 +49,8 @@ struct AuditView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                List {
-                    ForEach(auditRows) { row in
-                        AuditRowCard(
-                            item: row.item,
-                            showActionButtons: viewModel.isAdmin && viewModel.mode == .pending,
-                            onTap: {
-                                Task {
-                                    if let detail = await viewModel.loadDetail(row.item) {
-                                        detailSheetItem = AuditDetailSheetItem(record: detail)
-                                    }
-                                }
-                            },
-                            onApprove: {
-                                Task { await viewModel.approve(row.item) }
-                            },
-                            onReject: {
-                                rejectSheetItem = AuditRejectSheetItem(record: row.item)
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollDismissesKeyboard(.interactively)
+                auditListPanel
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 if viewModel.mode == .history {
                     historyPagerBar
@@ -241,7 +216,7 @@ struct AuditView: View {
             .opacity((viewModel.historyPage <= 1 || viewModel.isLoading) ? 0.45 : 1)
 
             Text("\u{7b2c} \(viewModel.historyPage) / \(viewModel.historyTotalPages) \u{9875}")
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(MetrologyPalette.textSecondary)
 
             Button("\u{4e0b}\u{4e00}\u{9875}") {
@@ -251,9 +226,64 @@ struct AuditView: View {
             .disabled(viewModel.historyPage >= viewModel.historyTotalPages || viewModel.isLoading)
             .opacity((viewModel.historyPage >= viewModel.historyTotalPages || viewModel.isLoading) ? 0.45 : 1)
         }
-        .padding(.bottom, 8)
-        .padding(10)
-        .metrologyCard()
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+    }
+
+    private var auditListPanel: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                if auditRows.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 26))
+                            .foregroundStyle(MetrologyPalette.textMuted)
+                        Text("\u{6682}\u{65e0}\u{5ba1}\u{6838}\u{8bb0}\u{5f55}")
+                            .font(.system(size: 13))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white, Color(hex: 0xF6FAFF)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+                    )
+                } else {
+                    ForEach(auditRows) { row in
+                        AuditRowCard(
+                            item: row.item,
+                            showActionButtons: viewModel.isAdmin && viewModel.mode == .pending,
+                            onTap: {
+                                Task {
+                                    if let detail = await viewModel.loadDetail(row.item) {
+                                        detailSheetItem = AuditDetailSheetItem(record: detail)
+                                    }
+                                }
+                            },
+                            onApprove: {
+                                Task { await viewModel.approve(row.item) }
+                            },
+                            onReject: {
+                                rejectSheetItem = AuditRejectSheetItem(record: row.item)
+                            }
+                        )
+                    }
+                }
+            }
+            .padding(.bottom, 4)
+        }
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -264,44 +294,108 @@ private struct AuditRowCard: View {
     let onApprove: () -> Void
     let onReject: () -> Void
 
+    private var valueFont: Font {
+        .system(size: 12, weight: .bold)
+    }
+
+    private var submittedByText: String {
+        fallbackAuditText(item.submittedBy)
+    }
+
+    private var submittedAtText: String {
+        auditTimeToMinute(item.submittedAt)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(translateType(item.type))
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 14.5, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textPrimary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                 Spacer()
+
                 Text(translateStatus(item.status))
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .font(.system(size: 11, weight: .bold))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
                     .background(statusColor.opacity(0.14))
                     .foregroundStyle(statusColor)
                     .clipShape(Capsule())
             }
 
             Text("\u{5bf9}\u{8c61}: \(translateEntityType(item.entityType)) / ID: \(item.entityId.map(String.init) ?? "-")")
-                .font(.subheadline)
+                .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
+                .padding(.top, 8)
+                .lineLimit(1)
 
-            Text("\u{63d0}\u{4ea4}\u{4eba}: \(item.submittedBy ?? "-")   \u{63d0}\u{4ea4}\u{65f6}\u{95f4}: \(item.submittedAt ?? "-")")
-                .font(.caption)
+            Text("\u{63d0}\u{4ea4}\u{4eba}: \(submittedByText)")
+                .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
+                .padding(.top, 3)
+                .lineLimit(1)
+
+            Text("\u{8bb0}\u{5f55}\u{65f6}\u{95f4}: \(submittedAtText)")
+                .font(valueFont)
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .padding(.top, 3)
+                .lineLimit(1)
 
             if showActionButtons {
                 HStack(spacing: 10) {
                     Button("\u{901a}\u{8fc7}") { onApprove() }
-                        .buttonStyle(MetrologyPrimaryButtonStyle())
-                        .controlSize(.small)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.navActive)
+                        .frame(minWidth: 56, minHeight: 28)
+                        .padding(.horizontal, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color(hex: 0x2563EB, alpha: 0.13))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color(hex: 0x2563EB, alpha: 0.40), lineWidth: 1)
+                        )
+
                     Button("\u{9a73}\u{56de}") { onReject() }
-                        .buttonStyle(MetrologySecondaryButtonStyle())
-                        .controlSize(.small)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.statusExpired)
+                        .frame(minWidth: 56, minHeight: 28)
+                        .padding(.horizontal, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color(hex: 0xDC2626, alpha: 0.12))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color(hex: 0xDC2626, alpha: 0.35), lineWidth: 1)
+                        )
+
+                    Spacer(minLength: 0)
                 }
+                .padding(.top, 6)
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .metrologyCard()
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white, Color(hex: 0xF6FAFF)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 4, x: 0, y: 2)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
@@ -340,9 +434,9 @@ struct AuditDetailView: View {
                     AuditDetailRow(label: "\u{5bf9}\u{8c61}\u{49}\u{44}", value: record.entityId.map(String.init) ?? "-")
                     AuditDetailRow(label: "\u{72b6}\u{6001}", value: translateStatus(record.status))
                     AuditDetailRow(label: "\u{63d0}\u{4ea4}\u{4eba}", value: record.submittedBy ?? "-")
-                    AuditDetailRow(label: "\u{63d0}\u{4ea4}\u{65f6}\u{95f4}", value: record.submittedAt ?? "-")
+                    AuditDetailRow(label: "\u{63d0}\u{4ea4}\u{65f6}\u{95f4}", value: auditTimeToMinute(record.submittedAt))
                     AuditDetailRow(label: "\u{5ba1}\u{6279}\u{4eba}", value: record.approvedBy ?? "-")
-                    AuditDetailRow(label: "\u{5ba1}\u{6279}\u{65f6}\u{95f4}", value: record.approvedAt ?? "-")
+                    AuditDetailRow(label: "\u{5ba1}\u{6279}\u{65f6}\u{95f4}", value: auditTimeToMinute(record.approvedAt))
                     AuditDetailRow(label: "\u{5907}\u{6ce8}", value: record.remark ?? "-")
                     AuditDetailRow(label: "\u{9a73}\u{56de}\u{539f}\u{56e0}", value: record.rejectReason ?? "-")
                 }
@@ -535,6 +629,68 @@ private enum AuditChangeStyle {
     case changed
 }
 
+private let auditOutputMinuteFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.timeZone = .current
+    formatter.dateFormat = "yyyy-MM-dd HH:mm"
+    return formatter
+}()
+
+private let auditInputDateFormatters: [DateFormatter] = {
+    let patterns = [
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd HH:mm",
+        "yyyy/MM/dd HH:mm:ss",
+        "yyyy/MM/dd HH:mm",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm"
+    ]
+    return patterns.map { pattern in
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = pattern
+        return formatter
+    }
+}()
+
+private let auditISO8601FormatterWithFraction: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.timeZone = .current
+    return formatter
+}()
+
+private let auditISO8601Formatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    formatter.timeZone = .current
+    return formatter
+}()
+
+private func auditTimeToMinute(_ value: String?) -> String {
+    let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !raw.isEmpty else { return "-" }
+
+    if let parsed = auditISO8601FormatterWithFraction.date(from: raw)
+        ?? auditISO8601Formatter.date(from: raw) {
+        return auditOutputMinuteFormatter.string(from: parsed)
+    }
+
+    for formatter in auditInputDateFormatters {
+        if let parsed = formatter.date(from: raw) {
+            return auditOutputMinuteFormatter.string(from: parsed)
+        }
+    }
+
+    let normalized = raw.replacingOccurrences(of: "T", with: " ")
+    if normalized.count >= 16 {
+        return String(normalized.prefix(16))
+    }
+    return normalized
+}
+
 private func buildAuditDiffRows(record: AuditRecordDto) -> [AuditDiffRow] {
     let oldObject = parseAuditObject(record.originalData)
     let newObject = parseAuditObject(record.newData)
@@ -644,6 +800,8 @@ private func normalizeAuditFieldValue(key: String, value: Any?) -> String {
         return translateValidity(text)
     case "calibrationResult", "result":
         return translateCalibrationResult(text)
+    case "submittedAt", "approvedAt":
+        return auditTimeToMinute(text)
     case "cycle":
         if let cycle = Int(text) {
             if cycle == 6 { return "\u{534a}\u{5e74}" }
