@@ -253,7 +253,7 @@ struct DeviceEditView: View {
     }
 
     private var departmentOptions: [String] {
-        let sessionDepartments = appState.session?.departments ?? []
+        let sessionDepartments: [String] = appState.session?.departments ?? []
         let candidates = sessionDepartments + [dept]
         var seen = Set<String>()
         return candidates.compactMap { raw in

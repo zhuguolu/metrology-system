@@ -503,7 +503,7 @@ struct DeviceListView: View {
     }
 
     private var departmentOptions: [String] {
-        let sessionValues = appState.session?.departments ?? []
+        let sessionValues: [String] = appState.session?.departments ?? []
         let currentValues = viewModel.items.compactMap {
             $0.dept?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
