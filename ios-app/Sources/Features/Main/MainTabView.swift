@@ -86,7 +86,7 @@ struct MainTabView: View {
             let tabDownOffset = min(max(bottomInset * 0.42, 0), 14)
 
             ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+                pageBackground
 
                 VStack(spacing: 0) {
                     if shouldShowTopBar {
@@ -111,7 +111,7 @@ struct MainTabView: View {
                     .padding(.bottom, tabBottomSpacing - tabDownOffset)
                 }
                 .background(
-                    MetrologyPalette.background
+                    bottomBackground
                         .ignoresSafeArea(edges: .bottom)
                 )
             }
@@ -162,6 +162,33 @@ struct MainTabView: View {
 
     private var shouldShowTopBar: Bool {
         true
+    }
+
+    @ViewBuilder
+    private var pageBackground: some View {
+        if selectedTab == .more {
+            LinearGradient(
+                colors: [MetrologyPalette.moreBgStart, MetrologyPalette.moreBgEnd],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        } else {
+            MetrologyPalette.background.ignoresSafeArea()
+        }
+    }
+
+    @ViewBuilder
+    private var bottomBackground: some View {
+        if selectedTab == .more {
+            LinearGradient(
+                colors: [MetrologyPalette.moreBgStart, MetrologyPalette.moreBgEnd],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            MetrologyPalette.background
+        }
     }
 
     private var currentTopBarTitle: String {
@@ -332,12 +359,7 @@ private struct MoreHubView: View {
                 )
 
                 ZStack {
-                    LinearGradient(
-                        colors: [MetrologyPalette.moreBgStart, MetrologyPalette.moreBgEnd],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
+                    Color.clear.ignoresSafeArea()
 
                     ScrollViewReader { reader in
                         ScrollView {
