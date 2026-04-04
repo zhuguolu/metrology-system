@@ -27,6 +27,7 @@ final class DeviceListViewModel: ObservableObject {
 
     let mode: DeviceListMode
     private let pageSize: Int = 20
+    private let ledgerOtherLocalFetchSize: Int = 5000
     private var currentLoadToken: UInt64 = 0
 
     init(mode: DeviceListMode) {
@@ -66,33 +67,76 @@ final class DeviceListViewModel: ObservableObject {
         }
 
         do {
-            let result = try await APIClient.shared.devicesPaged(
-                mode: mode,
-                search: searchText,
-                dept: deptFilter,
-                validity: validityFilter,
-                useStatus: useStatusFilter,
-                nextDateFrom: mode == .ledger ? nil : nextDateFrom,
-                nextDateTo: mode == .ledger ? nil : nextDateTo,
-                page: max(1, requestedPage),
-                size: pageSize
-            )
+            let safeRequestedPage = max(1, requestedPage)
+            let requestUseStatus = useStatusFilterForRequest()
+            let useLedgerOtherLocalFallback = shouldUseLedgerOtherLocalFallback()
+
+            let result: PageResult<DeviceDto>
+            let summarySourceItems: [DeviceDto]
+            let resolvedItems: [DeviceDto]
+            let resolvedTotal: Int64
+            let resolvedPage: Int
+            let resolvedTotalPages: Int
+
+            if useLedgerOtherLocalFallback {
+                result = try await APIClient.shared.devicesPaged(
+                    mode: mode,
+                    search: searchText,
+                    dept: deptFilter,
+                    validity: validityFilter,
+                    useStatus: nil,
+                    nextDateFrom: mode == .ledger ? nil : nextDateFrom,
+                    nextDateTo: mode == .ledger ? nil : nextDateTo,
+                    page: 1,
+                    size: ledgerOtherLocalFetchSize
+                )
+                guard shouldApplyResult(for: token) else { return }
+
+                let allItems = result.content ?? []
+                let otherItems = allItems.filter { useStatusBucketFromItem(for: $0.useStatus) == "其他" }
+                let pageSlice = paginateLocal(items: otherItems, requestedPage: safeRequestedPage)
+
+                summarySourceItems = allItems
+                resolvedItems = pageSlice.items
+                resolvedTotal = Int64(otherItems.count)
+                resolvedPage = pageSlice.page
+                resolvedTotalPages = pageSlice.totalPages
+            } else {
+                result = try await APIClient.shared.devicesPaged(
+                    mode: mode,
+                    search: searchText,
+                    dept: deptFilter,
+                    validity: validityFilter,
+                    useStatus: requestUseStatus,
+                    nextDateFrom: mode == .ledger ? nil : nextDateFrom,
+                    nextDateTo: mode == .ledger ? nil : nextDateTo,
+                    page: safeRequestedPage,
+                    size: pageSize
+                )
+                guard shouldApplyResult(for: token) else { return }
+
+                let pageItems = result.content ?? []
+                summarySourceItems = pageItems
+                resolvedItems = pageItems
+                resolvedTotal = result.totalElements ?? 0
+                resolvedPage = max(1, result.page ?? safeRequestedPage)
+                resolvedTotalPages = max(1, result.totalPages ?? 1)
+            }
             guard shouldApplyResult(for: token) else { return }
 
-            let resolvedItems = result.content ?? []
             let resolvedValiditySummary = resolveValiditySummary(
                 serverSummary: result.summaryCounts,
-                items: resolvedItems
+                items: summarySourceItems
             )
             let resolvedUseStatusSummary = resolveUseStatusSummary(
                 serverSummary: result.useStatusSummary,
-                items: resolvedItems
+                items: summarySourceItems
             )
 
             items = resolvedItems
-            total = result.totalElements ?? 0
-            page = max(1, result.page ?? requestedPage)
-            totalPages = max(1, result.totalPages ?? 1)
+            total = resolvedTotal
+            page = resolvedPage
+            totalPages = resolvedTotalPages
             summaryCounts = resolvedValiditySummary
             useStatusSummary = resolvedUseStatusSummary
 
@@ -276,6 +320,33 @@ final class DeviceListViewModel: ObservableObject {
         case .calibration:
             return "正常"
         }
+    }
+
+    private func useStatusFilterForRequest() -> String? {
+        let normalized = normalizeStatusText(useStatusFilter)
+        guard !normalized.isEmpty else { return nil }
+
+        if mode == .ledger, normalized == "其他" {
+            return nil
+        }
+        return normalized
+    }
+
+    private func shouldUseLedgerOtherLocalFallback() -> Bool {
+        mode == .ledger && normalizeStatusText(useStatusFilter) == "其他"
+    }
+
+    private func paginateLocal(items: [DeviceDto], requestedPage: Int) -> (items: [DeviceDto], page: Int, totalPages: Int) {
+        guard !items.isEmpty else {
+            return ([], 1, 1)
+        }
+
+        let totalPages = max(1, Int(ceil(Double(items.count) / Double(pageSize))))
+        let safePage = min(max(1, requestedPage), totalPages)
+        let startIndex = (safePage - 1) * pageSize
+        let endIndex = min(items.count, startIndex + pageSize)
+        let pageItems = Array(items[startIndex..<endIndex])
+        return (pageItems, safePage, totalPages)
     }
 
     private func resolveValiditySummary(
