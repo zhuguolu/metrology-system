@@ -18,6 +18,7 @@ struct DepartmentView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
 
             if let deletingItem {
@@ -306,6 +307,7 @@ private struct DepartmentEditorSheet: View {
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(title)

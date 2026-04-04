@@ -18,6 +18,7 @@ struct DeviceStatusView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollIndicators(.hidden)
 
             if let deletingItem {
                 MetrologyConfirmDialog(

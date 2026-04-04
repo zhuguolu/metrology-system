@@ -22,6 +22,7 @@ struct WebDavView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
 
             if let fileActionItem {
@@ -533,6 +534,7 @@ private struct WebDavMountEditorSheet: View {
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(title)

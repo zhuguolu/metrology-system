@@ -22,6 +22,7 @@ struct UserManagementView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollIndicators(.hidden)
 
             if let deleteTarget {
                 MetrologyConfirmDialog(
@@ -403,6 +404,7 @@ private struct UserCreateSheet: View {
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("新增用户")
         }
@@ -487,6 +489,7 @@ private struct UserPermissionSheet: View {
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("权限设置")
         }
@@ -547,6 +550,7 @@ private struct ResetPasswordSheet: View {
                     .padding(12)
                     .padding(.bottom, 18)
                 }
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("重置密码")
         }

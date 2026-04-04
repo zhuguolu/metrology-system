@@ -41,6 +41,7 @@ struct FilesView: View {
                 .padding(14)
                 .padding(.bottom, 14)
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
         }
         .navigationTitle("我的文件")

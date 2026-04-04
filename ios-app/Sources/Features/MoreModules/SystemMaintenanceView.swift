@@ -17,6 +17,7 @@ struct SystemMaintenanceView: View {
                 .padding(12)
                 .padding(.bottom, 18)
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
 
             if let errorMessage = viewModel.errorMessage {
