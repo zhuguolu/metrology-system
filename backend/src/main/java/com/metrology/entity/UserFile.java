@@ -7,7 +7,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "user_files")
+@Table(
+        name = "user_files",
+        indexes = {
+                @Index(name = "idx_user_files_user_parent_type_name", columnList = "user_id, parent_id, type, name"),
+                @Index(name = "idx_user_files_user_parent_name", columnList = "user_id, parent_id, name"),
+                @Index(name = "idx_user_files_parent_type_name", columnList = "parent_id, type, name"),
+                @Index(name = "idx_user_files_parent", columnList = "parent_id")
+        }
+)
 @Data
 @NoArgsConstructor
 public class UserFile {

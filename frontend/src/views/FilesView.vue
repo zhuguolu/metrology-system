@@ -449,6 +449,7 @@
       :top="isMobilePreview ? '0' : '5vh'"
       :fullscreen="isMobilePreview"
       destroy-on-close
+      @close="handlePreviewDialogClose"
       @closed="closePreview"
       class="file-preview-dialog"
     >
@@ -545,7 +546,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { fileApi } from '../api/index.js'
@@ -1875,6 +1876,13 @@ function cancelPreviewRequest() {
   }
 }
 
+function handlePreviewDialogClose() {
+  // Stop in-flight file download as early as possible when user closes preview.
+  previewRequestToken += 1
+  activePdfRenderToken += 1
+  cancelPreviewRequest()
+}
+
 function isPreviewRequestCanceled(error) {
   return error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError'
 }
@@ -1884,6 +1892,12 @@ function closePreview() {
   previewItem.value = null
   resetPreviewState()
 }
+
+watch(showPreviewDialog, visible => {
+  if (!visible) {
+    handlePreviewDialogClose()
+  }
+})
 
 async function previewFile(item) {
   cancelPreviewRequest()

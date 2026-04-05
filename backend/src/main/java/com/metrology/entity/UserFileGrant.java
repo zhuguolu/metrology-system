@@ -6,8 +6,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "user_file_grants",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "folder_id"}))
+@Table(
+        name = "user_file_grants",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "folder_id"}),
+        indexes = {
+                @Index(name = "idx_user_file_grants_user", columnList = "user_id"),
+                @Index(name = "idx_user_file_grants_folder", columnList = "folder_id")
+        }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

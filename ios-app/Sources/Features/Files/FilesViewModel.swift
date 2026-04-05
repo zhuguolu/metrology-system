@@ -37,6 +37,8 @@ final class FilesViewModel: ObservableObject {
     private var folderStack: [FolderStackEntry] = [FolderStackEntry(id: nil, name: "")]
     private var currentLoadToken: UInt64 = 0
     private var activeLoadTask: Task<Void, Never>?
+    private var currentPreviewToken: UInt64 = 0
+    private var activePreviewTask: Task<Void, Never>?
     private var folderCache: [String: FolderSnapshot] = [:]
     private let folderCacheTTL: TimeInterval = 20
     private var currentPreviewURL: URL?
@@ -105,6 +107,7 @@ final class FilesViewModel: ObservableObject {
 
     func open(_ item: UserFileItemDto) async {
         if item.isFolder {
+            cancelActivePreviewDownload(resetLoading: false)
             guard let folderId = item.id else {
                 errorMessage = "目录ID无效"
                 return
@@ -119,24 +122,43 @@ final class FilesViewModel: ObservableObject {
             return
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        let cacheKey = previewCacheKey(fileId: id, item: item)
+        if let cachedURL = cachedPreviewURL(for: cacheKey) {
+            cancelActivePreviewDownload(resetLoading: false)
+            currentPreviewURL = cachedURL
+            previewItem = PreviewItem(url: cachedURL, title: item.displayName)
+            return
+        }
 
-        do {
-            let cacheKey = previewCacheKey(fileId: id, item: item)
-            if let cachedURL = cachedPreviewURL(for: cacheKey) {
-                currentPreviewURL = cachedURL
-                previewItem = PreviewItem(url: cachedURL, title: item.displayName)
-                return
+        cancelActivePreviewDownload(resetLoading: false)
+        let token = beginPreviewLoad()
+        let fileName = item.name
+        let title = item.displayName
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.shouldApplyPreviewResult(for: token) {
+                    self.isLoading = false
+                    self.activePreviewTask = nil
+                }
             }
 
-            let url = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
-            storePreviewURL(url, for: cacheKey)
-            currentPreviewURL = url
-            previewItem = PreviewItem(url: url, title: item.displayName)
-        } catch {
-            errorMessage = localizedMessage(from: error)
+            do {
+                let url = try await APIClient.shared.downloadFile(id: id, suggestedName: fileName)
+                guard self.shouldApplyPreviewResult(for: token) else { return }
+                self.storePreviewURL(url, for: cacheKey)
+                self.currentPreviewURL = url
+                self.previewItem = PreviewItem(url: url, title: title)
+            } catch {
+                guard self.shouldApplyPreviewResult(for: token) else { return }
+                if error is CancellationError {
+                    return
+                }
+                self.errorMessage = self.localizedMessage(from: error)
+            }
         }
+        activePreviewTask = task
+        await task.value
     }
 
     func createFolder(name: String) async -> Bool {
@@ -239,7 +261,12 @@ final class FilesViewModel: ObservableObject {
     }
 
     func handlePreviewDismiss() {
+        cancelActivePreviewDownload(resetLoading: true)
         currentPreviewURL = nil
+    }
+
+    func cancelPreviewLoading() {
+        cancelActivePreviewDownload(resetLoading: true)
     }
 
     private func beginLoad() -> UInt64 {
@@ -252,6 +279,27 @@ final class FilesViewModel: ObservableObject {
 
     private func shouldApplyResult(for token: UInt64) -> Bool {
         token == currentLoadToken && !Task.isCancelled
+    }
+
+    private func beginPreviewLoad() -> UInt64 {
+        currentPreviewToken += 1
+        let token = currentPreviewToken
+        isLoading = true
+        errorMessage = nil
+        return token
+    }
+
+    private func shouldApplyPreviewResult(for token: UInt64) -> Bool {
+        token == currentPreviewToken && !Task.isCancelled
+    }
+
+    private func cancelActivePreviewDownload(resetLoading: Bool) {
+        currentPreviewToken += 1
+        activePreviewTask?.cancel()
+        activePreviewTask = nil
+        if resetLoading {
+            isLoading = false
+        }
     }
 
     private func applyAccess(_ access: FileAccessDto?) {

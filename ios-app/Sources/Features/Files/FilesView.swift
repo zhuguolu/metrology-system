@@ -49,6 +49,9 @@ struct FilesView: View {
         .task {
             await viewModel.load()
         }
+        .onDisappear {
+            viewModel.cancelPreviewLoading()
+        }
         .onChange(of: viewModel.currentFolderId) { _, _ in
             searchText = ""
         }
