@@ -19,6 +19,10 @@ struct FilesView: View {
     @State private var showActivitySheet = false
 
     var body: some View {
+        contentWithDialogs
+    }
+
+    private var mainListContent: some View {
         ZStack {
             MetrologyPalette.background.ignoresSafeArea()
 
@@ -50,127 +54,139 @@ struct FilesView: View {
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(backToParentGesture, including: .subviews)
         }
-        .navigationTitle("我的文件")
-        .task {
-            await viewModel.load()
-        }
-        .onDisappear {
-            viewModel.cancelPreviewLoading()
-        }
-        .onChange(of: viewModel.currentFolderId) { _, _ in
-            searchText = ""
-            selectedItemIDs.removeAll()
-        }
-        .onChange(of: viewModel.items) { _, items in
-            let validIDs = Set(items.compactMap { $0.id })
-            selectedItemIDs = selectedItemIDs.intersection(validIDs)
-        }
-        .fileImporter(
-            isPresented: $fileImporterOpen,
-            allowedContentTypes: [.item],
-            allowsMultipleSelection: true
-        ) { result in
-            switch result {
-            case let .success(urls):
-                Task { await viewModel.uploadFiles(urls: urls) }
-            case let .failure(error):
-                viewModel.errorMessage = error.localizedDescription
-            }
-        }
-        .alert("新建文件夹", isPresented: $createFolderDialogOpen) {
-            TextField("请输入文件夹名称", text: $createFolderName)
-            Button("取消", role: .cancel) {
-                createFolderName = ""
-            }
-            Button("创建") {
-                let pendingName = createFolderName
-                createFolderName = ""
-                Task {
-                    _ = await viewModel.createFolder(name: pendingName)
-                }
-            }
-        } message: {
-            Text("将在当前目录创建子文件夹")
-        }
-        .overlay {
-            if viewModel.isLoading {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        Text(loadingOverlayTitle)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(MetrologyPalette.textPrimary)
-                        Spacer()
-                        if canCancelPreviewLoading {
-                            Button("取消") {
-                                viewModel.cancelPreviewLoading()
-                            }
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(MetrologyPalette.navActive)
-                            .buttonStyle(.plain)
-                        }
-                    }
+    }
 
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(MetrologyPalette.navActive)
-                }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(MetrologyPalette.surface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                    )
+    private var contentWithLifecycle: some View {
+        mainListContent
+            .navigationTitle("我的文件")
+            .task {
+                await viewModel.load()
             }
-        }
-        .fullScreenCover(item: $viewModel.previewItem, onDismiss: {
-            viewModel.handlePreviewDismiss()
-        }) { item in
-            FilePreviewFullScreenView(item: item)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if hasSelection {
-                selectionActionBar
+            .onDisappear {
+                viewModel.cancelPreviewLoading()
             }
-        }
-        .sheet(isPresented: $showMoveTargetSheet) {
-            moveTargetSheet
-        }
-        .sheet(isPresented: $showActivitySheet) {
-            FilesActivitySheet(items: activityItems)
-        }
-        .confirmationDialog("更多操作", isPresented: $showMoreActions, titleVisibility: .visible) {
-            if canRenameSelected {
-                Button("重命名") {
-                    prepareRename()
+            .onChange(of: viewModel.currentFolderId) { _, _ in
+                searchText = ""
+                selectedItemIDs.removeAll()
+            }
+            .onChange(of: viewModel.items) { _, items in
+                let validIDs = Set(items.compactMap { $0.id })
+                selectedItemIDs = selectedItemIDs.intersection(validIDs)
+            }
+            .fileImporter(
+                isPresented: $fileImporterOpen,
+                allowedContentTypes: [.item],
+                allowsMultipleSelection: true
+            ) { result in
+                switch result {
+                case let .success(urls):
+                    Task { await viewModel.uploadFiles(urls: urls) }
+                case let .failure(error):
+                    viewModel.errorMessage = error.localizedDescription
                 }
             }
-            Button("删除", role: .destructive) {
-                showDeleteConfirm = true
+            .alert("新建文件夹", isPresented: $createFolderDialogOpen) {
+                TextField("请输入文件夹名称", text: $createFolderName)
+                Button("取消", role: .cancel) {
+                    createFolderName = ""
+                }
+                Button("创建") {
+                    let pendingName = createFolderName
+                    createFolderName = ""
+                    Task {
+                        _ = await viewModel.createFolder(name: pendingName)
+                    }
+                }
+            } message: {
+                Text("将在当前目录创建子文件夹")
             }
-            Button("取消", role: .cancel) {}
+            .overlay {
+                if viewModel.isLoading {
+                    loadingOverlay
+                }
+            }
+            .fullScreenCover(item: $viewModel.previewItem, onDismiss: {
+                viewModel.handlePreviewDismiss()
+            }) { item in
+                FilePreviewFullScreenView(item: item)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if hasSelection {
+                    selectionActionBar
+                }
+            }
+    }
+
+    private var contentWithDialogs: some View {
+        contentWithLifecycle
+            .sheet(isPresented: $showMoveTargetSheet) {
+                moveTargetSheet
+            }
+            .sheet(isPresented: $showActivitySheet) {
+                FilesActivitySheet(items: activityItems)
+            }
+            .confirmationDialog("更多操作", isPresented: $showMoreActions, titleVisibility: .visible) {
+                if canRenameSelected {
+                    Button("重命名") {
+                        prepareRename()
+                    }
+                }
+                Button("删除", role: .destructive) {
+                    showDeleteConfirm = true
+                }
+                Button("取消", role: .cancel) {}
+            }
+            .alert("重命名", isPresented: $showRenameDialog) {
+                TextField("请输入新名称", text: $renameText)
+                Button("取消", role: .cancel) {
+                    renameText = ""
+                }
+                Button("保存") {
+                    Task { await renameSelectedItem() }
+                }
+            } message: {
+                Text("仅支持单个文件或文件夹重命名")
+            }
+            .alert("确认删除", isPresented: $showDeleteConfirm) {
+                Button("取消", role: .cancel) {}
+                Button("删除", role: .destructive) {
+                    Task { await deleteSelectedItems() }
+                }
+            } message: {
+                Text("已选择 \(selectedItems.count) 项，删除后无法恢复")
+            }
+    }
+
+    private var loadingOverlay: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(loadingOverlayTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                Spacer()
+                if canCancelPreviewLoading {
+                    Button("取消") {
+                        viewModel.cancelPreviewLoading()
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(MetrologyPalette.navActive)
+                    .buttonStyle(.plain)
+                }
+            }
+
+            ProgressView()
+                .controlSize(.small)
+                .tint(MetrologyPalette.navActive)
         }
-        .alert("重命名", isPresented: $showRenameDialog) {
-            TextField("请输入新名称", text: $renameText)
-            Button("取消", role: .cancel) {
-                renameText = ""
-            }
-            Button("保存") {
-                Task { await renameSelectedItem() }
-            }
-        } message: {
-            Text("仅支持单个文件或文件夹重命名")
-        }
-        .alert("确认删除", isPresented: $showDeleteConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                Task { await deleteSelectedItems() }
-            }
-        } message: {
-            Text("已选择 \(selectedItems.count) 项，删除后无法恢复")
-        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(MetrologyPalette.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
     }
 
     private var selectionActionBar: some View {
