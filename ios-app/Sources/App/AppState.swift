@@ -37,6 +37,23 @@ private struct PendingImportedFile: Sendable {
     let mimeType: String?
 }
 
+private struct ShareInboxRecord: Codable {
+    let storedFileName: String
+    let originalFileName: String
+    let mimeType: String?
+    let createdAt: TimeInterval?
+}
+
+private struct ShareInboxManifest: Codable {
+    var items: [ShareInboxRecord] = []
+}
+
+private enum ShareBridgeConfig {
+    static let appGroupIdentifier = "group.com.metrology.ios.share"
+    static let inboxDirectoryName = "ShareInbox"
+    static let manifestFileName = "manifest.json"
+}
+
 private enum IncomingFileImportError: LocalizedError {
     case invalidURL
     case folderUnsupported
@@ -44,9 +61,9 @@ private enum IncomingFileImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "无法识别外部文件地址"
+            return "Invalid external file URL"
         case .folderUnsupported:
-            return "暂不支持导入文件夹，请选择具体文件"
+            return "Folder import is not supported. Please select a file."
         }
     }
 }
@@ -68,12 +85,13 @@ final class AppState: ObservableObject {
     init() {
         session = SessionStore.load()
         APIClient.shared.tokenProvider = { SessionStore.load()?.token }
+        drainShareExtensionInboxIntoPendingQueue()
         triggerIncomingImportTargetSelection()
     }
 
     func applyLogin(_ response: LoginResponse) {
         guard let token = response.token, !token.isEmpty else { return }
-        let username = response.username?.isEmpty == false ? response.username! : "未命名用户"
+        let username = response.username?.isEmpty == false ? response.username! : "User"
         let departmentValues: [String]? = {
             let fromList = (response.departments ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
@@ -93,6 +111,13 @@ final class AppState: ObservableObject {
         session = value
         SessionStore.save(value)
         APIClient.shared.tokenProvider = { SessionStore.load()?.token }
+
+        drainShareExtensionInboxIntoPendingQueue()
+        triggerIncomingImportTargetSelection()
+    }
+
+    func refreshIncomingSharedFiles() {
+        drainShareExtensionInboxIntoPendingQueue()
         triggerIncomingImportTargetSelection()
     }
 
@@ -122,9 +147,28 @@ final class AppState: ObservableObject {
         incomingImportPicker = nil
         guard !pendingImportedFiles.isEmpty else { return }
         incomingImportNotice = AppNotice(
-            title: "文件待导入",
-            message: "已暂存 \(pendingImportedFiles.count) 个文件，再次从微信/文件App打开到本应用时会重新弹出目录选择。"
+            title: "Files queued",
+            message: "Queued \(pendingImportedFiles.count) item(s). Open-in again to pick target folder."
         )
+    }
+
+    private func drainShareExtensionInboxIntoPendingQueue() {
+        let stagedFiles = loadPendingFilesFromShareExtensionInbox()
+        guard !stagedFiles.isEmpty else { return }
+
+        pendingImportedFiles.append(contentsOf: stagedFiles)
+
+        if isAuthenticated {
+            incomingImportNotice = AppNotice(
+                title: "Shared files received",
+                message: "Detected \(stagedFiles.count) shared item(s). Please choose target folder."
+            )
+        } else {
+            incomingImportNotice = AppNotice(
+                title: "Shared files queued",
+                message: "Detected \(stagedFiles.count) shared item(s). Login first, then choose folder to import."
+            )
+        }
     }
 
     private func stageIncomingFileAndImport(_ sourceURL: URL) async {
@@ -135,7 +179,7 @@ final class AppState: ObservableObject {
             pendingImportedFiles.append(staged)
         } catch {
             incomingImportNotice = AppNotice(
-                title: "文件导入失败",
+                title: "Import failed",
                 message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             )
             return
@@ -143,8 +187,8 @@ final class AppState: ObservableObject {
 
         guard isAuthenticated else {
             incomingImportNotice = AppNotice(
-                title: "已接收外部文件",
-                message: "文件已加入待导入队列，登录后会先让你选择目录，再自动导入。"
+                title: "External file received",
+                message: "File queued. Login first, then choose folder to import."
             )
             return
         }
@@ -201,8 +245,8 @@ final class AppState: ObservableObject {
             }
         } catch {
             incomingImportNotice = AppNotice(
-                title: "目录加载失败",
-                message: "目录列表获取失败，你仍可先导入到根目录。"
+                title: "Folder list failed",
+                message: "Folder list load failed. You can still import to root folder."
             )
         }
 
@@ -264,18 +308,18 @@ final class AppState: ObservableObject {
 
         if successCount > 0 && failedCount == 0 {
             incomingImportNotice = AppNotice(
-                title: "文件导入成功",
-                message: "已导入 \(successCount) 个文件到 \(targetTitle)。"
+                title: "Import success",
+                message: "Imported \(successCount) item(s) to \(targetTitle)."
             )
         } else if successCount > 0 && failedCount > 0 {
             incomingImportNotice = AppNotice(
-                title: "文件部分导入成功",
-                message: "成功 \(successCount) 个，失败 \(failedCount) 个。失败项会保留并在下次导入时继续处理。"
+                title: "Partial import",
+                message: "Success: \(successCount), failed: \(failedCount). Failed items stay queued."
             )
         } else if successCount == 0 && failedCount > 0 {
             incomingImportNotice = AppNotice(
-                title: "文件导入失败",
-                message: "导入未成功，文件已保留，后续可再次选择目录导入。"
+                title: "Import failed",
+                message: "No item imported. Files remain queued for retry."
             )
         }
 
@@ -334,6 +378,135 @@ private func stageIncomingExternalFile(from sourceURL: URL) throws -> PendingImp
         fileName: resolvedName,
         mimeType: resourceValues.contentType?.preferredMIMEType
     )
+}
+
+private func loadPendingFilesFromShareExtensionInbox() -> [PendingImportedFile] {
+    guard let inboxDirectory = resolveShareInboxDirectory(createIfMissing: false) else {
+        return []
+    }
+
+    let manifest = loadShareInboxManifest(in: inboxDirectory)
+    let candidates = collectShareInboxCandidates(in: inboxDirectory, manifest: manifest)
+    guard !candidates.isEmpty else {
+        cleanupShareInbox(in: inboxDirectory)
+        return []
+    }
+
+    var staged: [PendingImportedFile] = []
+    for candidate in candidates {
+        if let moved = moveShareInboxFileToLocalStaging(
+            sourceURL: candidate.fileURL,
+            originalFileName: candidate.originalFileName,
+            mimeType: candidate.mimeType
+        ) {
+            staged.append(moved)
+        }
+    }
+
+    cleanupShareInbox(in: inboxDirectory)
+    return staged
+}
+
+private func resolveShareInboxDirectory(createIfMissing: Bool) -> URL? {
+    guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: ShareBridgeConfig.appGroupIdentifier) else {
+        return nil
+    }
+
+    let inbox = container.appendingPathComponent(ShareBridgeConfig.inboxDirectoryName, isDirectory: true)
+    if createIfMissing && !FileManager.default.fileExists(atPath: inbox.path) {
+        try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+    }
+    guard FileManager.default.fileExists(atPath: inbox.path) else {
+        return nil
+    }
+    return inbox
+}
+
+private func loadShareInboxManifest(in inboxDirectory: URL) -> ShareInboxManifest? {
+    let manifestURL = inboxDirectory.appendingPathComponent(ShareBridgeConfig.manifestFileName)
+    guard let data = try? Data(contentsOf: manifestURL) else {
+        return nil
+    }
+    return try? JSONDecoder().decode(ShareInboxManifest.self, from: data)
+}
+
+private func collectShareInboxCandidates(
+    in inboxDirectory: URL,
+    manifest: ShareInboxManifest?
+) -> [(fileURL: URL, originalFileName: String, mimeType: String?)] {
+    var result: [(URL, String, String?)] = []
+
+    if let manifest {
+        for item in manifest.items {
+            let fileURL = inboxDirectory.appendingPathComponent(item.storedFileName)
+            guard FileManager.default.fileExists(atPath: fileURL.path) else { continue }
+            let name = normalizedIncomingFileName(item.originalFileName)
+            result.append((fileURL, name, item.mimeType))
+        }
+    }
+
+    if !result.isEmpty {
+        return result
+    }
+
+    let allFiles = (try? FileManager.default.contentsOfDirectory(at: inboxDirectory, includingPropertiesForKeys: nil)) ?? []
+    for fileURL in allFiles {
+        guard fileURL.lastPathComponent != ShareBridgeConfig.manifestFileName else { continue }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            continue
+        }
+
+        let name = normalizedIncomingFileName(fileURL.lastPathComponent)
+        let ext = (name as NSString).pathExtension
+        let mime = ext.isEmpty ? nil : UTType(filenameExtension: ext)?.preferredMIMEType
+        result.append((fileURL, name, mime))
+    }
+
+    return result
+}
+
+private func moveShareInboxFileToLocalStaging(
+    sourceURL: URL,
+    originalFileName: String,
+    mimeType: String?
+) -> PendingImportedFile? {
+    let stagingDirectory: URL
+    do {
+        stagingDirectory = try resolveIncomingImportStagingDirectory()
+    } catch {
+        return nil
+    }
+
+    let targetURL = uniqueIncomingFileURL(in: stagingDirectory, preferredName: originalFileName)
+
+    do {
+        try FileManager.default.moveItem(at: sourceURL, to: targetURL)
+    } catch {
+        do {
+            let data = try Data(contentsOf: sourceURL)
+            try data.write(to: targetURL, options: .atomic)
+            try? FileManager.default.removeItem(at: sourceURL)
+        } catch {
+            return nil
+        }
+    }
+
+    return PendingImportedFile(
+        localURL: targetURL,
+        fileName: originalFileName,
+        mimeType: mimeType
+    )
+}
+
+private func cleanupShareInbox(in inboxDirectory: URL) {
+    let manifestURL = inboxDirectory.appendingPathComponent(ShareBridgeConfig.manifestFileName)
+    try? FileManager.default.removeItem(at: manifestURL)
+
+    let leftovers = (try? FileManager.default.contentsOfDirectory(at: inboxDirectory, includingPropertiesForKeys: nil)) ?? []
+    for url in leftovers {
+        try? FileManager.default.removeItem(at: url)
+    }
 }
 
 private func resolveIncomingImportStagingDirectory() throws -> URL {

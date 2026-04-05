@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct MetrologyIOSApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appState = AppState()
     @State private var showsStartup: Bool = true
 
@@ -30,6 +31,11 @@ struct MetrologyIOSApp: App {
             }
             .onOpenURL { url in
                 appState.handleIncomingFileURL(url)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    appState.refreshIncomingSharedFiles()
+                }
             }
         }
     }
