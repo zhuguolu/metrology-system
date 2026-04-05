@@ -240,7 +240,7 @@ struct FilesView: View {
 
     private func fileRow(item: UserFileItemDto) -> some View {
         let iconStyle = fileIconStyle(for: item)
-        HStack(spacing: 12) {
+        return HStack(spacing: 12) {
             Image(systemName: iconStyle.symbolName)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(iconStyle.tint)
