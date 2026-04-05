@@ -84,7 +84,26 @@ struct FilesView: View {
         }
         .overlay {
             if viewModel.isLoading {
-                ProgressView(loadingOverlayTitle)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text(loadingOverlayTitle)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                        Spacer()
+                        if canCancelPreviewLoading {
+                            Button("取消") {
+                                viewModel.cancelPreviewLoading()
+                            }
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(MetrologyPalette.navActive)
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(MetrologyPalette.navActive)
+                }
                     .padding(12)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -317,6 +336,10 @@ struct FilesView: View {
             return "正在加载预览..."
         }
         return "处理中..."
+    }
+
+    private var canCancelPreviewLoading: Bool {
+        viewModel.previewLoadingFileId != nil
     }
 
     private func fileMetaText(for item: UserFileItemDto) -> String {
