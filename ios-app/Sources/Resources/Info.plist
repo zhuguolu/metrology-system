@@ -45,16 +45,92 @@
     <array>
         <dict>
             <key>CFBundleTypeName</key>
+            <string>办公文档</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.adobe.pdf</string>
+                <string>public.plain-text</string>
+                <string>public.comma-separated-values-text</string>
+                <string>com.microsoft.word.doc</string>
+                <string>org.openxmlformats.wordprocessingml.document</string>
+                <string>com.microsoft.excel.xls</string>
+                <string>org.openxmlformats.spreadsheetml.sheet</string>
+                <string>com.microsoft.powerpoint.ppt</string>
+                <string>org.openxmlformats.presentationml.presentation</string>
+                <string>public.zip-archive</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>pdf</string>
+                <string>txt</string>
+                <string>csv</string>
+                <string>doc</string>
+                <string>docx</string>
+                <string>xls</string>
+                <string>xlsx</string>
+                <string>ppt</string>
+                <string>pptx</string>
+                <string>zip</string>
+                <string>rar</string>
+                <string>7z</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>多媒体文件</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.image</string>
+                <string>public.jpeg</string>
+                <string>public.png</string>
+                <string>com.compuserve.gif</string>
+                <string>public.heic</string>
+                <string>public.movie</string>
+                <string>public.mpeg-4</string>
+                <string>com.apple.quicktime-movie</string>
+                <string>public.audio</string>
+                <string>public.mp3</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>jpg</string>
+                <string>jpeg</string>
+                <string>png</string>
+                <string>gif</string>
+                <string>heic</string>
+                <string>bmp</string>
+                <string>tif</string>
+                <string>tiff</string>
+                <string>mp4</string>
+                <string>mov</string>
+                <string>m4a</string>
+                <string>mp3</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
             <string>通用文件</string>
             <key>CFBundleTypeRole</key>
-            <string>Editor</string>
+            <string>Viewer</string>
             <key>LSHandlerRank</key>
             <string>Owner</string>
             <key>LSItemContentTypes</key>
             <array>
                 <string>public.data</string>
-                <string>public.content</string>
                 <string>public.item</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>dat</string>
+                <string>bin</string>
             </array>
         </dict>
     </array>
