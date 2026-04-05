@@ -74,7 +74,8 @@ final class DeviceListViewModel: ObservableObject {
     func load(page requestedPage: Int = 1) async {
         activeLoadTask?.cancel()
         let task = Task { [weak self] in
-            await self?.performLoad(page: requestedPage)
+            guard let self else { return }
+            await self.performLoad(page: requestedPage)
         }
         activeLoadTask = task
         await task.value

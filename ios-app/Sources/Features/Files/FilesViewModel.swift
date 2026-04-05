@@ -39,7 +39,8 @@ final class FilesViewModel: ObservableObject {
     func load() async {
         activeLoadTask?.cancel()
         let task = Task { [weak self] in
-            await self?.performLoad()
+            guard let self else { return }
+            await self.performLoad()
         }
         activeLoadTask = task
         await task.value
