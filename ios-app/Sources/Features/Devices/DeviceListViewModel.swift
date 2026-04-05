@@ -29,6 +29,7 @@ final class DeviceListViewModel: ObservableObject {
     private let pageSize: Int = 20
     private let ledgerOtherLocalFetchSize: Int = 5000
     private var currentLoadToken: UInt64 = 0
+    private var activeLoadTask: Task<Void, Never>?
     private var baselineSummaryCache: [String: BaselineSnapshot] = [:]
 
     private struct BaselineSnapshot {
@@ -71,6 +72,15 @@ final class DeviceListViewModel: ObservableObject {
     }
 
     func load(page requestedPage: Int = 1) async {
+        activeLoadTask?.cancel()
+        let task = Task { [weak self] in
+            await self?.performLoad(page: requestedPage)
+        }
+        activeLoadTask = task
+        await task.value
+    }
+
+    private func performLoad(page requestedPage: Int = 1) async {
         let token = beginLoad()
         defer {
             if shouldApplyResult(for: token) {

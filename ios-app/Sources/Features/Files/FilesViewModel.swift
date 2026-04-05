@@ -22,11 +22,30 @@ final class FilesViewModel: ObservableObject {
     @Published var canWrite: Bool = true
     @Published var readOnlyFolder: Bool = false
 
+    private struct FolderStackEntry {
+        let id: Int64?
+        let name: String
+    }
+
+    private let rootFolder = FolderStackEntry(id: nil, name: "")
+    private var folderStack: [FolderStackEntry] = [FolderStackEntry(id: nil, name: "")]
     private var currentLoadToken: UInt64 = 0
+    private var activeLoadTask: Task<Void, Never>?
     private var currentPreviewURL: URL?
-    private var cachedPreviewURLs: Set<URL> = []
+    private var previewCache: [String: URL] = [:]
+    private var previewCacheOrder: [String] = []
+    private let previewCacheLimit: Int = 40
 
     func load() async {
+        activeLoadTask?.cancel()
+        let task = Task { [weak self] in
+            await self?.performLoad()
+        }
+        activeLoadTask = task
+        await task.value
+    }
+
+    private func performLoad() async {
         let token = beginLoad()
         defer {
             if shouldApplyResult(for: token) {
@@ -51,39 +70,24 @@ final class FilesViewModel: ObservableObject {
     }
 
     func goRoot() async {
-        currentFolderId = nil
-        currentPath = "/"
+        resetToRoot()
         await load()
     }
 
     func goBack() async {
-        guard let folderId = currentFolderId else { return }
-        do {
-            let crumbs = try await APIClient.shared.fileBreadcrumb(folderId: folderId)
-            if crumbs.count >= 2 {
-                let parent = crumbs[crumbs.count - 2]
-                currentFolderId = parent.id
-                let names = crumbs.dropLast().compactMap { $0.name }.filter { !$0.isEmpty }
-                currentPath = names.isEmpty ? "/" : "/" + names.joined(separator: "/")
-            } else {
-                currentFolderId = nil
-                currentPath = "/"
-            }
-            await load()
-        } catch {
-            errorMessage = localizedMessage(from: error)
-        }
+        guard folderStack.count > 1 else { return }
+        _ = folderStack.popLast()
+        applyFolderStackState()
+        await load()
     }
 
     func open(_ item: UserFileItemDto) async {
         if item.isFolder {
-            currentFolderId = item.id
-            let name = item.displayName
-            if currentPath == "/" {
-                currentPath = "/\(name)"
-            } else {
-                currentPath += "/\(name)"
+            guard let folderId = item.id else {
+                errorMessage = "目录ID无效"
+                return
             }
+            pushFolder(id: folderId, name: item.displayName)
             await load()
             return
         }
@@ -97,11 +101,15 @@ final class FilesViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let url = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
-            registerPreviewTempFile(url)
-            if let previous = currentPreviewURL, previous != url {
-                removePreviewTempFile(previous)
+            let cacheKey = previewCacheKey(fileId: id, item: item)
+            if let cachedURL = cachedPreviewURL(for: cacheKey) {
+                currentPreviewURL = cachedURL
+                previewItem = PreviewItem(url: cachedURL, title: item.displayName)
+                return
             }
+
+            let url = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
+            storePreviewURL(url, for: cacheKey)
             currentPreviewURL = url
             previewItem = PreviewItem(url: url, title: item.displayName)
         } catch {
@@ -206,9 +214,7 @@ final class FilesViewModel: ObservableObject {
     }
 
     func handlePreviewDismiss() {
-        guard let url = currentPreviewURL else { return }
         currentPreviewURL = nil
-        removePreviewTempFile(url)
     }
 
     private func beginLoad() -> UInt64 {
@@ -265,12 +271,83 @@ final class FilesViewModel: ObservableObject {
         (error as? APIError)?.localizedDescription ?? error.localizedDescription
     }
 
-    private func registerPreviewTempFile(_ url: URL) {
-        cachedPreviewURLs.insert(url)
+    private func resetToRoot() {
+        folderStack = [rootFolder]
+        applyFolderStackState()
     }
 
-    private func removePreviewTempFile(_ url: URL) {
-        cachedPreviewURLs.remove(url)
+    private func pushFolder(id: Int64, name: String) {
+        folderStack.append(FolderStackEntry(id: id, name: normalizeFolderName(name)))
+        applyFolderStackState()
+    }
+
+    private func applyFolderStackState() {
+        currentFolderId = folderStack.last?.id
+        if folderStack.count <= 1 {
+            currentPath = "/"
+            return
+        }
+        let names = folderStack
+            .dropFirst()
+            .map { normalizeFolderName($0.name) }
+            .filter { !$0.isEmpty }
+        currentPath = names.isEmpty ? "/" : "/" + names.joined(separator: "/")
+    }
+
+    private func normalizeFolderName(_ rawName: String) -> String {
+        let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "-" : trimmed
+    }
+
+    private func previewCacheKey(fileId: Int64, item: UserFileItemDto) -> String {
+        "\(fileId)|\(item.createdAt ?? "")|\(item.fileSize ?? -1)"
+    }
+
+    private func cachedPreviewURL(for key: String) -> URL? {
+        guard let url = previewCache[key] else { return nil }
+        if FileManager.default.fileExists(atPath: url.path) {
+            touchPreviewCacheKey(key)
+            return url
+        }
+        removePreviewCacheEntry(for: key, removeFile: false)
+        return nil
+    }
+
+    private func storePreviewURL(_ url: URL, for key: String) {
+        if let existing = previewCache[key], existing != url {
+            removeFileIfExists(existing)
+        }
+        previewCache[key] = url
+        touchPreviewCacheKey(key)
+        trimPreviewCacheIfNeeded()
+    }
+
+    private func touchPreviewCacheKey(_ key: String) {
+        previewCacheOrder.removeAll { $0 == key }
+        previewCacheOrder.append(key)
+    }
+
+    private func trimPreviewCacheIfNeeded() {
+        while previewCacheOrder.count > previewCacheLimit {
+            let evictKey = previewCacheOrder.removeFirst()
+            guard let url = previewCache[evictKey] else { continue }
+            if url == currentPreviewURL {
+                previewCacheOrder.append(evictKey)
+                continue
+            }
+            removePreviewCacheEntry(for: evictKey, removeFile: true)
+        }
+    }
+
+    private func removePreviewCacheEntry(for key: String, removeFile: Bool) {
+        previewCacheOrder.removeAll { $0 == key }
+        guard let url = previewCache.removeValue(forKey: key) else { return }
+        if removeFile {
+            removeFileIfExists(url)
+        }
+    }
+
+    private func removeFileIfExists(_ url: URL) {
         do {
             if FileManager.default.fileExists(atPath: url.path) {
                 try FileManager.default.removeItem(at: url)
