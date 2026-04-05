@@ -281,13 +281,47 @@ struct FilesView: View {
     private var headerPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             searchField
-            HStack {
-                Text("路径")
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                Spacer()
-                Text(viewModel.currentPath)
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                    .lineLimit(1)
+
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("路径")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                    Text(viewModel.currentPath)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 6) {
+                    headerIconActionButton(
+                        title: "根目录",
+                        systemImage: "house.fill",
+                        style: .primary
+                    ) {
+                        Task { await viewModel.goRoot() }
+                    }
+
+                    headerIconActionButton(
+                        title: "上级",
+                        systemImage: "arrow.up.left",
+                        style: .secondary
+                    ) {
+                        Task { await viewModel.goBack() }
+                    }
+                    .disabled(viewModel.currentFolderId == nil)
+                    .opacity(viewModel.currentFolderId == nil ? 0.45 : 1)
+
+                    headerIconActionButton(
+                        title: "刷新",
+                        systemImage: "arrow.clockwise",
+                        style: .secondary
+                    ) {
+                        Task { await viewModel.load() }
+                    }
+                }
             }
 
             if isSearching || !viewModel.hint.isEmpty {
@@ -315,44 +349,34 @@ struct FilesView: View {
             }
 
             HStack(spacing: 8) {
-                Button("根目录") {
-                    Task { await viewModel.goRoot() }
-                }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-
-                Button("上级") {
-                    Task { await viewModel.goBack() }
-                }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-                .disabled(viewModel.currentFolderId == nil)
-                .opacity(viewModel.currentFolderId == nil ? 0.45 : 1)
-
-                Button("刷新") {
-                    Task { await viewModel.load() }
-                }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-            }
-
-            HStack(spacing: 8) {
-                Button("上传文件") {
+                headerPrimaryActionButton(
+                    title: "上传",
+                    systemImage: "arrow.up.circle.fill",
+                    style: .primary
+                ) {
                     fileImporterOpen = true
                 }
-                .buttonStyle(MetrologyPrimaryButtonStyle())
                 .disabled(!viewModel.canWrite)
                 .opacity(viewModel.canWrite ? 1 : 0.45)
 
-                Button("新建文件夹") {
+                headerPrimaryActionButton(
+                    title: "新建文件夹",
+                    systemImage: "folder.badge.plus",
+                    style: .secondary
+                ) {
                     createFolderName = ""
                     createFolderDialogOpen = true
                 }
-                .buttonStyle(MetrologySecondaryButtonStyle())
                 .disabled(!viewModel.canWrite)
                 .opacity(viewModel.canWrite ? 1 : 0.45)
 
-                Button("扫描同步") {
+                headerPrimaryActionButton(
+                    title: "同步",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    style: .secondary
+                ) {
                     Task { await viewModel.scanSync() }
                 }
-                .buttonStyle(MetrologySecondaryButtonStyle())
                 .disabled(!viewModel.canWrite)
                 .opacity(viewModel.canWrite ? 1 : 0.45)
             }
@@ -395,6 +419,79 @@ struct FilesView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(MetrologyPalette.stroke, lineWidth: 1)
         )
+    }
+
+    private enum HeaderActionStyle {
+        case primary
+        case secondary
+    }
+
+    private func headerIconActionButton(
+        title: String,
+        systemImage: String,
+        style: HeaderActionStyle,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 28, height: 28)
+        }
+        .foregroundStyle(style == .primary ? Color.white : MetrologyPalette.textPrimary)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(style == .primary ? MetrologyPalette.navActive : Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(
+                    style == .primary ? MetrologyPalette.navActive : MetrologyPalette.stroke,
+                    lineWidth: 1
+                )
+        )
+        .accessibilityLabel(title)
+        .buttonStyle(.plain)
+    }
+
+    private func headerPrimaryActionButton(
+        title: String,
+        systemImage: String,
+        style: HeaderActionStyle,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+        }
+        .foregroundStyle(style == .primary ? Color.white : MetrologyPalette.textPrimary)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                    style == .primary
+                        ? AnyShapeStyle(
+                            LinearGradient(
+                                colors: [MetrologyPalette.brandBlue, MetrologyPalette.navActive],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        : AnyShapeStyle(Color.white)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    style == .primary ? MetrologyPalette.navActive : MetrologyPalette.stroke,
+                    lineWidth: 1
+                )
+        )
+        .buttonStyle(.plain)
     }
 
     private var backToParentGesture: some Gesture {
