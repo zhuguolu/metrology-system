@@ -47,6 +47,12 @@ final class FilesViewModel: ObservableObject {
     private var previewCacheOrder: [String] = []
     private let previewCacheLimit: Int = 40
 
+    struct MoveTarget: Identifiable, Equatable {
+        let id: String
+        let folderId: Int64?
+        let title: String
+    }
+
     func load() async {
         activeLoadTask?.cancel()
         let task = Task { [weak self] in
@@ -274,6 +280,194 @@ final class FilesViewModel: ObservableObject {
         cancelActivePreviewDownload(resetLoading: true)
     }
 
+    func fetchMoveTargets() async -> [MoveTarget] {
+        do {
+            let folders = try await APIClient.shared.grantableFolders()
+            var targets: [MoveTarget] = [
+                MoveTarget(id: "root", folderId: nil, title: "/")
+            ]
+            targets.append(
+                contentsOf: folders.compactMap { folder in
+                    guard let id = folder.id else { return nil }
+                    return MoveTarget(
+                        id: "folder-\(id)",
+                        folderId: id,
+                        title: folder.displayName
+                    )
+                }
+            )
+            return targets
+        } catch {
+            if !(error is CancellationError) {
+                errorMessage = localizedMessage(from: error)
+            }
+            return []
+        }
+    }
+
+    func moveItems(_ ids: [Int64], to parentId: Int64?) async {
+        guard !ids.isEmpty else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        var successCount = 0
+        var failCount = 0
+
+        for id in ids {
+            do {
+                _ = try await APIClient.shared.moveFile(id: id, parentId: parentId)
+                successCount += 1
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+                failCount += 1
+            }
+        }
+
+        scanSyncMessage = "移动完成：成功 \(successCount)，失败 \(failCount)"
+        invalidateFolderCache()
+        await load()
+    }
+
+    func deleteItems(_ ids: [Int64]) async {
+        guard !ids.isEmpty else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        var successCount = 0
+        var failCount = 0
+
+        for id in ids {
+            do {
+                try await APIClient.shared.deleteFile(id: id)
+                successCount += 1
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+                failCount += 1
+            }
+        }
+
+        scanSyncMessage = "删除完成：成功 \(successCount)，失败 \(failCount)"
+        invalidateFolderCache()
+        await load()
+    }
+
+    func renameItem(id: Int64, newName: String) async -> Bool {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "名称不能为空"
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            _ = try await APIClient.shared.renameFile(id: id, name: trimmed)
+            scanSyncMessage = "重命名成功"
+            invalidateFolderCache()
+            await load()
+            return true
+        } catch {
+            if error is CancellationError {
+                return false
+            }
+            errorMessage = localizedMessage(from: error)
+            return false
+        }
+    }
+
+    func prepareDownloads(for items: [UserFileItemDto]) async -> [URL] {
+        guard !items.isEmpty else { return [] }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        var urls: [URL] = []
+        var skippedFolders = 0
+        var failed = 0
+
+        for item in items {
+            if item.isFolder {
+                skippedFolders += 1
+                continue
+            }
+            guard let id = item.id else {
+                failed += 1
+                continue
+            }
+            do {
+                let url = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
+                urls.append(url)
+            } catch {
+                if error is CancellationError {
+                    return urls
+                }
+                failed += 1
+            }
+        }
+
+        if skippedFolders > 0 || failed > 0 {
+            scanSyncMessage = "下载准备完成：成功 \(urls.count)，文件夹跳过 \(skippedFolders)，失败 \(failed)"
+        }
+        return urls
+    }
+
+    func copyItemsToCurrentFolder(_ items: [UserFileItemDto]) async {
+        guard !items.isEmpty else { return }
+        guard canWrite else {
+            errorMessage = "当前目录为只读，不能复制"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        var successCount = 0
+        var failedCount = 0
+        var skippedFolders = 0
+        var usedNames = Set(self.items.map { $0.displayName.lowercased() })
+
+        for item in items {
+            if item.isFolder {
+                skippedFolders += 1
+                continue
+            }
+            guard let id = item.id else {
+                failedCount += 1
+                continue
+            }
+            do {
+                let sourceURL = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
+                let data = try Data(contentsOf: sourceURL)
+                let copiedName = makeCopyName(from: item.displayName, usedNames: &usedNames)
+                _ = try await APIClient.shared.uploadFile(
+                    parentId: currentFolderId,
+                    fileName: copiedName,
+                    mimeType: item.mimeType,
+                    bytes: data
+                )
+                successCount += 1
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+                failedCount += 1
+            }
+        }
+
+        scanSyncMessage = "复制完成：成功 \(successCount)，文件夹跳过 \(skippedFolders)，失败 \(failedCount)"
+        invalidateFolderCache()
+        await load()
+    }
+
     private func beginLoad() -> UInt64 {
         currentLoadToken += 1
         let token = currentLoadToken
@@ -344,6 +538,25 @@ final class FilesViewModel: ObservableObject {
         } catch {
             return nil
         }
+    }
+
+    private func makeCopyName(from originalName: String, usedNames: inout Set<String>) -> String {
+        let trimmed = originalName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeOriginal = trimmed.isEmpty ? "未命名" : trimmed
+        let nsName = safeOriginal as NSString
+        let ext = nsName.pathExtension
+        let base = nsName.deletingPathExtension
+        let baseWithCopy = base.isEmpty ? "未命名-副本" : "\(base)-副本"
+
+        var candidate = ext.isEmpty ? baseWithCopy : "\(baseWithCopy).\(ext)"
+        var idx = 2
+        while usedNames.contains(candidate.lowercased()) {
+            let indexed = "\(baseWithCopy)\(idx)"
+            candidate = ext.isEmpty ? indexed : "\(indexed).\(ext)"
+            idx += 1
+        }
+        usedNames.insert(candidate.lowercased())
+        return candidate
     }
 
     private func localizedMessage(from error: Error) -> String {

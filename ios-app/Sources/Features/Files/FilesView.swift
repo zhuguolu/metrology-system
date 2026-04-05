@@ -7,6 +7,16 @@ struct FilesView: View {
     @State private var createFolderDialogOpen = false
     @State private var createFolderName = ""
     @State private var searchText = ""
+    @State private var selectedItemIDs: Set<Int64> = []
+    @State private var showMoveTargetSheet = false
+    @State private var moveTargets: [FilesViewModel.MoveTarget] = []
+    @State private var moveTargetLoading = false
+    @State private var showMoreActions = false
+    @State private var showRenameDialog = false
+    @State private var renameText = ""
+    @State private var showDeleteConfirm = false
+    @State private var activityItems: [Any] = []
+    @State private var showActivitySheet = false
 
     var body: some View {
         ZStack {
@@ -29,17 +39,12 @@ struct FilesView: View {
                         .metrologyCard()
                     } else {
                         ForEach(fileRows) { row in
-                            Button {
-                                Task { await viewModel.open(row.item) }
-                            } label: {
-                                fileRow(item: row.item)
-                            }
-                            .buttonStyle(.plain)
+                            fileRow(item: row.item)
                         }
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.bottom, 14)
+                .padding(.bottom, hasSelection ? 86 : 14)
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
@@ -54,6 +59,11 @@ struct FilesView: View {
         }
         .onChange(of: viewModel.currentFolderId) { _, _ in
             searchText = ""
+            selectedItemIDs.removeAll()
+        }
+        .onChange(of: viewModel.items) { _, items in
+            let validIDs = Set(items.compactMap { $0.id })
+            selectedItemIDs = selectedItemIDs.intersection(validIDs)
         }
         .fileImporter(
             isPresented: $fileImporterOpen,
@@ -115,13 +125,134 @@ struct FilesView: View {
                     )
             }
         }
-        .sheet(item: $viewModel.previewItem, onDismiss: {
+        .fullScreenCover(item: $viewModel.previewItem, onDismiss: {
             viewModel.handlePreviewDismiss()
         }) { item in
-            NavigationStack {
-                QuickLookPreview(url: item.url)
-                    .navigationTitle(item.title)
-                    .navigationBarTitleDisplayMode(.inline)
+            FilePreviewFullScreenView(item: item)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if hasSelection {
+                selectionActionBar
+            }
+        }
+        .sheet(isPresented: $showMoveTargetSheet) {
+            moveTargetSheet
+        }
+        .sheet(isPresented: $showActivitySheet) {
+            FilesActivitySheet(items: activityItems)
+        }
+        .confirmationDialog("更多操作", isPresented: $showMoreActions, titleVisibility: .visible) {
+            if canRenameSelected {
+                Button("重命名") {
+                    prepareRename()
+                }
+            }
+            Button("删除", role: .destructive) {
+                showDeleteConfirm = true
+            }
+            Button("取消", role: .cancel) {}
+        }
+        .alert("重命名", isPresented: $showRenameDialog) {
+            TextField("请输入新名称", text: $renameText)
+            Button("取消", role: .cancel) {
+                renameText = ""
+            }
+            Button("保存") {
+                Task { await renameSelectedItem() }
+            }
+        } message: {
+            Text("仅支持单个文件或文件夹重命名")
+        }
+        .alert("确认删除", isPresented: $showDeleteConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                Task { await deleteSelectedItems() }
+            }
+        } message: {
+            Text("已选择 \(selectedItems.count) 项，删除后无法恢复")
+        }
+    }
+
+    private var selectionActionBar: some View {
+        HStack(spacing: 8) {
+            selectionActionButton(title: "复制", systemImage: "doc.on.doc") {
+                Task { await copySelectedItems() }
+            }
+
+            selectionActionButton(title: "移动", systemImage: "folder") {
+                Task { await openMoveTargetPicker() }
+            }
+
+            selectionActionButton(title: "下载", systemImage: "arrow.down.circle") {
+                Task { await downloadSelectedItems() }
+            }
+
+            selectionActionButton(title: "更多", systemImage: "ellipsis.circle") {
+                showMoreActions = true
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(MetrologyPalette.surface)
+        .overlay(
+            Rectangle()
+                .fill(MetrologyPalette.stroke)
+                .frame(height: 1),
+            alignment: .top
+        )
+    }
+
+    private func selectionActionButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(MetrologyPalette.navActive)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var moveTargetSheet: some View {
+        NavigationStack {
+            Group {
+                if moveTargetLoading {
+                    ProgressView("加载目标目录...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(moveTargets) { target in
+                        Button {
+                            showMoveTargetSheet = false
+                            Task { await moveSelectedItems(to: target.folderId) }
+                        } label: {
+                            HStack {
+                                Text(target.title)
+                                    .foregroundStyle(MetrologyPalette.textPrimary)
+                                Spacer()
+                                if target.folderId == viewModel.currentFolderId {
+                                    Text("当前")
+                                        .font(.caption2)
+                                        .foregroundStyle(MetrologyPalette.textMuted)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("选择目标目录")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("关闭") {
+                        showMoveTargetSheet = false
+                    }
+                }
             }
         }
     }
@@ -260,37 +391,36 @@ struct FilesView: View {
     private func fileRow(item: UserFileItemDto) -> some View {
         let iconStyle = fileIconStyle(for: item)
         return HStack(spacing: 12) {
-            Image(systemName: iconStyle.symbolName)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(iconStyle.tint)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(MetrologyPalette.surface)
-                )
+            Button {
+                handleRowTap(item)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: iconStyle.symbolName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(iconStyle.tint)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(MetrologyPalette.surface)
+                        )
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.displayName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(fileMetaText(for: item))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                    .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.displayName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(fileMetaText(for: item))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if !item.isFolder, viewModel.previewLoadingFileId == item.id {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(MetrologyPalette.navActive)
-            } else {
-                Image(systemName: item.isFolder ? "chevron.right" : "arrow.down.circle")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(MetrologyPalette.textMuted)
-            }
+            .buttonStyle(.plain)
+            selectionCircle(item: item)
         }
         .padding(12)
         .metrologyCard()
@@ -328,6 +458,56 @@ struct FilesView: View {
         return viewModel.hint
     }
 
+    private var hasSelection: Bool {
+        !selectedItemIDs.isEmpty
+    }
+
+    private var selectedItems: [UserFileItemDto] {
+        viewModel.items.filter { item in
+            guard let id = item.id else { return false }
+            return selectedItemIDs.contains(id)
+        }
+    }
+
+    private var canRenameSelected: Bool {
+        selectedItems.count == 1
+    }
+
+    private func handleRowTap(_ item: UserFileItemDto) {
+        if hasSelection, item.id != nil {
+            toggleSelection(for: item)
+            return
+        }
+        Task { await viewModel.open(item) }
+    }
+
+    @ViewBuilder
+    private func selectionCircle(item: UserFileItemDto) -> some View {
+        if let id = item.id {
+            Button {
+                toggleSelection(for: item)
+            } label: {
+                Image(systemName: selectedItemIDs.contains(id) ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(selectedItemIDs.contains(id) ? MetrologyPalette.navActive : MetrologyPalette.textMuted)
+            }
+            .buttonStyle(.plain)
+        } else {
+            Image(systemName: "circle")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(MetrologyPalette.textMuted.opacity(0.35))
+        }
+    }
+
+    private func toggleSelection(for item: UserFileItemDto) {
+        guard let id = item.id else { return }
+        if selectedItemIDs.contains(id) {
+            selectedItemIDs.remove(id)
+        } else {
+            selectedItemIDs.insert(id)
+        }
+    }
+
     private var loadingOverlayTitle: String {
         if viewModel.isUploading {
             return "正在上传..."
@@ -340,6 +520,58 @@ struct FilesView: View {
 
     private var canCancelPreviewLoading: Bool {
         viewModel.previewLoadingFileId != nil
+    }
+
+    private func copySelectedItems() async {
+        let items = selectedItems
+        guard !items.isEmpty else { return }
+        await viewModel.copyItemsToCurrentFolder(items)
+        selectedItemIDs.removeAll()
+    }
+
+    private func openMoveTargetPicker() async {
+        moveTargetLoading = true
+        showMoveTargetSheet = true
+        moveTargets = await viewModel.fetchMoveTargets()
+        moveTargetLoading = false
+    }
+
+    private func moveSelectedItems(to parentId: Int64?) async {
+        let ids = selectedItems.compactMap { $0.id }
+        guard !ids.isEmpty else { return }
+        await viewModel.moveItems(ids, to: parentId)
+        selectedItemIDs.removeAll()
+    }
+
+    private func downloadSelectedItems() async {
+        let items = selectedItems
+        guard !items.isEmpty else { return }
+        let urls = await viewModel.prepareDownloads(for: items)
+        guard !urls.isEmpty else { return }
+        activityItems = urls
+        showActivitySheet = true
+        selectedItemIDs.removeAll()
+    }
+
+    private func prepareRename() {
+        guard let item = selectedItems.first else { return }
+        renameText = item.displayName
+        showRenameDialog = true
+    }
+
+    private func renameSelectedItem() async {
+        guard let item = selectedItems.first, let id = item.id else { return }
+        let success = await viewModel.renameItem(id: id, newName: renameText)
+        if success {
+            selectedItemIDs.removeAll()
+        }
+    }
+
+    private func deleteSelectedItems() async {
+        let ids = selectedItems.compactMap { $0.id }
+        guard !ids.isEmpty else { return }
+        await viewModel.deleteItems(ids)
+        selectedItemIDs.removeAll()
     }
 
     private func fileMetaText(for item: UserFileItemDto) -> String {
@@ -476,4 +708,61 @@ private struct FileListRow: Identifiable {
 private struct FileIconStyle {
     let symbolName: String
     let tint: Color
+}
+
+private struct FilePreviewFullScreenView: View {
+    let item: PreviewItem
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var showExternalSheet = false
+
+    var body: some View {
+        NavigationStack {
+            QuickLookPreview(url: item.url)
+                .navigationTitle(item.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("关闭") {
+                            dismiss()
+                        }
+                    }
+                }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(MetrologyPalette.stroke)
+                    .frame(height: 1)
+                Button {
+                    showExternalSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.up.forward.app")
+                        Text("外部打开")
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(MetrologyPalette.navActive)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 14)
+                }
+                .buttonStyle(.plain)
+            }
+            .background(MetrologyPalette.surface)
+        }
+        .sheet(isPresented: $showExternalSheet) {
+            FilesActivitySheet(items: [item.url])
+        }
+    }
+}
+
+private struct FilesActivitySheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

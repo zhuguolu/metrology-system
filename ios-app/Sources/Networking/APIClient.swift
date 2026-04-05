@@ -231,6 +231,32 @@ final class APIClient {
         return try await send(path: "api/files/breadcrumb", method: "GET", queryItems: query, authorized: true)
     }
 
+    func grantableFolders() async throws -> [GrantableFolderDto] {
+        try await send(path: "api/files/grantable-folders", method: "GET", authorized: true)
+    }
+
+    func renameFile(id: Int64, name: String) async throws -> UserFileItemDto {
+        try await send(
+            path: "api/files/\(id)/rename",
+            method: "PUT",
+            body: RenameFileRequest(name: name),
+            authorized: true
+        )
+    }
+
+    func moveFile(id: Int64, parentId: Int64?) async throws -> UserFileItemDto {
+        try await send(
+            path: "api/files/\(id)/move",
+            method: "PUT",
+            body: MoveFileRequest(parentId: parentId),
+            authorized: true
+        )
+    }
+
+    func deleteFile(id: Int64) async throws {
+        try await sendWithoutResponse(path: "api/files/\(id)", method: "DELETE", authorized: true)
+    }
+
     func downloadFile(id: Int64, suggestedName: String?) async throws -> URL {
         let safeName = sanitizeFilename(suggestedName ?? "preview.bin")
         let cache = try resolveDownloadCacheURLs(fileId: id, safeName: safeName)

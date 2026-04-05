@@ -247,8 +247,31 @@ struct BreadcrumbItemDto: Codable {
     let readOnly: Bool?
 }
 
+struct GrantableFolderDto: Codable, Identifiable {
+    let id: Int64?
+    let name: String?
+    let path: String?
+
+    var displayName: String {
+        let value = path?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !value.isEmpty {
+            return value
+        }
+        let fallback = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return fallback.isEmpty ? "/" : fallback
+    }
+}
+
 struct CreateFolderRequest: Codable {
     let name: String
+    let parentId: Int64?
+}
+
+struct RenameFileRequest: Codable {
+    let name: String
+}
+
+struct MoveFileRequest: Codable {
     let parentId: Int64?
 }
 
