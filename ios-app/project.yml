@@ -13,10 +13,6 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - Sources
-    dependencies:
-      - target: MetrologyShareExtension
-        embed: true
-        codeSign: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.metrology.ios
@@ -34,37 +30,10 @@ targets:
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
         INFOPLIST_KEY_CFBundleDisplayName: 校准管理系统
         INFOPLIST_KEY_CFBundleName: 校准管理系统
-        CODE_SIGN_ENTITLEMENTS: Sources/Resources/MetrologyiOS.entitlements
     info:
       path: Sources/Resources/Info.plist
-  MetrologyShareExtension:
-    type: app-extension
-    platform: iOS
-    deploymentTarget: "26.0"
-    sources:
-      - ShareExtension/Sources
-    dependencies:
-      - sdk: Social.framework
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.metrology.ios.shareextension
-        PRODUCT_NAME: MetrologyShareExtension
-        CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 1.0.0
-        CODE_SIGN_STYLE: Automatic
-        GENERATE_INFOPLIST_FILE: NO
-        INFOPLIST_FILE: ShareExtension/Info.plist
-        TARGETED_DEVICE_FAMILY: "1"
-        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
-        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
-        APPLICATION_EXTENSION_API_ONLY: YES
-        CODE_SIGN_ENTITLEMENTS: ShareExtension/ShareExtension.entitlements
-        INFOPLIST_KEY_CFBundleDisplayName: 导入到校准管理系统
-    info:
-      path: ShareExtension/Info.plist
 schemes:
   MetrologyiOS:
     build:
       targets:
         MetrologyiOS: all
-        MetrologyShareExtension: all
