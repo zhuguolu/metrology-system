@@ -27,16 +27,8 @@ final class DeviceListViewModel: ObservableObject {
 
     let mode: DeviceListMode
     private let pageSize: Int = 20
-    private let ledgerOtherLocalFetchSize: Int = 5000
     private var currentLoadToken: UInt64 = 0
     private var activeLoadTask: Task<Void, Never>?
-    private var baselineSummaryCache: [String: BaselineSnapshot] = [:]
-
-    private struct BaselineSnapshot {
-        let total: Int64
-        let validitySummary: [String: Int64]
-        let useStatusSummary: [String: Int64]
-    }
 
     init(mode: DeviceListMode) {
         self.mode = mode
@@ -92,120 +84,47 @@ final class DeviceListViewModel: ObservableObject {
         do {
             let safeRequestedPage = max(1, requestedPage)
             let requestUseStatus = useStatusFilterForRequest()
-            let useLedgerOtherLocalFallback = shouldUseLedgerOtherLocalFallback()
-
-            let result: PageResult<DeviceDto>
-            let summarySourceItems: [DeviceDto]
-            let resolvedItems: [DeviceDto]
-            let resolvedTotal: Int64
-            let resolvedPage: Int
-            let resolvedTotalPages: Int
-
-            if useLedgerOtherLocalFallback {
-                result = try await APIClient.shared.devicesPaged(
-                    mode: mode,
-                    search: searchText,
-                    dept: deptFilter,
-                    validity: validityFilter,
-                    useStatus: nil,
-                    nextDateFrom: mode == .ledger ? nil : nextDateFrom,
-                    nextDateTo: mode == .ledger ? nil : nextDateTo,
-                    page: 1,
-                    size: ledgerOtherLocalFetchSize
-                )
-                guard shouldApplyResult(for: token) else { return }
-
-                let allItems = result.content ?? []
-                let otherItems = allItems.filter { useStatusBucketFromItem(for: $0.useStatus) == "其他" }
-                let pageSlice = paginateLocal(items: otherItems, requestedPage: safeRequestedPage)
-
-                summarySourceItems = allItems
-                resolvedItems = pageSlice.items
-                resolvedTotal = Int64(otherItems.count)
-                resolvedPage = pageSlice.page
-                resolvedTotalPages = pageSlice.totalPages
-            } else {
-                result = try await APIClient.shared.devicesPaged(
-                    mode: mode,
-                    search: searchText,
-                    dept: deptFilter,
-                    validity: validityFilter,
-                    useStatus: requestUseStatus,
-                    nextDateFrom: mode == .ledger ? nil : nextDateFrom,
-                    nextDateTo: mode == .ledger ? nil : nextDateTo,
-                    page: safeRequestedPage,
-                    size: pageSize
-                )
-                guard shouldApplyResult(for: token) else { return }
-
-                let pageItems = result.content ?? []
-                summarySourceItems = pageItems
-                resolvedItems = pageItems
-                resolvedTotal = result.totalElements ?? 0
-                resolvedPage = max(1, result.page ?? safeRequestedPage)
-                resolvedTotalPages = max(1, result.totalPages ?? 1)
-            }
+            let result = try await APIClient.shared.devicesPaged(
+                mode: mode,
+                search: searchText,
+                dept: deptFilter,
+                validity: validityFilter,
+                useStatus: requestUseStatus,
+                baselineUseStatus: baselineUseStatusFilter,
+                nextDateFrom: mode == .ledger ? nil : nextDateFrom,
+                nextDateTo: mode == .ledger ? nil : nextDateTo,
+                page: safeRequestedPage,
+                size: pageSize
+            )
             guard shouldApplyResult(for: token) else { return }
 
+            let pageItems = result.content ?? []
             let resolvedValiditySummary = resolveValiditySummary(
                 serverSummary: result.summaryCounts,
-                items: summarySourceItems
+                items: pageItems
             )
             let resolvedUseStatusSummary = resolveUseStatusSummary(
                 serverSummary: result.useStatusSummary,
-                items: summarySourceItems
+                items: pageItems
+            )
+            let resolvedOverallValiditySummary = resolveValiditySummary(
+                serverSummary: result.overallSummaryCounts ?? result.summaryCounts,
+                items: pageItems
+            )
+            let resolvedOverallUseStatusSummary = resolveUseStatusSummary(
+                serverSummary: result.overallUseStatusSummary ?? result.useStatusSummary,
+                items: pageItems
             )
 
-            items = resolvedItems
-            total = resolvedTotal
-            page = resolvedPage
-            totalPages = resolvedTotalPages
+            items = pageItems
+            total = result.totalElements ?? 0
+            page = max(1, result.page ?? safeRequestedPage)
+            totalPages = max(1, result.totalPages ?? 1)
             summaryCounts = resolvedValiditySummary
             useStatusSummary = resolvedUseStatusSummary
-
-            let baselineCacheKey = currentBaselineCacheKey()
-            if let cached = baselineSummaryCache[baselineCacheKey] {
-                overallTotal = cached.total
-                overallSummaryCounts = cached.validitySummary
-                overallUseStatusSummary = cached.useStatusSummary
-            } else {
-                do {
-                    let baselineResult = try await APIClient.shared.devicesPaged(
-                        mode: mode,
-                        search: searchText,
-                        dept: deptFilter,
-                        validity: nil,
-                        useStatus: baselineUseStatusFilter,
-                        nextDateFrom: mode == .ledger ? nil : nextDateFrom,
-                        nextDateTo: mode == .ledger ? nil : nextDateTo,
-                        page: 1,
-                        size: 1
-                    )
-                    guard shouldApplyResult(for: token) else { return }
-
-                    let baselineItems = baselineResult.content ?? []
-                    let snapshot = BaselineSnapshot(
-                        total: baselineResult.totalElements ?? total,
-                        validitySummary: resolveValiditySummary(
-                            serverSummary: baselineResult.summaryCounts,
-                            items: baselineItems
-                        ),
-                        useStatusSummary: resolveUseStatusSummary(
-                            serverSummary: baselineResult.useStatusSummary,
-                            items: baselineItems
-                        )
-                    )
-                    baselineSummaryCache[baselineCacheKey] = snapshot
-                    overallTotal = snapshot.total
-                    overallSummaryCounts = snapshot.validitySummary
-                    overallUseStatusSummary = snapshot.useStatusSummary
-                } catch {
-                    guard shouldApplyResult(for: token) else { return }
-                    overallTotal = total
-                    overallSummaryCounts = resolvedValiditySummary
-                    overallUseStatusSummary = resolvedUseStatusSummary
-                }
-            }
+            overallTotal = result.overallTotalElements ?? total
+            overallSummaryCounts = resolvedOverallValiditySummary
+            overallUseStatusSummary = resolvedOverallUseStatusSummary
             hintMessage = "共 \(total) 条，当前第 \(page)/\(totalPages) 页"
         } catch {
             guard shouldApplyResult(for: token) else { return }
@@ -382,60 +301,11 @@ final class DeviceListViewModel: ObservableObject {
     private func useStatusFilterForRequest() -> String? {
         let normalized = normalizeStatusText(useStatusFilter)
         guard !normalized.isEmpty else { return nil }
-
-        if mode == .ledger, normalized == "其他" {
-            return nil
-        }
         return normalized
     }
 
-    private func shouldUseLedgerOtherLocalFallback() -> Bool {
-        mode == .ledger && normalizeStatusText(useStatusFilter) == "其他"
-    }
-
-    private func currentBaselineCacheKey() -> String {
-        [
-            cacheModeKey,
-            normalizeCacheText(searchText),
-            normalizeCacheText(deptFilter),
-            mode == .ledger ? "" : normalizeCacheText(nextDateFrom),
-            mode == .ledger ? "" : normalizeCacheText(nextDateTo),
-            normalizeCacheText(baselineUseStatusFilter)
-        ].joined(separator: "|")
-    }
-
-    private var cacheModeKey: String {
-        switch mode {
-        case .ledger:
-            return "ledger"
-        case .calibration:
-            return "calibration"
-        case .todo:
-            return "todo"
-        }
-    }
-
-    private func normalizeCacheText(_ rawValue: String?) -> String {
-        (rawValue ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-    }
-
     private func invalidateBaselineCache() {
-        baselineSummaryCache.removeAll(keepingCapacity: true)
-    }
-
-    private func paginateLocal(items: [DeviceDto], requestedPage: Int) -> (items: [DeviceDto], page: Int, totalPages: Int) {
-        guard !items.isEmpty else {
-            return ([], 1, 1)
-        }
-
-        let totalPages = max(1, Int(ceil(Double(items.count) / Double(pageSize))))
-        let safePage = min(max(1, requestedPage), totalPages)
-        let startIndex = (safePage - 1) * pageSize
-        let endIndex = min(items.count, startIndex + pageSize)
-        let pageItems = Array(items[startIndex..<endIndex])
-        return (pageItems, safePage, totalPages)
+        // Kept for call-site compatibility after removing client-side baseline fetch cache.
     }
 
     private func resolveValiditySummary(

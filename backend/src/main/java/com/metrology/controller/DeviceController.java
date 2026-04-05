@@ -65,6 +65,7 @@ public class DeviceController {
             @RequestParam(required = false) String validity,
             @RequestParam(required = false) String responsiblePerson,
             @RequestParam(required = false) String useStatus,
+            @RequestParam(required = false) String baselineUseStatus,
             @RequestParam(required = false) String nextDateFrom,
             @RequestParam(required = false) String nextDateTo,
             @RequestParam(defaultValue = "false") boolean todoOnly,
@@ -75,7 +76,7 @@ public class DeviceController {
         }
         return ResponseEntity.ok(deviceService.getDevicesPaged(
                 userDetails.getUsername(), search, assetNo, serialNo, dept, validity, responsiblePerson, useStatus,
-                nextDateFrom, nextDateTo, todoOnly, page, size));
+                baselineUseStatus, nextDateFrom, nextDateTo, todoOnly, page, size));
     }
 
     @PostMapping

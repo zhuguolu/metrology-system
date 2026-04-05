@@ -173,6 +173,9 @@ struct PageResult<T: Codable>: Codable {
     let size: Int?
     let summaryCounts: [String: Int64]?
     let useStatusSummary: [String: Int64]?
+    let overallTotalElements: Int64?
+    let overallSummaryCounts: [String: Int64]?
+    let overallUseStatusSummary: [String: Int64]?
 }
 
 struct AuditRecordDto: Codable, Identifiable {

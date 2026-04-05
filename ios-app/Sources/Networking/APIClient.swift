@@ -65,6 +65,7 @@ final class APIClient {
         dept: String?,
         validity: String?,
         useStatus: String?,
+        baselineUseStatus: String?,
         nextDateFrom: String?,
         nextDateTo: String?,
         page: Int,
@@ -94,6 +95,9 @@ final class APIClient {
         }
         if let resolvedUseStatus, !resolvedUseStatus.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             query.append(URLQueryItem(name: "useStatus", value: resolvedUseStatus))
+        }
+        if let baselineUseStatus, !baselineUseStatus.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            query.append(URLQueryItem(name: "baselineUseStatus", value: baselineUseStatus))
         }
 
         if let nextDateFrom, !nextDateFrom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -228,16 +232,38 @@ final class APIClient {
     }
 
     func downloadFile(id: Int64, suggestedName: String?) async throws -> URL {
+        let safeName = sanitizeFilename(suggestedName ?? "preview.bin")
+        let cache = try resolveDownloadCacheURLs(fileId: id, safeName: safeName)
         var request = try makeRequest(path: "api/files/\(id)/download", method: "GET", queryItems: [], bodyData: nil, authorized: true)
         request.timeoutInterval = 120
+        if FileManager.default.fileExists(atPath: cache.fileURL.path),
+           let cachedEtag = loadCachedEtag(from: cache.etagURL) {
+            request.setValue(cachedEtag, forHTTPHeaderField: "If-None-Match")
+        }
 
         let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.unknown
+        }
 
-        let safeName = sanitizeFilename(suggestedName ?? "preview.bin")
-        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "_" + safeName)
-        try data.write(to: fileURL, options: .atomic)
-        return fileURL
+        if http.statusCode == 304, FileManager.default.fileExists(atPath: cache.fileURL.path) {
+            return cache.fileURL
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            let message = extractErrorMessage(from: data)
+            throw APIError.httpStatus(http.statusCode, message)
+        }
+
+        try data.write(to: cache.fileURL, options: .atomic)
+        if let responseEtag = http.value(forHTTPHeaderField: "ETag"),
+           !responseEtag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            saveCachedEtag(responseEtag, to: cache.etagURL)
+        }
+        return cache.fileURL
     }
 
     func settings() async throws -> SettingsDto {
@@ -466,6 +492,40 @@ final class APIClient {
 
     private func sanitizeFilename(_ value: String) -> String {
         value.replacingOccurrences(of: "[\\/:*?\"<>|]", with: "_", options: .regularExpression)
+    }
+
+    private struct DownloadCacheURLs {
+        let fileURL: URL
+        let etagURL: URL
+    }
+
+    private func resolveDownloadCacheURLs(fileId: Int64, safeName: String) throws -> DownloadCacheURLs {
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let folder = cachesDir.appendingPathComponent("MetrologyDownloads", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: folder.path) {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+
+        let normalizedName = safeName.isEmpty ? "preview.bin" : safeName
+        let baseName = "file_\(fileId)_\(normalizedName)"
+        let fileURL = folder.appendingPathComponent(baseName)
+        let etagURL = folder.appendingPathComponent(baseName + ".etag")
+        return DownloadCacheURLs(fileURL: fileURL, etagURL: etagURL)
+    }
+
+    private func loadCachedEtag(from url: URL) -> String? {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return nil
+        }
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private func saveCachedEtag(_ etag: String, to url: URL) {
+        let value = etag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        try? value.write(to: url, atomically: true, encoding: .utf8)
     }
 
     private func makeMultipartBody(

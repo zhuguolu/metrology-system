@@ -4,9 +4,11 @@ import com.metrology.entity.UserFile;
 import com.metrology.service.PermissionService;
 import com.metrology.service.UserFileService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,9 +16,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.StringUtils;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -140,22 +142,67 @@ public class UserFileController {
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> download(
+    public ResponseEntity<?> download(
             @AuthenticationPrincipal UserDetails u,
-            @PathVariable Long id) throws IOException {
+            @PathVariable Long id,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) throws IOException {
         if (!permissionService.hasFileModuleAccess(u.getUsername())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         UserFile f = service.getFile(u.getUsername(), id);
         File target = service.resolveDownloadTarget(f);
         String encoded = URLEncoder.encode(f.getName(), StandardCharsets.UTF_8).replace("+", "%20");
-        InputStreamResource resource = new InputStreamResource(new FileInputStream(target));
+        MediaType mediaType = MediaType.parseMediaType(
+                f.getMimeType() != null ? f.getMimeType() : "application/octet-stream");
+        String etag = buildWeakEtag(target);
+
+        if (matchesIfNoneMatch(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
+                    .header(HttpHeaders.ETAG, etag)
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
+                    .build();
+        }
+
+        Resource resource = new FileSystemResource(target);
+        if (StringUtils.hasText(rangeHeader)) {
+            try {
+                var ranges = HttpRange.parseRanges(rangeHeader);
+                if (ranges.isEmpty()) {
+                    throw new IllegalArgumentException("Invalid range");
+                }
+                HttpRange range = ranges.get(0);
+                ResourceRegion region = range.toResourceRegion(resource);
+                long start = region.getPosition();
+                long end = Math.min(start + region.getCount() - 1, target.length() - 1);
+                return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
+                        .header(HttpHeaders.ETAG, etag)
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                        .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
+                        .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + target.length())
+                        .contentType(mediaType)
+                        .contentLength(region.getCount())
+                        .body(region);
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                        .header(HttpHeaders.CONTENT_RANGE, "bytes */" + target.length())
+                        .header(HttpHeaders.ETAG, etag)
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                        .build();
+            }
+        }
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
-                .contentType(MediaType.parseMediaType(
-                        f.getMimeType() != null ? f.getMimeType() : "application/octet-stream"))
+                .header(HttpHeaders.ETAG, etag)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
+                .contentType(mediaType)
                 .contentLength(target.length())
-                .body(resource);
+                .body(new FileSystemResource(target));
     }
 
     @DeleteMapping("/{id}")
@@ -272,5 +319,35 @@ public class UserFileController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
+    }
+
+    private String buildWeakEtag(File file) {
+        return "W/\"" + Long.toHexString(file.lastModified()) + "-" + Long.toHexString(file.length()) + "\"";
+    }
+
+    private boolean matchesIfNoneMatch(String ifNoneMatch, String etag) {
+        if (!StringUtils.hasText(ifNoneMatch) || !StringUtils.hasText(etag)) {
+            return false;
+        }
+        String normalizedEtag = normalizeEtag(etag);
+        for (String token : ifNoneMatch.split(",")) {
+            String candidate = token.trim();
+            if ("*".equals(candidate)) {
+                return true;
+            }
+            if (normalizedEtag.equals(normalizeEtag(candidate))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeEtag(String value) {
+        if (value == null) return "";
+        String normalized = value.trim();
+        if (normalized.startsWith("W/")) {
+            normalized = normalized.substring(2).trim();
+        }
+        return normalized;
     }
 }

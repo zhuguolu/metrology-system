@@ -111,7 +111,8 @@ public class DeviceService {
     /** 闂傚倸鍊搁崐鎼佸磹閹间礁纾归柟闂寸绾惧綊鏌熼梻瀵割槮缁惧墽鎳撻—鍐偓锝庝簼閹癸綁鏌ｉ鐐搭棞闁靛棙甯掗～婵嬫晲閸涱剙顥氬┑掳鍊楁慨鐑藉磻濞戔懞鍥偨缁嬫寧鐎悗骞垮劚椤︻垳绮堢€ｎ偁浜滈柟鍝勭Ф閸斿秵銇勯弬鎸庡枠婵﹦绮幏鍛村川婵犲懐顢呴梻浣侯焾缁ㄦ椽宕愬┑鍡欐殾闁汇垹鎲￠弲婵嬫煃瑜滈崜鐔煎春閵夛箑绶炲┑鐐灮閸犳牠寮婚妸褉鍋撻敐搴′簼婵犮垺鍨垮缁樻媴缁涘娈梺鍛婂灩閺咁偆妲愰悙鍝勫耿婵炴垶顭囬崝锕€顪冮妶鍡楃瑨妞わ富鍨堕悰顕€骞嬮敂鐣屽幈闁瑰吋鐣崝瀣箟妤ｅ啯鐓冮柕澶樺灣閻ｇ數鈧娲滈…鍫ｇ亙婵炶揪绲介幉锟犳偪閸岀偞鈷掗柛灞捐壘閳ь剚鎮傞幃褎绻濋崟顓犵厯闂佺鎻拋锝囩礊閺嶎偀鍋撻崗澶婁壕闂侀€炲苯澧版俊鍙夊姍楠炴鈧稒锚椤庢捇姊洪崷顓犲笡閻㈩垰锕ョ粩鐔煎即閵忊檧鎷绘繛杈剧秬濞咃綁濡存繝鍥ㄧ厱闁规儳顕粻妯荤節閳ь剚鎷呴搹鍦紳婵炶揪绲块悺鏃堝吹濞嗘劒绻嗘い鎰剁悼缁犵偟鈧鍠栭…宄邦嚕閹绢喖顫呴柣妯款嚙閺佽绻濋悽闈涒枅婵炰匠鍏犳椽濡堕崨顏呯€洪梺鎸庣箓閹峰銆掓繝姘厪闁割偅绻冮崳鐣岀磼閻橀潧浠遍柡灞剧⊕閹棃鏁愰崱妯荤槗闁诲孩顔栭崰娑㈩敋瑜旈、妯荤附缁嬪潡鍞跺銈嗗姧缂嶅棝鍩€椤掆偓濞差厼顫忕紒妯诲闁告稑锕ら弳鍫ユ⒑閸︻収鐒炬い顓犲厴楠炲啴鎮滈挊澶屽幐婵炶揪绲块崕銈呪枔閹屾富闁靛牆妫涙晶閬嶆煕鐎ｎ偆銆掔紒顔垮吹缁辨帒螣闂€鎰泿闂備礁鎼崐鎼佹倶濠靛绠栭柟杈鹃檮閻撶喖骞栭幖顓炴灈濠⒀勬尦閺岀喖顢欑粵瀣杹闂佺粯渚楅崳锝呯暦瑜版帩鏁婇柣鎾冲瘨濞兼稑鈹戦敍鍕杭闁稿ě鍛亾闂堟稓鐒哥€规洖缍婂畷濂稿即閻愯埖鎲伴梺璇插嚱缂嶅棝宕伴弽顓熷€峰┑鐘插暔娴滄粓鏌熼崫鍕ラ柛蹇撶焸閺屾稑鈻庤箛鏃戞闂佸疇顫夐崹鍧楀箖閳哄啰纾兼俊顖氼煼閺侇亝绻濈喊妯活潑闁稿鎳愰幑銏ゅ醇閵夛絺鍋撴笟鈧獮妯侯熆閸曨剚顥堢€规洏鍔戦、娆撳箚瑜嶇粻浼存⒒閸屾瑧顦﹂柟璇х磿閸掓帡宕奸姀銏㈢劶婵炴挻鍩冮崑鎾绘煟濞戝崬鏋涢摶鏍煕閹板吀绨介柨娑欑矌缁辨捇宕掑▎鎴濆濡炪値鍘煎ú銊у垝婵犳碍鍊锋繛鏉戭儐閺傗偓婵＄偑鍊栧濠氬箠閹惧顩插Δ锝呭暞閳锋帒霉閿濆洦鍤€妞ゆ洘绮庣槐鎺旀嫚閹绘巻鍋撳宀€浜辨繝鐢靛仦閸垶宕圭涵鍛闂傚倷绀佺紞濠囧磻婵犲洤绀傛慨妞诲亾鐎殿喓鍔嶇粋鎺斺偓锝庡亞閸樹粙姊鸿ぐ鎺戜喊闁搞劋鍗抽幆鍐倻濡偐鐦堥梺閫炲苯澧存鐐达耿椤㈡瑩鎮剧仦钘夌疄婵犵數濮烽弫鍛婃叏閹绢喖鐤柡澶嬶紩濞差亜绾ч柟瀛樻⒐閺傗偓闂備焦瀵х粙鎴犫偓姘煎弮瀵娊顢楁笟鍥啍闂佺粯鍔曞鍫曞窗濡眹浜滈柕蹇ョ磿閹冲洭鏌熼鈧弨閬嶆晬閹邦厽濯撮柛鎾冲级椤ワ繝姊婚崒姘偓鎼佸磹閹间礁纾归柟闂寸劍閸嬪鈹戦悩鎻掝伀闁活厽鐟╅弻鐔兼倻濮楀棙鐣堕梺姹囧€ら崳锝夊蓟閿濆绠涙い鏃傚帶婵℃椽姊虹粙鍖″伐闁诲繑宀搁獮鍫ュΩ閵夘喗寤洪梺绯曞墲椤ㄥ懘鍩涢幒妤佲拺缂備焦蓱鐏忣參鏌曢崼鐔稿€愮€殿喖顭烽弫宥夊礋椤忓懎濯伴梺鑽ゅТ濞诧箒銇愰崘顕嗙稏闁搞儺鍓氶崐鍨箾閸繄浠㈡繛鍛耿閺屾盯鏁愯箛鏇炲煂闂佷紮绲块崗妯虹暦婵傜鍗抽柣鎰М閺呮繈骞夐崫銉㈠亾閿濆骸鏋涢柣鎺戠仛閵囧嫰骞掗崱妞惧闂備焦瀵уú锔界濠婂牞缍栭煫鍥ㄦ媼濞差亶鏁傞柛娑卞幗椤撳ジ姊绘笟鈧褔鎮ч崱娑樼疇闊洦鎸冮幒妤€绠涢柣妤€鐗冮幏娲⒑閸涘﹦绠撻悗姘煎弮瀹曟娊鎸婃径鍡樻杸闂佺粯鍔忛弲娑欑妤ｅ啯鐓熼幖娣焺閸熷繘鏌涢悩宕囧⒌闁炽儻绠撻幃婊堟寠婢跺鈧剟姊鸿ぐ鎺戜喊闁告鍋愬▎銏ゆ倷濞村鏂€闂佺粯蓱瑜板啴顢楅姀銏㈢＝鐎广儱鎳庨埀顒€鐏濋～蹇曠磼濡顎撶紓浣割儐鐎笛冃掗幇鐗堚拺闁革富鍘搁幏锟犳煕鐎ｎ亷宸ラ柣锝囧厴椤㈡盯鎮滈崱妯绘珖闂備線娼ч悧鍡椢涘▎蹇婃灁濞寸厧鐡ㄩ埛鎴︽⒒閸喍鑵规繛鎴欏灩瀹告繃銇勯弽銉モ偓妤呮⒒?*/
     public PageResult<DeviceDto> getDevicesPaged(String username, String search, String assetNo, String serialNo,
                                                   String dept, String validity, String responsiblePerson,
-                                                  String useStatus, String nextDateFrom, String nextDateTo,
+                                                  String useStatus, String baselineUseStatus,
+                                                  String nextDateFrom, String nextDateTo,
                                                   boolean todoOnly, int page, int size) {
         UserSettings settings = getSettings(username);
         boolean canSeePurchasePrice = canViewPurchasePrice(username);
@@ -142,17 +143,28 @@ public class DeviceService {
                 ? Sort.by(Sort.Order.desc("daysPassed"), Sort.Order.asc("nextDate"), Sort.Order.asc("id"))
                 : Sort.by(Sort.Order.asc("useStatus"), Sort.Order.asc("nextDate"), Sort.Order.asc("id"));
 
+        String normalizedSearch = normalizeParam(search);
+        String normalizedAssetNo = normalizeParam(assetNo);
+        String normalizedSerialNo = normalizeParam(serialNo);
+        String normalizedValidity = normalizeParam(validity);
+        String normalizedResponsiblePerson = normalizeParam(responsiblePerson);
+        String normalizedUseStatus = normalizeParam(useStatus);
+        String normalizedBaselineUseStatus = normalizeParam(baselineUseStatus);
+        LocalDate parsedNextDateFrom = parseDate(nextDateFrom);
+        LocalDate parsedNextDateTo = parseDate(nextDateTo);
+        boolean deptsEmpty = !hasDeptConstraint;
+
         Page<Device> result = deviceRepository.findWithFiltersPaged(
-                normalizeParam(search),
-                normalizeParam(assetNo),
-                normalizeParam(serialNo),
+                normalizedSearch,
+                normalizedAssetNo,
+                normalizedSerialNo,
                 deptScopes,
-                !hasDeptConstraint,
-                normalizeParam(validity),
-                normalizeParam(responsiblePerson),
-                normalizeParam(useStatus),
-                parseDate(nextDateFrom),
-                parseDate(nextDateTo),
+                deptsEmpty,
+                normalizedValidity,
+                normalizedResponsiblePerson,
+                normalizedUseStatus,
+                parsedNextDateFrom,
+                parsedNextDateTo,
                 todoOnly,
                 PageRequest.of(safePage - 1, safeSize, sort)
         );
@@ -162,30 +174,72 @@ public class DeviceService {
                 .collect(Collectors.toList());
 
         Map<String, Long> summaryCounts = buildValiditySummary(
-                normalizeParam(search),
-                normalizeParam(assetNo),
-                normalizeParam(serialNo),
+                normalizedSearch,
+                normalizedAssetNo,
+                normalizedSerialNo,
                 deptScopes,
-                !hasDeptConstraint,
-                normalizeParam(validity),
-                normalizeParam(responsiblePerson),
-                normalizeParam(useStatus),
-                parseDate(nextDateFrom),
-                parseDate(nextDateTo),
+                deptsEmpty,
+                normalizedValidity,
+                normalizedResponsiblePerson,
+                normalizedUseStatus,
+                parsedNextDateFrom,
+                parsedNextDateTo,
                 todoOnly
         );
 
         Map<String, Long> useStatusSummary = buildUseStatusSummary(
-                normalizeParam(search),
-                normalizeParam(assetNo),
-                normalizeParam(serialNo),
+                normalizedSearch,
+                normalizedAssetNo,
+                normalizedSerialNo,
                 deptScopes,
-                !hasDeptConstraint,
-                normalizeParam(validity),
-                normalizeParam(responsiblePerson),
-                normalizeParam(useStatus),
-                parseDate(nextDateFrom),
-                parseDate(nextDateTo),
+                deptsEmpty,
+                normalizedValidity,
+                normalizedResponsiblePerson,
+                normalizedUseStatus,
+                parsedNextDateFrom,
+                parsedNextDateTo,
+                todoOnly
+        );
+
+        Map<String, Long> overallSummaryCounts = buildValiditySummary(
+                normalizedSearch,
+                normalizedAssetNo,
+                normalizedSerialNo,
+                deptScopes,
+                deptsEmpty,
+                null,
+                normalizedResponsiblePerson,
+                normalizedBaselineUseStatus,
+                parsedNextDateFrom,
+                parsedNextDateTo,
+                todoOnly
+        );
+
+        Map<String, Long> overallUseStatusSummary = buildUseStatusSummary(
+                normalizedSearch,
+                normalizedAssetNo,
+                normalizedSerialNo,
+                deptScopes,
+                deptsEmpty,
+                null,
+                normalizedResponsiblePerson,
+                normalizedBaselineUseStatus,
+                parsedNextDateFrom,
+                parsedNextDateTo,
+                todoOnly
+        );
+
+        long overallTotalElements = deviceRepository.countWithFilters(
+                normalizedSearch,
+                normalizedAssetNo,
+                normalizedSerialNo,
+                deptScopes,
+                deptsEmpty,
+                null,
+                normalizedResponsiblePerson,
+                normalizedBaselineUseStatus,
+                parsedNextDateFrom,
+                parsedNextDateTo,
                 todoOnly
         );
 
@@ -196,7 +250,10 @@ public class DeviceService {
                 safePage,
                 safeSize,
                 summaryCounts,
-                useStatusSummary
+                useStatusSummary,
+                overallTotalElements,
+                overallSummaryCounts,
+                overallUseStatusSummary
         );
     }
 
