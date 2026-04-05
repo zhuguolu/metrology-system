@@ -19,6 +19,7 @@ final class FilesViewModel: ObservableObject {
     @Published var currentFolderId: Int64?
     @Published var currentPath: String = "/"
     @Published var previewItem: PreviewItem?
+    @Published var previewLoadingFileId: Int64?
     @Published var canWrite: Bool = true
     @Published var readOnlyFolder: Bool = false
 
@@ -118,6 +119,7 @@ final class FilesViewModel: ObservableObject {
         }
 
         guard let id = item.id else {
+            previewLoadingFileId = nil
             errorMessage = "文件ID无效"
             return
         }
@@ -126,11 +128,13 @@ final class FilesViewModel: ObservableObject {
         if let cachedURL = cachedPreviewURL(for: cacheKey) {
             cancelActivePreviewDownload(resetLoading: false)
             currentPreviewURL = cachedURL
+            previewLoadingFileId = nil
             previewItem = PreviewItem(url: cachedURL, title: item.displayName)
             return
         }
 
         cancelActivePreviewDownload(resetLoading: false)
+        previewLoadingFileId = id
         let token = beginPreviewLoad()
         let fileName = item.name
         let title = item.displayName
@@ -140,6 +144,7 @@ final class FilesViewModel: ObservableObject {
                 if self.shouldApplyPreviewResult(for: token) {
                     self.isLoading = false
                     self.activePreviewTask = nil
+                    self.previewLoadingFileId = nil
                 }
             }
 
@@ -297,6 +302,7 @@ final class FilesViewModel: ObservableObject {
         currentPreviewToken += 1
         activePreviewTask?.cancel()
         activePreviewTask = nil
+        previewLoadingFileId = nil
         if resetLoading {
             isLoading = false
         }

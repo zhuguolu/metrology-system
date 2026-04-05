@@ -84,7 +84,7 @@ struct FilesView: View {
         }
         .overlay {
             if viewModel.isLoading {
-                ProgressView(viewModel.isUploading ? "正在上传..." : "处理中...")
+                ProgressView(loadingOverlayTitle)
                     .padding(12)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -239,29 +239,39 @@ struct FilesView: View {
     }
 
     private func fileRow(item: UserFileItemDto) -> some View {
+        let iconStyle = fileIconStyle(for: item)
         HStack(spacing: 12) {
-            Image(systemName: item.isFolder ? "folder.fill" : "doc.fill")
+            Image(systemName: iconStyle.symbolName)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(item.isFolder ? MetrologyPalette.navActive : MetrologyPalette.textMuted)
+                .foregroundStyle(iconStyle.tint)
                 .frame(width: 32, height: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(MetrologyPalette.surface)
                 )
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(item.displayName)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(MetrologyPalette.textPrimary)
-                    .lineLimit(1)
-                Text(item.createdAt ?? "")
-                    .font(.caption2)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(fileMetaText(for: item))
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(MetrologyPalette.textSecondary)
                     .lineLimit(1)
             }
-            Spacer()
-            Image(systemName: item.isFolder ? "chevron.right" : "arrow.down.circle")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(MetrologyPalette.textMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !item.isFolder, viewModel.previewLoadingFileId == item.id {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(MetrologyPalette.navActive)
+            } else {
+                Image(systemName: item.isFolder ? "chevron.right" : "arrow.down.circle")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(MetrologyPalette.textMuted)
+            }
         }
         .padding(12)
         .metrologyCard()
@@ -299,6 +309,134 @@ struct FilesView: View {
         return viewModel.hint
     }
 
+    private var loadingOverlayTitle: String {
+        if viewModel.isUploading {
+            return "正在上传..."
+        }
+        if viewModel.previewLoadingFileId != nil {
+            return "正在加载预览..."
+        }
+        return "处理中..."
+    }
+
+    private func fileMetaText(for item: UserFileItemDto) -> String {
+        let dateText = displayDateOnly(item.createdAt)
+        let sizeText = item.isFolder ? "文件夹" : displayFileSize(item.fileSize)
+        if dateText == "--" {
+            return sizeText
+        }
+        return "\(dateText) · \(sizeText)"
+    }
+
+    private func displayDateOnly(_ raw: String?) -> String {
+        let text = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !text.isEmpty else { return "--" }
+
+        if text.count >= 10 {
+            let prefix = String(text.prefix(10))
+            if prefix.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
+                return prefix
+            }
+        }
+
+        if let date = Self.isoDateFormatterWithFractionalSeconds.date(from: text)
+            ?? Self.isoDateFormatter.date(from: text) {
+            return Self.dayFormatter.string(from: date)
+        }
+
+        return text
+    }
+
+    private func displayFileSize(_ bytes: Int64?) -> String {
+        guard let bytes, bytes >= 0 else { return "--" }
+        return Self.fileSizeFormatter.string(fromByteCount: bytes)
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let isoDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let isoDateFormatterWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let fileSizeFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        formatter.includesActualByteCount = false
+        return formatter
+    }()
+
+    private func fileIconStyle(for item: UserFileItemDto) -> FileIconStyle {
+        if item.isFolder {
+            return FileIconStyle(symbolName: "folder.fill", tint: MetrologyPalette.navActive)
+        }
+
+        let ext = fileExtension(of: item)
+        let mime = (item.mimeType ?? "").lowercased()
+
+        if ["pdf"].contains(ext) {
+            return FileIconStyle(symbolName: "doc.richtext.fill", tint: MetrologyPalette.statusExpired)
+        }
+        if ["doc", "docx", "rtf", "pages"].contains(ext) {
+            return FileIconStyle(symbolName: "doc.text.fill", tint: MetrologyPalette.navActive)
+        }
+        if ["xls", "xlsx", "csv", "numbers"].contains(ext) {
+            return FileIconStyle(symbolName: "tablecells.fill", tint: MetrologyPalette.statusValid)
+        }
+        if ["ppt", "pptx", "key"].contains(ext) {
+            return FileIconStyle(symbolName: "rectangle.on.rectangle.angled.fill", tint: MetrologyPalette.statusWarning)
+        }
+        if ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "tif", "tiff", "svg"].contains(ext)
+            || mime.hasPrefix("image/") {
+            return FileIconStyle(symbolName: "photo.fill", tint: MetrologyPalette.statusValid)
+        }
+        if ["mp4", "mov", "m4v", "avi", "wmv", "mkv", "flv", "webm"].contains(ext)
+            || mime.hasPrefix("video/") {
+            return FileIconStyle(symbolName: "film.fill", tint: MetrologyPalette.statusWarning)
+        }
+        if ["mp3", "wav", "m4a", "aac", "flac", "ogg", "wma"].contains(ext)
+            || mime.hasPrefix("audio/") {
+            return FileIconStyle(symbolName: "music.note", tint: MetrologyPalette.navInactive)
+        }
+        if ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"].contains(ext) {
+            return FileIconStyle(symbolName: "archivebox.fill", tint: MetrologyPalette.textSecondary)
+        }
+        if ["json", "xml", "yaml", "yml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "java", "kt", "swift", "py", "go", "c", "cc", "cpp", "h", "hpp", "sql", "sh", "md"].contains(ext)
+            || mime.contains("json")
+            || mime.contains("xml")
+            || mime.contains("javascript")
+            || mime.contains("text/") {
+            return FileIconStyle(symbolName: "chevron.left.forwardslash.chevron.right", tint: MetrologyPalette.navInactive)
+        }
+        if ["apk", "ipa", "exe", "msi", "dmg", "pkg", "deb", "rpm"].contains(ext) {
+            return FileIconStyle(symbolName: "shippingbox.fill", tint: MetrologyPalette.navActive)
+        }
+
+        return FileIconStyle(symbolName: "doc.fill", tint: MetrologyPalette.textMuted)
+    }
+
+    private func fileExtension(of item: UserFileItemDto) -> String {
+        let rawName = (item.name ?? item.displayName).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let dotIndex = rawName.lastIndex(of: "."), dotIndex < rawName.index(before: rawName.endIndex) else {
+            return ""
+        }
+        let suffix = rawName[rawName.index(after: dotIndex)...]
+        return suffix.lowercased()
+    }
+
     private func baseFileRowID(_ item: UserFileItemDto) -> String {
         if let id = item.id {
             return "id:\(id)"
@@ -310,4 +448,9 @@ struct FilesView: View {
 private struct FileListRow: Identifiable {
     let id: String
     let item: UserFileItemDto
+}
+
+private struct FileIconStyle {
+    let symbolName: String
+    let tint: Color
 }
