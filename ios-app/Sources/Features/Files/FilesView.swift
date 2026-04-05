@@ -69,8 +69,8 @@ struct FilesView: View {
                 searchText = ""
                 selectedItemIDs.removeAll()
             }
-            .onChange(of: viewModel.items) { _, items in
-                let validIDs = Set(items.compactMap { $0.id })
+            .onChange(of: viewModel.items.map(\.id)) { _, ids in
+                let validIDs = Set(ids.compactMap { $0 })
                 selectedItemIDs = selectedItemIDs.intersection(validIDs)
             }
             .fileImporter(
