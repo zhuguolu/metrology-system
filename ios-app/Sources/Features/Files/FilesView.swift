@@ -73,6 +73,11 @@ struct FilesView: View {
                 let validIDs = Set(ids.compactMap { $0 })
                 selectedItemIDs = selectedItemIDs.intersection(validIDs)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .metrologyExternalFilesImported)) { _ in
+                Task {
+                    await viewModel.goRoot()
+                }
+            }
             .fileImporter(
                 isPresented: $fileImporterOpen,
                 allowedContentTypes: [.item],

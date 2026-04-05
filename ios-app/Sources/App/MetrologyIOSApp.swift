@@ -28,6 +28,9 @@ struct MetrologyIOSApp: App {
                 try? await Task.sleep(nanoseconds: 280_000_000)
                 showsStartup = false
             }
+            .onOpenURL { url in
+                appState.handleIncomingFileURL(url)
+            }
         }
     }
 }

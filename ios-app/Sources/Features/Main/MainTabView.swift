@@ -112,6 +112,7 @@ private enum MoreModuleEntry: String, Identifiable, Hashable {
     }
 }
 struct MainTabView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var selectedTab: MainTab = .ledger
     @State private var loadedTabs: Set<MainTab> = [.ledger]
     @State private var dashboardSheetOpen = false
@@ -150,6 +151,15 @@ struct MainTabView: View {
                         )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                if let notice = appState.incomingImportNotice {
+                    MetrologyNoticeDialog(
+                        title: notice.title,
+                        message: notice.message
+                    ) {
+                        appState.clearIncomingImportNotice()
+                    }
+                }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
@@ -176,6 +186,17 @@ struct MainTabView: View {
                 NavigationStack {
                     DashboardView()
                 }
+            }
+            .sheet(item: incomingImportPickerBinding) { state in
+                IncomingImportTargetPickerSheet(
+                    state: state,
+                    onSelect: { target in
+                        appState.selectIncomingImportTarget(target)
+                    },
+                    onCancel: {
+                        appState.deferIncomingImportSelection()
+                    }
+                )
             }
         }
     }
@@ -225,6 +246,13 @@ struct MainTabView: View {
 
     private var shouldShowTopBar: Bool {
         true
+    }
+
+    private var incomingImportPickerBinding: Binding<IncomingImportPickerState?> {
+        Binding(
+            get: { appState.incomingImportPicker },
+            set: { appState.incomingImportPicker = $0 }
+        )
     }
 
     private var currentTopBarTitle: String {
@@ -308,6 +336,60 @@ struct MainTabView: View {
                 .stroke(Color(hex: 0xD3E2F6), lineWidth: 1)
         )
         .shadow(color: Color(hex: 0x6485AA, alpha: 0.15), radius: 4, x: 0, y: 2)
+    }
+}
+
+private struct IncomingImportTargetPickerSheet: View {
+    let state: IncomingImportPickerState
+    let onSelect: (IncomingImportTarget) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List(state.targets) { target in
+                Button {
+                    onSelect(target)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(target.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                        Spacer(minLength: 0)
+                        if target.folderId == nil {
+                            Text("根目录")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(MetrologyPalette.navActive)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(MetrologyPalette.surface)
+            }
+            .listStyle(.plain)
+            .background(MetrologyPalette.background.ignoresSafeArea())
+            .navigationTitle("选择导入目录")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("稍后") {
+                        onCancel()
+                    }
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack {
+                    Text("已接收 \(state.pendingCount) 个文件，请选择上传目录")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(MetrologyPalette.background)
+            }
+        }
+        .preferredColorScheme(.light)
     }
 }
 
