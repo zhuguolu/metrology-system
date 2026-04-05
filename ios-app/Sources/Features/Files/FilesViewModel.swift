@@ -27,10 +27,18 @@ final class FilesViewModel: ObservableObject {
         let name: String
     }
 
+    private struct FolderSnapshot {
+        let items: [UserFileItemDto]
+        let access: FileAccessDto?
+        let cachedAt: Date
+    }
+
     private let rootFolder = FolderStackEntry(id: nil, name: "")
     private var folderStack: [FolderStackEntry] = [FolderStackEntry(id: nil, name: "")]
     private var currentLoadToken: UInt64 = 0
     private var activeLoadTask: Task<Void, Never>?
+    private var folderCache: [String: FolderSnapshot] = [:]
+    private let folderCacheTTL: TimeInterval = 20
     private var currentPreviewURL: URL?
     private var previewCache: [String: URL] = [:]
     private var previewCacheOrder: [String] = []
@@ -54,6 +62,14 @@ final class FilesViewModel: ObservableObject {
             }
         }
 
+        let folderKey = folderCacheKey(folderId: currentFolderId)
+        if let cached = folderCache[folderKey],
+           Date().timeIntervalSince(cached.cachedAt) <= folderCacheTTL {
+            items = cached.items
+            applyAccess(cached.access)
+            hint = "共 \(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+        }
+
         do {
             let result = try await APIClient.shared.files(parentId: currentFolderId)
             guard shouldApplyResult(for: token) else { return }
@@ -61,6 +77,11 @@ final class FilesViewModel: ObservableObject {
             items = result.items ?? []
             applyAccess(result.access)
             hint = "共 \(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+            folderCache[folderKey] = FolderSnapshot(
+                items: items,
+                access: result.access,
+                cachedAt: Date()
+            )
         } catch {
             guard shouldApplyResult(for: token) else { return }
             if error is CancellationError {
@@ -136,6 +157,7 @@ final class FilesViewModel: ObservableObject {
         do {
             _ = try await APIClient.shared.createFolder(name: trimmed, parentId: currentFolderId)
             scanSyncMessage = "文件夹创建成功"
+            invalidateFolderCache()
             await load()
             return true
         } catch {
@@ -188,6 +210,7 @@ final class FilesViewModel: ObservableObject {
         }
 
         scanSyncMessage = "上传完成：成功 \(successCount)，失败 \(failCount)"
+        invalidateFolderCache()
         await load()
     }
 
@@ -204,6 +227,7 @@ final class FilesViewModel: ObservableObject {
         do {
             let result = try await APIClient.shared.scanSync(parentId: currentFolderId)
             scanSyncMessage = scanSyncSummary(from: result)
+            invalidateFolderCache()
             await load()
         } catch {
             if error is CancellationError {
@@ -298,6 +322,14 @@ final class FilesViewModel: ObservableObject {
     private func normalizeFolderName(_ rawName: String) -> String {
         let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "-" : trimmed
+    }
+
+    private func folderCacheKey(folderId: Int64?) -> String {
+        folderId.map(String.init) ?? "root"
+    }
+
+    private func invalidateFolderCache() {
+        folderCache.removeAll(keepingCapacity: true)
     }
 
     private func previewCacheKey(fileId: Int64, item: UserFileItemDto) -> String {

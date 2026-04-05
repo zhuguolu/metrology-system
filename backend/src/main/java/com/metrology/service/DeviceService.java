@@ -173,7 +173,7 @@ public class DeviceService {
                 .map(device -> toDto(device, settings, canSeePurchasePrice))
                 .collect(Collectors.toList());
 
-        Map<String, Long> summaryCounts = buildValiditySummary(
+        DeviceRepository.DeviceSummaryProjection filteredSummary = deviceRepository.summarizeWithFilters(
                 normalizedSearch,
                 normalizedAssetNo,
                 normalizedSerialNo,
@@ -186,22 +186,10 @@ public class DeviceService {
                 parsedNextDateTo,
                 todoOnly
         );
+        Map<String, Long> summaryCounts = validitySummaryFromProjection(filteredSummary);
+        Map<String, Long> useStatusSummary = useStatusSummaryFromProjection(filteredSummary);
 
-        Map<String, Long> useStatusSummary = buildUseStatusSummary(
-                normalizedSearch,
-                normalizedAssetNo,
-                normalizedSerialNo,
-                deptScopes,
-                deptsEmpty,
-                normalizedValidity,
-                normalizedResponsiblePerson,
-                normalizedUseStatus,
-                parsedNextDateFrom,
-                parsedNextDateTo,
-                todoOnly
-        );
-
-        Map<String, Long> overallSummaryCounts = buildValiditySummary(
+        DeviceRepository.DeviceSummaryProjection overallSummary = deviceRepository.summarizeWithFilters(
                 normalizedSearch,
                 normalizedAssetNo,
                 normalizedSerialNo,
@@ -214,34 +202,9 @@ public class DeviceService {
                 parsedNextDateTo,
                 todoOnly
         );
-
-        Map<String, Long> overallUseStatusSummary = buildUseStatusSummary(
-                normalizedSearch,
-                normalizedAssetNo,
-                normalizedSerialNo,
-                deptScopes,
-                deptsEmpty,
-                null,
-                normalizedResponsiblePerson,
-                normalizedBaselineUseStatus,
-                parsedNextDateFrom,
-                parsedNextDateTo,
-                todoOnly
-        );
-
-        long overallTotalElements = deviceRepository.countWithFilters(
-                normalizedSearch,
-                normalizedAssetNo,
-                normalizedSerialNo,
-                deptScopes,
-                deptsEmpty,
-                null,
-                normalizedResponsiblePerson,
-                normalizedBaselineUseStatus,
-                parsedNextDateFrom,
-                parsedNextDateTo,
-                todoOnly
-        );
+        Map<String, Long> overallSummaryCounts = validitySummaryFromProjection(overallSummary);
+        Map<String, Long> overallUseStatusSummary = useStatusSummaryFromProjection(overallSummary);
+        long overallTotalElements = safeCount(overallSummary == null ? null : overallSummary.getTotalCount());
 
         return new PageResult<>(
                 content,
@@ -909,72 +872,25 @@ public class DeviceService {
         return normalized.isEmpty() ? null : normalized;
     }
 
-    private Map<String, Long> buildValiditySummary(String search,
-                                                   String assetNo,
-                                                   String serialNo,
-                                                   List<String> deptScopes,
-                                                   boolean deptsEmpty,
-                                                   String validity,
-                                                   String responsiblePerson,
-                                                   String useStatus,
-                                                   LocalDate nextDateFrom,
-                                                   LocalDate nextDateTo,
-                                                   boolean todoOnly) {
-        Map<String, Long> summary = new LinkedHashMap<>();
-        for (Object[] row : deviceRepository.countValiditySummary(
-                search,
-                assetNo,
-                serialNo,
-                deptScopes,
-                deptsEmpty,
-                validity,
-                responsiblePerson,
-                useStatus,
-                nextDateFrom,
-                nextDateTo,
-                todoOnly
-        )) {
-            if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
-                continue;
-            }
-            summary.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
-        }
-        return summary;
+    private Map<String, Long> validitySummaryFromProjection(DeviceRepository.DeviceSummaryProjection summary) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        result.put("\u6709\u6548", safeCount(summary == null ? null : summary.getValidCount()));
+        result.put("\u5373\u5c06\u8fc7\u671f", safeCount(summary == null ? null : summary.getWarningCount()));
+        result.put("\u5931\u6548", safeCount(summary == null ? null : summary.getExpiredCount()));
+        return result;
     }
 
-    private Map<String, Long> buildUseStatusSummary(String search,
-                                                    String assetNo,
-                                                    String serialNo,
-                                                    List<String> deptScopes,
-                                                    boolean deptsEmpty,
-                                                    String validity,
-                                                    String responsiblePerson,
-                                                    String useStatus,
-                                                    LocalDate nextDateFrom,
-                                                    LocalDate nextDateTo,
-                                                    boolean todoOnly) {
-        Map<String, Long> summary = new LinkedHashMap<>();
-        for (Object[] row : deviceRepository.countUseStatusSummary(
-                search,
-                assetNo,
-                serialNo,
-                deptScopes,
-                deptsEmpty,
-                validity,
-                responsiblePerson,
-                useStatus,
-                nextDateFrom,
-                nextDateTo,
-                todoOnly
-        )) {
-            if (row == null || row.length < 2 || row[1] == null) {
-                continue;
-            }
-            String key = row[0] == null ? "其他" : String.valueOf(row[0]).trim();
-            if (key.isEmpty()) key = "其他";
-            summary.put(key, ((Number) row[1]).longValue());
-        }
-        return summary;
+    private Map<String, Long> useStatusSummaryFromProjection(DeviceRepository.DeviceSummaryProjection summary) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        result.put("\u6b63\u5e38", safeCount(summary == null ? null : summary.getNormalCount()));
+        result.put("\u6545\u969c", safeCount(summary == null ? null : summary.getFaultCount()));
+        result.put("\u62a5\u5e9f", safeCount(summary == null ? null : summary.getScrapCount()));
+        result.put("\u5176\u4ed6", safeCount(summary == null ? null : summary.getOtherCount()));
+        return result;
+    }
+
+    private long safeCount(Long value) {
+        return value == null ? 0L : Math.max(0L, value);
     }
 
     private LocalDate parseDate(String value) {

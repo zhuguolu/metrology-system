@@ -4,6 +4,12 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:metrology}
     password: ${SPRING_DATASOURCE_PASSWORD:metrology123}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${DB_CONN_TIMEOUT_MS:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:300000}
+      max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
   jpa:
     hibernate:
       ddl-auto: update
@@ -19,6 +25,12 @@ spring:
 
 server:
   port: 8080
+  compression:
+    enabled: true
+    min-response-size: 2KB
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,application/javascript
+  http2:
+    enabled: true
 
 jwt:
   secret: ${JWT_SECRET:metrology-jwt-secret-key-at-least-32-chars-2024}

@@ -19,7 +19,10 @@ import java.time.LocalDateTime;
         @Index(name = "idx_devices_next_date", columnList = "next_date"),
         @Index(name = "idx_devices_cal_date", columnList = "cal_date"),
         @Index(name = "idx_devices_todo_lookup", columnList = "use_status, validity, next_date"),
-        @Index(name = "idx_devices_dept_next_date", columnList = "dept, next_date")
+        @Index(name = "idx_devices_dept_next_date", columnList = "dept, next_date"),
+        @Index(name = "idx_devices_sort_default", columnList = "use_status, next_date, id"),
+        @Index(name = "idx_devices_sort_todo", columnList = "days_passed, next_date, id"),
+        @Index(name = "idx_devices_filter_scope", columnList = "dept, responsible_person, use_status, validity, next_date")
 })
 @Data
 @NoArgsConstructor

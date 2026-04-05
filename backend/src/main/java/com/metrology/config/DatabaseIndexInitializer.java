@@ -29,7 +29,10 @@ public class DatabaseIndexInitializer implements ApplicationRunner {
                 new IndexDefinition("devices", "idx_devices_next_date", "next_date"),
                 new IndexDefinition("devices", "idx_devices_cal_date", "cal_date"),
                 new IndexDefinition("devices", "idx_devices_todo_lookup", "use_status, validity, next_date"),
-                new IndexDefinition("devices", "idx_devices_dept_next_date", "dept, next_date")
+                new IndexDefinition("devices", "idx_devices_dept_next_date", "dept, next_date"),
+                new IndexDefinition("devices", "idx_devices_sort_default", "use_status, next_date, id"),
+                new IndexDefinition("devices", "idx_devices_sort_todo", "days_passed, next_date, id"),
+                new IndexDefinition("devices", "idx_devices_filter_scope", "dept, responsible_person, use_status, validity, next_date")
         );
 
         for (IndexDefinition definition : indexes) {
