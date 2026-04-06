@@ -95,7 +95,12 @@ jobs:
           tail -n 200 build_unsigned_ipa.log || true
           if [ "$EXIT_CODE" -ne 0 ]; then
             LAST_LINES="$(tail -n 20 build_unsigned_ipa.log | tr '\n' ' ' | sed 's/[[:space:]]\\+/ /g')"
-            echo "::error::Unsigned IPA build failed (exit=$EXIT_CODE): $LAST_LINES"
+            ERROR_LINES="$(grep -n ' error:' build_unsigned_ipa.log | tail -n 20 | tr '\n' ' ' | sed 's/[[:space:]]\\+/ /g' || true)"
+            if [ -n "$ERROR_LINES" ]; then
+              echo "::error::Unsigned IPA build failed (exit=$EXIT_CODE): $ERROR_LINES"
+            else
+              echo "::error::Unsigned IPA build failed (exit=$EXIT_CODE): $LAST_LINES"
+            fi
             exit "$EXIT_CODE"
           fi
 
