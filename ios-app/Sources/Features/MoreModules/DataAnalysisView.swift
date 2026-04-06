@@ -428,7 +428,7 @@ final class DataAnalysisViewModel: ObservableObject {
     }
 }
 
-private struct CapabilityResult {
+struct CapabilityResult {
     let sampleCount: Int
     let groupCount: Int
     let mean: Double
@@ -466,7 +466,7 @@ private struct CapabilityResult {
     }
 }
 
-private struct GrrResult {
+struct GrrResult {
     let partCount: Int
     let operatorCount: Int
     let repeatCount: Int
