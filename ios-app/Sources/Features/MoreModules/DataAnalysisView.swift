@@ -539,7 +539,7 @@ private enum CapabilityCalculator {
             }
             let d2 = try D2Constants.value(for: 2, context: "移动极差")
             withinSigma = movingRanges.mean / d2
-            groupCount = max(values.count - 1, 1)
+            groupCount = Swift.max(values.count - 1, 1)
         }
 
         guard withinSigma > 0 else {
@@ -638,7 +638,7 @@ private enum GrrCalculator {
         let repeatCount = Double(repeats)
 
         let avRaw = pow(xDiffOperator / d2Operator, 2) - pow(ev, 2) / (partCount * repeatCount)
-        let av = sqrt(max(avRaw, 0))
+        let av = sqrt(Swift.max(avRaw, 0))
 
         let partMeans: [Double] = parts.map { name in
             rows.filter { $0.part == name }.map(\.value).mean
@@ -825,7 +825,7 @@ private extension Array where Element == Double {
         guard count >= 2 else { return 0 }
         let avg = mean
         let variance = reduce(0) { $0 + pow($1 - avg, 2) } / Double(count - 1)
-        return sqrt(max(variance, 0))
+        return sqrt(Swift.max(variance, 0))
     }
 
     var adjacentMovingRanges: [Double] {
