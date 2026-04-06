@@ -72,6 +72,7 @@ private enum MoreModuleEntry: String, Identifiable, Hashable {
     case files
     case webdav
     case changeRecord
+    case dataAnalysis
     case deviceStatus
     case department
     case userManagement
@@ -84,6 +85,7 @@ private enum MoreModuleEntry: String, Identifiable, Hashable {
         case .files: return "我的文件"
         case .webdav: return "网络挂载"
         case .changeRecord: return "变更记录"
+        case .dataAnalysis: return "数据分析"
         case .deviceStatus: return "使用状态"
         case .department: return "部门管理"
         case .userManagement: return "用户管理"
@@ -100,6 +102,8 @@ private enum MoreModuleEntry: String, Identifiable, Hashable {
             WebDavView()
         case .changeRecord:
             ChangeRecordView()
+        case .dataAnalysis:
+            DataAnalysisView()
         case .deviceStatus:
             DeviceStatusView()
         case .department:
@@ -514,6 +518,7 @@ private struct MoreHubView: View {
                                     moduleEntryButton(entry: .files, icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
                                     moduleEntryButton(entry: .webdav, icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
                                     moduleEntryButton(entry: .changeRecord, icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
+                                    moduleEntryButton(entry: .dataAnalysis, icon: "chart.xyaxis.line", title: "数据分析", tint: Color(hex: 0x0F766E), scale: scale)
                                     moduleEntryButton(entry: .deviceStatus, icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
                                 }
                             }
@@ -660,7 +665,7 @@ private struct MoreHubView: View {
 
     private func moduleIconOpticalScale(_ icon: String) -> CGFloat {
         switch icon {
-        case "network", "waveform.path.ecg", "doc.text.magnifyingglass":
+        case "network", "waveform.path.ecg", "doc.text.magnifyingglass", "chart.xyaxis.line":
             return 1.12
         case "rectangle.grid.1x2.fill":
             return 1.06
