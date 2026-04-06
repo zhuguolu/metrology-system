@@ -72,13 +72,6 @@ struct DataAnalysisView: View {
                 .buttonStyle(MetrologyPrimaryButtonStyle())
                 .frame(maxWidth: .infinity)
 
-                Button("填充示例") {
-                    metrologyDismissKeyboard()
-                    viewModel.fillCapabilityExample()
-                }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-                .frame(maxWidth: .infinity)
-
                 Button("清空") {
                     metrologyDismissKeyboard()
                     viewModel.clearCapabilityInputs()
@@ -158,13 +151,6 @@ struct DataAnalysisView: View {
                     viewModel.calculateGRR()
                 }
                 .buttonStyle(MetrologyPrimaryButtonStyle())
-                .frame(maxWidth: .infinity)
-
-                Button("填充示例") {
-                    metrologyDismissKeyboard()
-                    viewModel.fillGRRExample()
-                }
-                .buttonStyle(MetrologySecondaryButtonStyle())
                 .frame(maxWidth: .infinity)
 
                 Button("清空") {
