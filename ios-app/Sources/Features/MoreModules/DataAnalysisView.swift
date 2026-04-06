@@ -287,7 +287,7 @@ private struct AnalysisMetric: Identifiable {
     let tone: AnalysisMetricTone
 }
 
-private enum AnalysisMetricTone {
+enum AnalysisMetricTone {
     case normal
     case neutral
     case good
