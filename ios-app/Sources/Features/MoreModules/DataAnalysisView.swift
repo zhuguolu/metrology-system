@@ -78,6 +78,13 @@ struct DataAnalysisView: View {
                 }
                 .buttonStyle(MetrologySecondaryButtonStyle())
                 .frame(maxWidth: .infinity)
+
+                Button("清空") {
+                    metrologyDismissKeyboard()
+                    viewModel.clearCapabilityInputs()
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(12)
@@ -102,8 +109,8 @@ struct DataAnalysisView: View {
                     AnalysisMetric(title: "样本数", value: "\(result.sampleCount)", tone: .neutral),
                     AnalysisMetric(title: "子组数", value: "\(result.groupCount)", tone: .neutral),
                     AnalysisMetric(title: "平均值", value: result.mean.formatted(4), tone: .normal),
-                    AnalysisMetric(title: "组内σ", value: result.sigmaWithin.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "整体σ", value: result.sigmaOverall.formatted(6), tone: .normal),
+                    AnalysisMetric(title: "组内标准差", value: result.sigmaWithin.formatted(6), tone: .normal),
+                    AnalysisMetric(title: "整体标准差", value: result.sigmaOverall.formatted(6), tone: .normal),
                     AnalysisMetric(title: "Cp", value: result.cp.formatted(4), tone: result.capabilityTone),
                     AnalysisMetric(title: "Cpk", value: result.cpk.formatted(4), tone: result.capabilityTone),
                     AnalysisMetric(title: "Pp", value: result.pp.formatted(4), tone: result.performanceTone),
@@ -156,6 +163,13 @@ struct DataAnalysisView: View {
                 Button("填充示例") {
                     metrologyDismissKeyboard()
                     viewModel.fillGRRExample()
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+                .frame(maxWidth: .infinity)
+
+                Button("清空") {
+                    metrologyDismissKeyboard()
+                    viewModel.clearGRRInputs()
                 }
                 .buttonStyle(MetrologySecondaryButtonStyle())
                 .frame(maxWidth: .infinity)
@@ -355,6 +369,16 @@ final class DataAnalysisViewModel: ObservableObject {
         hint = "已填充能力分析示例数据。"
     }
 
+    func clearCapabilityInputs() {
+        capabilityLSLText = ""
+        capabilityUSLText = ""
+        capabilitySubgroupText = ""
+        capabilityDataText = ""
+        capabilityResult = nil
+        errorMessage = nil
+        hint = "已清空能力分析输入数据。"
+    }
+
     func calculateCapability() {
         do {
             let lsl = try AnalysisNumericParser.parseDouble(capabilityLSLText, field: "LSL")
@@ -405,6 +429,16 @@ final class DataAnalysisViewModel: ObservableObject {
         P4,O3,2,9.95
         """
         hint = "已填充 GRR 示例数据。"
+    }
+
+    func clearGRRInputs() {
+        grrPartsText = ""
+        grrOperatorsText = ""
+        grrRepeatsText = ""
+        grrDataText = ""
+        grrResult = nil
+        errorMessage = nil
+        hint = "已清空 GRR 输入数据。"
     }
 
     func calculateGRR() {

@@ -288,7 +288,7 @@ struct MetrologySelectField: View {
 struct MetrologyNoticeDialog: View {
     let title: String
     let message: String
-    var confirmTitle: String = "纭畾"
+    var confirmTitle: String = "确定"
     let onConfirm: () -> Void
 
     var body: some View {
