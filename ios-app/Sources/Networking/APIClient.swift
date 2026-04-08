@@ -360,7 +360,7 @@ final class APIClient {
         let fileExists = FileManager.default.fileExists(atPath: cache.fileURL.path)
         var cachedEtag = loadCachedEtag(from: cache.etagURL)
 
-        if fileExists, let cachedEtag {
+        if fileExists, let currentEtag = cachedEtag {
             var validateRequest = try makeRequest(
                 path: "api/files/\(id)/download",
                 method: "GET",
@@ -369,7 +369,7 @@ final class APIClient {
                 authorized: true
             )
             validateRequest.timeoutInterval = 35
-            validateRequest.setValue(cachedEtag, forHTTPHeaderField: "If-None-Match")
+            validateRequest.setValue(currentEtag, forHTTPHeaderField: "If-None-Match")
             let (_, validateResponse) = try await session.data(for: validateRequest)
             if let http = validateResponse as? HTTPURLResponse {
                 if http.statusCode == 304 {
