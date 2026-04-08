@@ -131,7 +131,7 @@ final class APIClient {
         return try await send(path: "api/auth/login", method: "POST", body: request, authorized: false)
     }
 
-    func me() async throws -> LoginResponse {
+    func me(notifyUnauthorized: Bool = true) async throws -> LoginResponse {
         let request = try makeRequest(
             path: "api/auth/me",
             method: "GET",
@@ -140,7 +140,7 @@ final class APIClient {
             authorized: true
         )
         let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data, notifyUnauthorized: true)
+        try validate(response: response, data: data, notifyUnauthorized: notifyUnauthorized)
         return try decodeResponse(LoginResponse.self, from: data)
     }
 
@@ -376,8 +376,9 @@ final class APIClient {
                     return cache.fileURL
                 }
                 if http.statusCode == 401 {
-                    notifyUnauthorizedIfNeeded()
-                    throw APIError.unauthorized
+                    // Some gateways may reject conditional requests unexpectedly.
+                    // Degrade to normal download flow before treating as real auth failure.
+                    cachedEtag = nil
                 }
             }
         } else if fileExists, cachedEtag == nil {
@@ -421,6 +422,33 @@ final class APIClient {
             }
 
             if http.statusCode == 401 {
+                // Fallback: retry one plain full download when range request is rejected.
+                if resumeOffset == 0 {
+                    var plainRequest = try makeRequest(
+                        path: "api/files/\(id)/download",
+                        method: "GET",
+                        queryItems: [],
+                        bodyData: nil,
+                        authorized: true
+                    )
+                    plainRequest.timeoutInterval = 180
+                    let (plainData, plainResponse) = try await session.data(for: plainRequest)
+                    if let plainHTTP = plainResponse as? HTTPURLResponse {
+                        if (200...299).contains(plainHTTP.statusCode) {
+                            if let responseEtag = plainHTTP.value(forHTTPHeaderField: "ETag"),
+                               !responseEtag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                saveCachedEtag(responseEtag, to: cache.etagURL)
+                            }
+                            try writeFile(plainData, to: cache.partialURL)
+                            return try finalizePartialDownload(from: cache.partialURL, to: cache.fileURL)
+                        }
+                        if plainHTTP.statusCode != 401 {
+                            let message = extractErrorMessage(from: plainData)
+                            throw APIError.httpStatus(plainHTTP.statusCode, message)
+                        }
+                    }
+                }
+
                 notifyUnauthorizedIfNeeded()
                 throw APIError.unauthorized
             }

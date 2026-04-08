@@ -60,6 +60,7 @@ final class AppState: ObservableObject {
     private var pendingImportedFiles: [PendingImportedFile] = []
     private var isProcessingIncomingImports = false
     private var isPreparingIncomingImportTargets = false
+    private var unauthorizedRecheckTask: Task<Void, Never>?
 
     var isAuthenticated: Bool {
         session != nil
@@ -67,7 +68,7 @@ final class AppState: ObservableObject {
 
     init() {
         APIClient.shared.unauthorizedHandler = { [weak self] in
-            self?.handleUnauthorizedSessionExpiry()
+            self?.handleUnauthorizedSignal()
         }
         session = SessionStore.load()
         setAPIToken(session?.token)
@@ -94,6 +95,8 @@ final class AppState: ObservableObject {
     }
 
     func logout() {
+        unauthorizedRecheckTask?.cancel()
+        unauthorizedRecheckTask = nil
         session = nil
         SessionStore.clear()
         setAPIToken(nil)
@@ -305,7 +308,7 @@ final class AppState: ObservableObject {
         guard let currentSession = session else { return }
 
         do {
-            let profile = try await APIClient.shared.me()
+            let profile = try await APIClient.shared.me(notifyUnauthorized: false)
             let latestUsername = profile.username?.trimmingCharacters(in: .whitespacesAndNewlines)
             let nextUsername = (latestUsername?.isEmpty == false) ? latestUsername! : currentSession.username
 
@@ -348,6 +351,27 @@ final class AppState: ObservableObject {
             title: "登录状态已失效",
             message: "登录状态已过期，请重新登录后继续操作。"
         )
+    }
+
+    private func handleUnauthorizedSignal() {
+        guard session != nil else { return }
+        guard unauthorizedRecheckTask == nil else { return }
+
+        unauthorizedRecheckTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.unauthorizedRecheckTask = nil }
+
+            do {
+                _ = try await APIClient.shared.me(notifyUnauthorized: false)
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+                if let apiError = error as? APIError, case .unauthorized = apiError {
+                    self.handleUnauthorizedSessionExpiry()
+                }
+            }
+        }
     }
 }
 
