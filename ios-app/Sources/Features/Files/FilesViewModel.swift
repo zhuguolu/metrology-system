@@ -241,7 +241,7 @@ final class FilesViewModel: ObservableObject {
         for url in urls {
             guard let payload = resolveUploadMetadata(from: url) else {
                 failCount += 1
-                advanceBatchProgress()
+                self.advanceBatchProgress()
                 continue
             }
             uploadRequests.append(payload)
@@ -277,7 +277,7 @@ final class FilesViewModel: ObservableObject {
                 } else {
                     failCount += 1
                 }
-                advanceBatchProgress()
+                self.advanceBatchProgress()
             }
         )
 
@@ -376,7 +376,7 @@ final class FilesViewModel: ObservableObject {
                 } else {
                     failCount += 1
                 }
-                advanceBatchProgress()
+                self.advanceBatchProgress()
             }
         )
 
@@ -417,7 +417,7 @@ final class FilesViewModel: ObservableObject {
                 } else {
                     failCount += 1
                 }
-                advanceBatchProgress()
+                self.advanceBatchProgress()
             }
         )
 
@@ -475,12 +475,12 @@ final class FilesViewModel: ObservableObject {
         for item in items {
             if item.isFolder {
                 skippedFolders += 1
-                advanceBatchProgress()
+                self.advanceBatchProgress()
                 continue
             }
             guard let id = item.id else {
                 failed += 1
-                advanceBatchProgress()
+                self.advanceBatchProgress()
                 continue
             }
             requests.append(DownloadRequest(id: id, suggestedName: item.name))
@@ -500,7 +500,7 @@ final class FilesViewModel: ObservableObject {
                 } else {
                     failed += 1
                 }
-                advanceBatchProgress()
+                self.advanceBatchProgress()
             }
         )
 
@@ -541,7 +541,7 @@ final class FilesViewModel: ObservableObject {
         for item in items {
             if item.isFolder {
                 skippedFolders += 1
-                advanceBatchProgress()
+                self.advanceBatchProgress()
                 continue
             }
             guard let id = item.id else {
@@ -582,7 +582,7 @@ final class FilesViewModel: ObservableObject {
                 } else {
                     failedCount += 1
                 }
-                advanceBatchProgress()
+                self.advanceBatchProgress()
             }
         )
 
