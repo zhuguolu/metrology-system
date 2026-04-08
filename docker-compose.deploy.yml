@@ -1,53 +1,73 @@
 services:
   mysql:
-    image: mysql:5.7
+    image: mysql:8.0
     container_name: metrology-mysql
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-Asia/Shanghai}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-metrology_db}
-      MYSQL_USER: ${MYSQL_USER:-metrology}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-metrology123}
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: metrology_db
+      MYSQL_USER: metrology
+      MYSQL_PASSWORD: metrology123
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      # Database data directory
+      - /tmp/zfsv3/nvme11/18501613216/data/docker/CMS/mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 20s
+      retries: 20
 
   backend:
-    image: ${BACKEND_IMAGE:-crpi-52xa45ikkzp96ntt.cn-hangzhou.personal.cr.aliyuncs.com/zglweb/zspace-backup:backend-latest}
+    image: crpi-52xa45ikkzp96ntt.cn-hangzhou.personal.cr.aliyuncs.com/zglweb/cms:backend-latest
     container_name: metrology-backend
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-Asia/Shanghai}
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Duser.timezone=Asia/Shanghai}
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-metrology_db}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&serverTimezone=Asia/Shanghai
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-metrology}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-metrology123}
-      JWT_SECRET: ${JWT_SECRET:-metrology-jwt-secret-key-at-least-32-chars-2024}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-604800000}
-      UPLOAD_PATH: ${UPLOAD_PATH:-/app/uploads}
-      CMS_ROOT_PATH: ${CMS_ROOT_PATH:-/app/cms}
+      TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Shanghai
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/metrology_db?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: metrology
+      SPRING_DATASOURCE_PASSWORD: metrology123
+      JWT_SECRET: metrology-jwt-secret-key-at-least-32-chars-2024
+      JWT_EXPIRATION: 604800000
+      UPLOAD_PATH: /app/uploads
+      CMS_ROOT_PATH: /app/cms
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "8083:8080"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     volumes:
-      - upload_data:/app/uploads
-      - ./:/app/cms
+      # Uploaded files directory
+      - /tmp/zfsv3/nvme11/public/cms/uploads:/app/uploads
+      # CMS root directory
+      - /tmp/zfsv3/nvme11/18501613216/data/docker/CMS:/app/cms
 
   frontend:
-    image: ${FRONTEND_IMAGE:-crpi-52xa45ikkzp96ntt.cn-hangzhou.personal.cr.aliyuncs.com/zglweb/zspace-backup:frontend-latest}
+    image: crpi-52xa45ikkzp96ntt.cn-hangzhou.personal.cr.aliyuncs.com/zglweb/cms:frontend-latest
     container_name: metrology-frontend
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-Asia/Shanghai}
+      TZ: Asia/Shanghai
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "8071:80"
     depends_on:
       - backend
 
-volumes:
-  mysql_data:
-  upload_data:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: metrology-nginx
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "6606:80"
+    volumes:
+      # Optional reverse proxy layer for a single :6606 entrypoint.
+      - ./deploy/nginx/metrology.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
