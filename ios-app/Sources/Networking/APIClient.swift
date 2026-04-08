@@ -33,6 +33,7 @@ final class APIClient {
     static let shared = APIClient()
 
     var tokenProvider: () -> String? = { nil }
+    var unauthorizedHandler: (() -> Void)?
 
     private struct GETCachePolicy {
         let freshTTL: TimeInterval
@@ -128,6 +129,19 @@ final class APIClient {
     func login(username: String, password: String) async throws -> LoginResponse {
         let request = LoginRequest(username: username, password: password)
         return try await send(path: "api/auth/login", method: "POST", body: request, authorized: false)
+    }
+
+    func me() async throws -> LoginResponse {
+        let request = try makeRequest(
+            path: "api/auth/me",
+            method: "GET",
+            queryItems: [],
+            bodyData: nil,
+            authorized: true
+        )
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data, notifyUnauthorized: true)
+        return try decodeResponse(LoginResponse.self, from: data)
     }
 
     func dashboard() async throws -> DashboardStats {
@@ -357,8 +371,14 @@ final class APIClient {
             validateRequest.timeoutInterval = 35
             validateRequest.setValue(cachedEtag, forHTTPHeaderField: "If-None-Match")
             let (_, validateResponse) = try await session.data(for: validateRequest)
-            if let http = validateResponse as? HTTPURLResponse, http.statusCode == 304 {
-                return cache.fileURL
+            if let http = validateResponse as? HTTPURLResponse {
+                if http.statusCode == 304 {
+                    return cache.fileURL
+                }
+                if http.statusCode == 401 {
+                    notifyUnauthorizedIfNeeded()
+                    throw APIError.unauthorized
+                }
             }
         } else if fileExists, cachedEtag == nil {
             return cache.fileURL
@@ -401,6 +421,7 @@ final class APIClient {
             }
 
             if http.statusCode == 401 {
+                notifyUnauthorizedIfNeeded()
                 throw APIError.unauthorized
             }
 
@@ -636,6 +657,7 @@ final class APIClient {
 
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 401 {
+                notifyUnauthorizedIfNeeded()
                 throw APIError.unauthorized
             }
             let data = (try? Data(contentsOf: tempURL)) ?? Data()
@@ -862,7 +884,11 @@ final class APIClient {
         }
     }
 
-    private func sendCachedGet<T: Decodable>(request: URLRequest, as type: T.Type) async throws -> T {
+    private func sendCachedGet<T: Decodable>(
+        request: URLRequest,
+        as type: T.Type,
+        notifyUnauthorized: Bool
+    ) async throws -> T {
         let key = requestCacheKey(for: request)
         let policy = cachePolicy(for: request)
 
@@ -871,7 +897,11 @@ final class APIClient {
             return try decodeResponse(T.self, from: cached)
         case let .stale(stale):
             if let decoded = try? decodeResponse(T.self, from: stale) {
-                await startBackgroundRefreshIfNeeded(key: key, request: request)
+                await startBackgroundRefreshIfNeeded(
+                    key: key,
+                    request: request,
+                    notifyUnauthorized: notifyUnauthorized
+                )
                 return decoded
             }
             await getResponseStore.removeCache(for: key)
@@ -884,7 +914,7 @@ final class APIClient {
             return try decodeResponse(T.self, from: data)
         }
 
-        let task = makeGETFetchTask(request: request)
+        let task = makeGETFetchTask(request: request, notifyUnauthorized: notifyUnauthorized)
         await getResponseStore.setTask(task, for: key)
 
         do {
@@ -898,20 +928,30 @@ final class APIClient {
         }
     }
 
-    private func makeGETFetchTask(request: URLRequest) -> Task<Data, Error> {
+    private func makeGETFetchTask(
+        request: URLRequest,
+        notifyUnauthorized: Bool
+    ) -> Task<Data, Error> {
         Task<Data, Error> {
             let (data, response) = try await self.session.data(for: request)
-            try self.validate(response: response, data: data)
+            try self.validate(response: response, data: data, notifyUnauthorized: notifyUnauthorized)
             return data
         }
     }
 
-    private func startBackgroundRefreshIfNeeded(key: String, request: URLRequest) async {
+    private func startBackgroundRefreshIfNeeded(
+        key: String,
+        request: URLRequest,
+        notifyUnauthorized: Bool
+    ) async {
         if await getResponseStore.runningTask(for: key) != nil {
             return
         }
 
-        let refreshTask = makeGETFetchTask(request: request)
+        let refreshTask = makeGETFetchTask(
+            request: request,
+            notifyUnauthorized: notifyUnauthorized
+        )
         await getResponseStore.setTask(refreshTask, for: key)
 
         Task.detached { [weak self] in
@@ -939,10 +979,14 @@ final class APIClient {
     ) async throws -> T {
         let request = try makeRequest(path: path, method: method, queryItems: queryItems, bodyData: nil, authorized: authorized)
         if method.uppercased() == "GET" {
-            return try await sendCachedGet(request: request, as: T.self)
+            return try await sendCachedGet(
+                request: request,
+                as: T.self,
+                notifyUnauthorized: authorized
+            )
         }
         let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
+        try validate(response: response, data: data, notifyUnauthorized: authorized)
         await invalidateGetCaches()
         return try decodeResponse(T.self, from: data)
     }
@@ -956,7 +1000,7 @@ final class APIClient {
         let bodyData = try encoder.encode(body)
         let request = try makeRequest(path: path, method: method, queryItems: [], bodyData: bodyData, authorized: authorized)
         let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
+        try validate(response: response, data: data, notifyUnauthorized: authorized)
         await invalidateGetCaches()
         return try decodeResponse(T.self, from: data)
     }
@@ -969,7 +1013,7 @@ final class APIClient {
     ) async throws {
         let request = try makeRequest(path: path, method: method, queryItems: queryItems, bodyData: nil, authorized: authorized)
         let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
+        try validate(response: response, data: data, notifyUnauthorized: authorized)
         await invalidateGetCaches()
     }
 
@@ -999,7 +1043,7 @@ final class APIClient {
         return request
     }
 
-    private func validate(response: URLResponse, data: Data) throws {
+    private func validate(response: URLResponse, data: Data, notifyUnauthorized: Bool = true) throws {
         guard let http = response as? HTTPURLResponse else {
             throw APIError.unknown
         }
@@ -1009,6 +1053,9 @@ final class APIClient {
         }
 
         if http.statusCode == 401 {
+            if notifyUnauthorized {
+                notifyUnauthorizedIfNeeded()
+            }
             throw APIError.unauthorized
         }
 
@@ -1030,6 +1077,12 @@ final class APIClient {
         }
 
         return nil
+    }
+
+    private func notifyUnauthorizedIfNeeded() {
+        Task { @MainActor [weak self] in
+            self?.unauthorizedHandler?()
+        }
     }
 }
 

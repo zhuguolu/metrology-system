@@ -66,23 +66,19 @@ final class AppState: ObservableObject {
     }
 
     init() {
+        APIClient.shared.unauthorizedHandler = { [weak self] in
+            self?.handleUnauthorizedSessionExpiry()
+        }
         session = SessionStore.load()
         setAPIToken(session?.token)
+        triggerSessionValidationIfNeeded()
         triggerIncomingImportTargetSelection()
     }
 
     func applyLogin(_ response: LoginResponse) {
         guard let token = response.token, !token.isEmpty else { return }
         let username = response.username?.isEmpty == false ? response.username! : "User"
-        let departmentValues: [String]? = {
-            let fromList = (response.departments ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            if !fromList.isEmpty { return fromList }
-            if let single = response.department?.trimmingCharacters(in: .whitespacesAndNewlines), !single.isEmpty {
-                return [single]
-            }
-            return nil
-        }()
+        let departmentValues = normalizedDepartments(from: response)
 
         let value = Session(
             token: token,
@@ -93,6 +89,7 @@ final class AppState: ObservableObject {
         session = value
         SessionStore.save(value)
         setAPIToken(value.token)
+        triggerSessionValidationIfNeeded()
         triggerIncomingImportTargetSelection()
     }
 
@@ -296,6 +293,62 @@ final class AppState: ObservableObject {
     private func setAPIToken(_ token: String?) {
         APIClient.shared.tokenProvider = { token }
     }
+
+    private func triggerSessionValidationIfNeeded() {
+        guard session != nil else { return }
+        Task { [weak self] in
+            await self?.validateSessionFromServer()
+        }
+    }
+
+    private func validateSessionFromServer() async {
+        guard let currentSession = session else { return }
+
+        do {
+            let profile = try await APIClient.shared.me()
+            let latestUsername = profile.username?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let nextUsername = (latestUsername?.isEmpty == false) ? latestUsername! : currentSession.username
+
+            let refreshed = Session(
+                token: currentSession.token,
+                username: nextUsername,
+                role: profile.role ?? currentSession.role,
+                departments: normalizedDepartments(from: profile) ?? currentSession.departments
+            )
+            session = refreshed
+            SessionStore.save(refreshed)
+            setAPIToken(refreshed.token)
+        } catch {
+            if error is CancellationError {
+                return
+            }
+            if let apiError = error as? APIError, case .unauthorized = apiError {
+                handleUnauthorizedSessionExpiry()
+            }
+        }
+    }
+
+    private func normalizedDepartments(from response: LoginResponse) -> [String]? {
+        let fromList = (response.departments ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !fromList.isEmpty { return fromList }
+
+        if let single = response.department?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !single.isEmpty {
+            return [single]
+        }
+        return nil
+    }
+
+    private func handleUnauthorizedSessionExpiry() {
+        guard session != nil else { return }
+        logout()
+        incomingImportNotice = AppNotice(
+            title: "登录状态已失效",
+            message: "登录状态已过期，请重新登录后继续操作。"
+        )
+    }
 }
 
 private func stageIncomingExternalFile(from sourceURL: URL) throws -> PendingImportedFile {
@@ -396,3 +449,4 @@ private func copyFileByStreaming(from sourceURL: URL, to targetURL: URL) throws 
         throw error
     }
 }
+
