@@ -3,15 +3,19 @@ package com.metrology.controller;
 import com.metrology.service.PermissionService;
 import com.metrology.service.WebDavService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -40,7 +44,7 @@ public class WebDavController {
 
     @PostMapping("/mounts")
     public ResponseEntity<?> createMount(@AuthenticationPrincipal UserDetails user,
-                                          @RequestBody Map<String, String> body) {
+                                         @RequestBody Map<String, String> body) {
         ResponseEntity<?> check = checkWebDavAccess(user.getUsername());
         if (check != null) return check;
         try {
@@ -52,8 +56,8 @@ public class WebDavController {
 
     @PutMapping("/mounts/{id}")
     public ResponseEntity<?> updateMount(@AuthenticationPrincipal UserDetails user,
-                                          @PathVariable Long id,
-                                          @RequestBody Map<String, String> body) {
+                                         @PathVariable Long id,
+                                         @RequestBody Map<String, String> body) {
         ResponseEntity<?> check = checkWebDavAccess(user.getUsername());
         if (check != null) return check;
         try {
@@ -65,7 +69,7 @@ public class WebDavController {
 
     @DeleteMapping("/mounts/{id}")
     public ResponseEntity<?> deleteMount(@AuthenticationPrincipal UserDetails user,
-                                          @PathVariable Long id) {
+                                         @PathVariable Long id) {
         ResponseEntity<?> check = checkWebDavAccess(user.getUsername());
         if (check != null) return check;
         try {
@@ -87,8 +91,8 @@ public class WebDavController {
 
     @GetMapping("/browse")
     public ResponseEntity<?> browse(@AuthenticationPrincipal UserDetails user,
-                                     @RequestParam Long mountId,
-                                     @RequestParam(required = false) String path) {
+                                    @RequestParam Long mountId,
+                                    @RequestParam(required = false) String path) {
         ResponseEntity<?> check = checkWebDavAccess(user.getUsername());
         if (check != null) return check;
         try {
@@ -99,31 +103,65 @@ public class WebDavController {
     }
 
     @GetMapping("/download")
-    public ResponseEntity<byte[]> download(@AuthenticationPrincipal UserDetails user,
-                                            @RequestParam Long mountId,
-                                            @RequestParam String path,
-                                            @RequestParam(required = false) String filename) throws Exception {
+    public ResponseEntity<Resource> download(@AuthenticationPrincipal UserDetails user,
+                                             @RequestParam Long mountId,
+                                             @RequestParam String path,
+                                             @RequestParam(required = false) String filename) throws Exception {
         if (!permissionService.hasPermission(user.getUsername(), PermissionService.WEBDAV_ACCESS)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        byte[] data = webDavService.downloadFile(user.getUsername(), mountId, path);
-        String name = filename != null ? filename : path.substring(path.lastIndexOf('/') + 1);
+
+        InputStream inputStream = webDavService.downloadFileStream(user.getUsername(), mountId, path);
+        String name = resolveDownloadName(path, filename);
         String encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedName)
+                .header(HttpHeaders.CACHE_CONTROL, "no-cache")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(data);
+                .body(new InputStreamResource(inputStream));
     }
 
     @PostMapping("/upload")
     public ResponseEntity<?> upload(@AuthenticationPrincipal UserDetails user,
-                                     @RequestParam Long mountId,
-                                     @RequestParam String path,
-                                     @RequestParam MultipartFile file) throws Exception {
+                                    @RequestParam Long mountId,
+                                    @RequestParam String path,
+                                    @RequestParam MultipartFile file) throws Exception {
         ResponseEntity<?> check = checkWebDavAccess(user.getUsername());
         if (check != null) return check;
-        webDavService.uploadFile(user.getUsername(), mountId, path + file.getOriginalFilename(),
-                file.getBytes(), file.getContentType());
+
+        String targetPath = buildUploadTargetPath(path, file.getOriginalFilename());
+        try (InputStream inputStream = file.getInputStream()) {
+            webDavService.uploadFile(
+                    user.getUsername(),
+                    mountId,
+                    targetPath,
+                    inputStream,
+                    file.getContentType()
+            );
+        }
         return ResponseEntity.ok(Map.of("message", "上传成功"));
+    }
+
+    private String resolveDownloadName(String path, String filename) {
+        if (StringUtils.hasText(filename)) {
+            return filename.trim();
+        }
+        if (!StringUtils.hasText(path)) {
+            return "download.bin";
+        }
+        String normalized = path.replace('\\', '/');
+        int idx = normalized.lastIndexOf('/');
+        String extracted = idx >= 0 ? normalized.substring(idx + 1) : normalized;
+        return StringUtils.hasText(extracted) ? extracted : "download.bin";
+    }
+
+    private String buildUploadTargetPath(String path, String originalFilename) {
+        String basePath = StringUtils.hasText(path) ? path.trim() : "/";
+        String fileName = StringUtils.hasText(originalFilename) ? originalFilename : "upload.bin";
+        if (basePath.endsWith("/")) {
+            return basePath + fileName;
+        }
+        return basePath + "/" + fileName;
     }
 }

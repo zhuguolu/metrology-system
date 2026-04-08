@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.*;
 
 @Service
@@ -37,8 +39,9 @@ public class WebDavService {
         if (body.containsKey("name")) mount.setName(body.get("name"));
         if (body.containsKey("url")) mount.setUrl(normalizeUrl(body.get("url")));
         if (body.containsKey("username")) mount.setUsername(body.get("username"));
-        if (body.containsKey("password") && !body.get("password").isEmpty())
+        if (body.containsKey("password") && !body.get("password").isEmpty()) {
             mount.setPassword(body.get("password"));
+        }
         return mountRepository.save(mount);
     }
 
@@ -89,22 +92,57 @@ public class WebDavService {
         return result;
     }
 
-    public byte[] downloadFile(String userId, Long mountId, String path) throws Exception {
+    public InputStream downloadFileStream(String userId, Long mountId, String path) throws Exception {
         WebDavMount mount = mountRepository.findByIdAndUserId(mountId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("挂载点不存在"));
         Sardine sardine = buildSardine(mount.getUsername(), mount.getPassword());
         String fullUrl = path.startsWith("http") ? path : joinUrl(mount.getUrl(), path);
-        try (InputStream is = sardine.get(fullUrl)) {
-            return is.readAllBytes();
+        return sardine.get(fullUrl);
+    }
+
+    public void uploadFile(String userId, Long mountId, String path, InputStream dataStream, String contentType) throws Exception {
+        WebDavMount mount = mountRepository.findByIdAndUserId(mountId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("挂载点不存在"));
+        Sardine sardine = buildSardine(mount.getUsername(), mount.getPassword());
+        String fullUrl = path.startsWith("http") ? path : joinUrl(mount.getUrl(), path);
+        putStream(sardine, fullUrl, dataStream, contentType != null ? contentType : "application/octet-stream");
+    }
+
+    private void putStream(Sardine sardine, String fullUrl, InputStream dataStream, String contentType) throws Exception {
+        try {
+            Method putWithType = Sardine.class.getMethod("put", String.class, InputStream.class, String.class);
+            putWithType.invoke(sardine, fullUrl, dataStream, contentType);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Fallback to 2-arg stream API.
+        } catch (InvocationTargetException ite) {
+            throw unwrapInvocationException(ite);
+        }
+
+        try {
+            Method putStream = Sardine.class.getMethod("put", String.class, InputStream.class);
+            putStream.invoke(sardine, fullUrl, dataStream);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Fallback to byte[] API if stream API is unavailable.
+        } catch (InvocationTargetException ite) {
+            throw unwrapInvocationException(ite);
+        }
+
+        try {
+            byte[] bytes = dataStream.readAllBytes();
+            sardine.put(fullUrl, bytes, contentType);
+        } catch (Exception e) {
+            throw e;
         }
     }
 
-    public void uploadFile(String userId, Long mountId, String path, byte[] data, String contentType) throws Exception {
-        WebDavMount mount = mountRepository.findByIdAndUserId(mountId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("挂载点不存在"));
-        Sardine sardine = buildSardine(mount.getUsername(), mount.getPassword());
-        String fullUrl = path.startsWith("http") ? path : joinUrl(mount.getUrl(), path);
-        sardine.put(fullUrl, data, contentType != null ? contentType : "application/octet-stream");
+    private Exception unwrapInvocationException(InvocationTargetException ite) {
+        Throwable cause = ite.getTargetException();
+        if (cause instanceof Exception exception) {
+            return exception;
+        }
+        return new RuntimeException(cause);
     }
 
     private Sardine buildSardine(String username, String password) {

@@ -90,6 +90,16 @@ export const deviceApi = {
   batchUpdateCalibration: (ids, data) => Promise.all(ids.map(id => api.put(`/devices/${id}/calibration`, data))),
 }
 
+export const analysisApi = {
+  capability: d => api.post('/analysis/capability', d),
+  capabilityReport: d => api.post('/analysis/capability/report', d, { responseType: 'blob' }),
+  grr: d => api.post('/analysis/grr', d),
+  grrReport: d => api.post('/analysis/grr/report', d, { responseType: 'blob' }),
+  repeatabilityReport: d => api.post('/analysis/repeatability/report', d, { responseType: 'blob' }),
+  reproducibilityReport: d => api.post('/analysis/reproducibility/report', d, { responseType: 'blob' }),
+  linearityReport: d => api.post('/analysis/linearity/report', d, { responseType: 'blob' }),
+}
+
 export const settingsApi = {
   get: () => api.get('/settings'),
   save: d => api.put('/settings', d),

@@ -179,9 +179,15 @@ struct FilesView: View {
                 }
             }
 
-            ProgressView()
-                .controlSize(.small)
-                .tint(MetrologyPalette.navActive)
+            if let fraction = viewModel.batchProgressFraction {
+                ProgressView(value: fraction)
+                    .controlSize(.small)
+                    .tint(MetrologyPalette.navActive)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(MetrologyPalette.navActive)
+            }
         }
         .padding(12)
         .background(
@@ -627,6 +633,9 @@ struct FilesView: View {
     }
 
     private var loadingOverlayTitle: String {
+        if let batchText = viewModel.batchProgressText {
+            return batchText
+        }
         if viewModel.isUploading {
             return "正在上传..."
         }

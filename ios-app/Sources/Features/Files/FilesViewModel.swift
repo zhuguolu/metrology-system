@@ -22,6 +22,9 @@ final class FilesViewModel: ObservableObject {
     @Published var previewLoadingFileId: Int64?
     @Published var canWrite: Bool = true
     @Published var readOnlyFolder: Bool = false
+    @Published private(set) var batchProgressTitle: String?
+    @Published private(set) var batchProgressCurrent: Int = 0
+    @Published private(set) var batchProgressTotal: Int = 0
 
     private struct FolderStackEntry {
         let id: Int64?
@@ -51,6 +54,16 @@ final class FilesViewModel: ObservableObject {
         let id: String
         let folderId: Int64?
         let title: String
+    }
+
+    var batchProgressText: String? {
+        guard let batchProgressTitle, batchProgressTotal > 0 else { return nil }
+        return "\(batchProgressTitle) \(batchProgressCurrent)/\(batchProgressTotal)"
+    }
+
+    var batchProgressFraction: Double? {
+        guard batchProgressTotal > 0 else { return nil }
+        return min(1.0, max(0, Double(batchProgressCurrent) / Double(batchProgressTotal)))
     }
 
     func load() async {
@@ -212,42 +225,61 @@ final class FilesViewModel: ObservableObject {
         isLoading = true
         isUploading = true
         errorMessage = nil
+        beginBatchProgress(title: "上传中", total: urls.count)
         defer {
+            clearBatchProgress()
             isUploading = false
             isLoading = false
         }
 
         var successCount = 0
         var failCount = 0
+        let folderId = currentFolderId
 
+        var uploadRequests: [UploadPayload] = []
+        uploadRequests.reserveCapacity(urls.count)
         for url in urls {
-            let accessing = url.startAccessingSecurityScopedResource()
-            defer {
-                if accessing {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
-
             guard let payload = resolveUploadMetadata(from: url) else {
                 failCount += 1
+                advanceBatchProgress()
                 continue
             }
-
-            do {
-                _ = try await APIClient.shared.uploadFile(
-                    parentId: currentFolderId,
-                    fileName: payload.name,
-                    mimeType: payload.mimeType,
-                    fileURL: payload.fileURL
-                )
-                successCount += 1
-            } catch {
-                if error is CancellationError {
-                    return
-                }
-                failCount += 1
-            }
+            uploadRequests.append(payload)
         }
+
+        await runBoundedTasks(
+            inputs: uploadRequests,
+            maxConcurrent: 2,
+            taskFactory: { payload in
+                Task.detached(priority: .userInitiated) {
+                    let accessing = payload.fileURL.startAccessingSecurityScopedResource()
+                    defer {
+                        if accessing {
+                            payload.fileURL.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    do {
+                        _ = try await APIClient.shared.uploadFile(
+                            parentId: folderId,
+                            fileName: payload.name,
+                            mimeType: payload.mimeType,
+                            fileURL: payload.fileURL
+                        )
+                        return true
+                    } catch {
+                        return false
+                    }
+                }
+            },
+            onResult: { succeeded in
+                if succeeded {
+                    successCount += 1
+                } else {
+                    failCount += 1
+                }
+                advanceBatchProgress()
+            }
+        )
 
         scanSyncMessage = "上传完成：成功 \(successCount)，失败 \(failCount)"
         invalidateFolderCache()
@@ -316,22 +348,37 @@ final class FilesViewModel: ObservableObject {
         guard !ids.isEmpty else { return }
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        beginBatchProgress(title: "移动中", total: ids.count)
+        defer {
+            clearBatchProgress()
+            isLoading = false
+        }
 
         var successCount = 0
         var failCount = 0
 
-        for id in ids {
-            do {
-                _ = try await APIClient.shared.moveFile(id: id, parentId: parentId)
-                successCount += 1
-            } catch {
-                if error is CancellationError {
-                    return
+        await runBoundedTasks(
+            inputs: ids,
+            maxConcurrent: 3,
+            taskFactory: { id in
+                Task.detached(priority: .userInitiated) {
+                    do {
+                        _ = try await APIClient.shared.moveFile(id: id, parentId: parentId)
+                        return true
+                    } catch {
+                        return false
+                    }
                 }
-                failCount += 1
+            },
+            onResult: { succeeded in
+                if succeeded {
+                    successCount += 1
+                } else {
+                    failCount += 1
+                }
+                advanceBatchProgress()
             }
-        }
+        )
 
         scanSyncMessage = "移动完成：成功 \(successCount)，失败 \(failCount)"
         invalidateFolderCache()
@@ -342,22 +389,37 @@ final class FilesViewModel: ObservableObject {
         guard !ids.isEmpty else { return }
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        beginBatchProgress(title: "删除中", total: ids.count)
+        defer {
+            clearBatchProgress()
+            isLoading = false
+        }
 
         var successCount = 0
         var failCount = 0
 
-        for id in ids {
-            do {
-                try await APIClient.shared.deleteFile(id: id)
-                successCount += 1
-            } catch {
-                if error is CancellationError {
-                    return
+        await runBoundedTasks(
+            inputs: ids,
+            maxConcurrent: 3,
+            taskFactory: { id in
+                Task.detached(priority: .userInitiated) {
+                    do {
+                        try await APIClient.shared.deleteFile(id: id)
+                        return true
+                    } catch {
+                        return false
+                    }
                 }
-                failCount += 1
+            },
+            onResult: { succeeded in
+                if succeeded {
+                    successCount += 1
+                } else {
+                    failCount += 1
+                }
+                advanceBatchProgress()
             }
-        }
+        )
 
         scanSyncMessage = "删除完成：成功 \(successCount)，失败 \(failCount)"
         invalidateFolderCache()
@@ -394,31 +456,53 @@ final class FilesViewModel: ObservableObject {
         guard !items.isEmpty else { return [] }
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        beginBatchProgress(title: "下载准备", total: items.count)
+        defer {
+            clearBatchProgress()
+            isLoading = false
+        }
+
+        struct DownloadRequest: Sendable {
+            let id: Int64
+            let suggestedName: String?
+        }
 
         var urls: [URL] = []
         var skippedFolders = 0
         var failed = 0
+        var requests: [DownloadRequest] = []
 
         for item in items {
             if item.isFolder {
                 skippedFolders += 1
+                advanceBatchProgress()
                 continue
             }
             guard let id = item.id else {
                 failed += 1
+                advanceBatchProgress()
                 continue
             }
-            do {
-                let url = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
-                urls.append(url)
-            } catch {
-                if error is CancellationError {
-                    return urls
-                }
-                failed += 1
-            }
+            requests.append(DownloadRequest(id: id, suggestedName: item.name))
         }
+
+        await runBoundedTasks(
+            inputs: requests,
+            maxConcurrent: 3,
+            taskFactory: { request in
+                Task.detached(priority: .userInitiated) {
+                    try? await APIClient.shared.downloadFile(id: request.id, suggestedName: request.suggestedName)
+                }
+            },
+            onResult: { url in
+                if let url {
+                    urls.append(url)
+                } else {
+                    failed += 1
+                }
+                advanceBatchProgress()
+            }
+        )
 
         if skippedFolders > 0 || failed > 0 {
             scanSyncMessage = "下载准备完成：成功 \(urls.count)，文件夹跳过 \(skippedFolders)，失败 \(failed)"
@@ -435,39 +519,72 @@ final class FilesViewModel: ObservableObject {
 
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        beginBatchProgress(title: "复制中", total: items.count)
+        defer {
+            clearBatchProgress()
+            isLoading = false
+        }
+
+        struct CopyRequest: Sendable {
+            let id: Int64
+            let sourceName: String?
+            let targetName: String
+            let mimeType: String?
+        }
 
         var successCount = 0
         var failedCount = 0
         var skippedFolders = 0
         var usedNames = Set(self.items.map { $0.displayName.lowercased() })
+        var requests: [CopyRequest] = []
 
         for item in items {
             if item.isFolder {
                 skippedFolders += 1
+                advanceBatchProgress()
                 continue
             }
             guard let id = item.id else {
                 failedCount += 1
+                advanceBatchProgress()
                 continue
             }
-            do {
-                let sourceURL = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
-                let copiedName = makeCopyName(from: item.displayName, usedNames: &usedNames)
-                _ = try await APIClient.shared.uploadFile(
-                    parentId: currentFolderId,
-                    fileName: copiedName,
-                    mimeType: item.mimeType,
-                    fileURL: sourceURL
-                )
-                successCount += 1
-            } catch {
-                if error is CancellationError {
-                    return
-                }
-                failedCount += 1
-            }
+            let copiedName = makeCopyName(from: item.displayName, usedNames: &usedNames)
+            requests.append(CopyRequest(id: id, sourceName: item.name, targetName: copiedName, mimeType: item.mimeType))
         }
+
+        let folderId = currentFolderId
+        await runBoundedTasks(
+            inputs: requests,
+            maxConcurrent: 2,
+            taskFactory: { request in
+                Task.detached(priority: .userInitiated) {
+                    do {
+                        let sourceURL = try await APIClient.shared.downloadFile(
+                            id: request.id,
+                            suggestedName: request.sourceName
+                        )
+                        _ = try await APIClient.shared.uploadFile(
+                            parentId: folderId,
+                            fileName: request.targetName,
+                            mimeType: request.mimeType,
+                            fileURL: sourceURL
+                        )
+                        return true
+                    } catch {
+                        return false
+                    }
+                }
+            },
+            onResult: { succeeded in
+                if succeeded {
+                    successCount += 1
+                } else {
+                    failedCount += 1
+                }
+                advanceBatchProgress()
+            }
+        )
 
         scanSyncMessage = "复制完成：成功 \(successCount)，文件夹跳过 \(skippedFolders)，失败 \(failedCount)"
         invalidateFolderCache()
@@ -535,6 +652,58 @@ final class FilesViewModel: ObservableObject {
             return UploadPayload(name: name, mimeType: mimeType, fileURL: url)
         } catch {
             return nil
+        }
+    }
+
+    private func beginBatchProgress(title: String, total: Int) {
+        let clampedTotal = max(total, 0)
+        batchProgressTitle = clampedTotal > 0 ? title : nil
+        batchProgressTotal = clampedTotal
+        batchProgressCurrent = 0
+    }
+
+    private func advanceBatchProgress() {
+        guard batchProgressTotal > 0 else { return }
+        batchProgressCurrent = min(batchProgressCurrent + 1, batchProgressTotal)
+    }
+
+    private func clearBatchProgress() {
+        batchProgressTitle = nil
+        batchProgressCurrent = 0
+        batchProgressTotal = 0
+    }
+
+    private func runBoundedTasks<Input: Sendable, Output: Sendable>(
+        inputs: [Input],
+        maxConcurrent: Int,
+        taskFactory: @escaping @Sendable (Input) -> Task<Output, Never>,
+        onResult: @MainActor @escaping (Output) -> Void
+    ) async {
+        guard !inputs.isEmpty else { return }
+        let workerLimit = max(1, maxConcurrent)
+
+        await withTaskGroup(of: Output.self) { group in
+            var nextIndex = 0
+            let initialCount = min(workerLimit, inputs.count)
+
+            for _ in 0..<initialCount {
+                let input = inputs[nextIndex]
+                nextIndex += 1
+                group.addTask {
+                    await taskFactory(input).value
+                }
+            }
+
+            while let output = await group.next() {
+                await onResult(output)
+                if nextIndex < inputs.count {
+                    let input = inputs[nextIndex]
+                    nextIndex += 1
+                    group.addTask {
+                        await taskFactory(input).value
+                    }
+                }
+            }
         }
     }
 
@@ -656,7 +825,7 @@ final class FilesViewModel: ObservableObject {
     }
 }
 
-private struct UploadPayload {
+private struct UploadPayload: Sendable {
     let name: String
     let mimeType: String?
     let fileURL: URL

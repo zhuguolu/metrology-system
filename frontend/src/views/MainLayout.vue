@@ -196,6 +196,12 @@ const TITLES = {
   '/equipment': '设备台账',
   '/device-status': '使用状态管理',
   '/calibration': '校准管理',
+  '/analysis': '数据分析',
+  '/analysis/cpk': '数据分析 · CPK/PPK',
+  '/analysis/grr': '数据分析 · GRR',
+  '/analysis/repeatability': '数据分析 · 重复性',
+  '/analysis/reproducibility': '数据分析 · 再现性',
+  '/analysis/linearity': '数据分析 · 线性分析',
   '/todo': '我的待办',
   '/files': '我的文件',
   '/webdav': '网络挂载',
@@ -237,6 +243,16 @@ const navItems = computed(() => {
       tip: '校准管理',
       desc: '记录校准并管理有效期',
       icon: Calendar,
+      show: true,
+      badge: 0
+    },
+    {
+      key: 'analysis',
+      path: '/analysis',
+      label: '数据分析',
+      tip: '数据分析',
+      desc: '计算 CPK/PPK 并查看运行图',
+      icon: DataAnalysis,
       show: true,
       badge: 0
     },
@@ -336,7 +352,7 @@ const navItems = computed(() => {
 })
 
 const workbenchGroups = computed(() => {
-  const workbenchPaths = new Set(['/equipment', '/calibration', '/todo', '/audit', '/files'])
+  const workbenchPaths = new Set(['/equipment', '/calibration', '/analysis', '/todo', '/audit', '/files'])
   const items = navItems.value.filter(item => workbenchPaths.has(item.path))
 
   return items.length
@@ -345,7 +361,8 @@ const workbenchGroups = computed(() => {
 })
 
 function isActive(path) {
-  return route.path === path
+  if (route.path === path) return true
+  return route.path.startsWith(`${path}/`)
 }
 
 function toggleCollapse() {
@@ -415,7 +432,7 @@ function goToModule(item) {
     loadPendingCount()
   }
 
-  if (route.path !== item.path) {
+  if (!isActive(item.path)) {
     router.push(item.path)
   }
 }
@@ -870,6 +887,12 @@ onMounted(() => {
 .workbench-icon.nav-calibration {
   background: linear-gradient(135deg, #ffedd5, #fed7aa);
   color: #c2410c;
+}
+
+.nav-analysis .nav-icon,
+.workbench-icon.nav-analysis {
+  background: linear-gradient(135deg, #e0e7ff, #bfdbfe);
+  color: #1e40af;
 }
 
 .nav-todo .nav-icon,

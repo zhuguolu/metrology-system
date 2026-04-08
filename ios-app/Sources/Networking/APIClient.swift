@@ -34,29 +34,52 @@ final class APIClient {
 
     var tokenProvider: () -> String? = { nil }
 
+    private struct GETCachePolicy {
+        let freshTTL: TimeInterval
+        let staleTTL: TimeInterval
+        let allowsStaleWhileRevalidate: Bool
+
+        static let `default` = GETCachePolicy(
+            freshTTL: 2.5,
+            staleTTL: 10,
+            allowsStaleWhileRevalidate: true
+        )
+    }
+
     private actor GETResponseStore {
+        enum CacheLookup {
+            case fresh(Data)
+            case stale(Data)
+            case miss
+        }
+
         struct CacheEntry {
             let data: Data
             let timestamp: Date
         }
 
-        private let ttl: TimeInterval
         private var cache: [String: CacheEntry] = [:]
         private var inFlight: [String: Task<Data, Error>] = [:]
 
-        init(ttl: TimeInterval) {
-            self.ttl = ttl
-        }
-
-        func cachedData(for key: String, now: Date = Date()) -> Data? {
+        func lookupCachedData(
+            for key: String,
+            policy: GETCachePolicy,
+            now: Date = Date()
+        ) -> CacheLookup {
             guard let entry = cache[key] else {
-                return nil
+                return .miss
             }
-            if now.timeIntervalSince(entry.timestamp) > ttl {
+            let age = now.timeIntervalSince(entry.timestamp)
+            if age <= policy.freshTTL {
+                return .fresh(entry.data)
+            }
+            if age <= policy.staleTTL, policy.allowsStaleWhileRevalidate {
+                return .stale(entry.data)
+            }
+            if age > policy.staleTTL {
                 cache.removeValue(forKey: key)
-                return nil
             }
-            return entry.data
+            return .miss
         }
 
         func runningTask(for key: String) -> Task<Data, Error>? {
@@ -75,6 +98,10 @@ final class APIClient {
             cache[key] = CacheEntry(data: data, timestamp: now)
         }
 
+        func removeCache(for key: String) {
+            cache.removeValue(forKey: key)
+        }
+
         func invalidateAll() {
             cache.removeAll(keepingCapacity: true)
         }
@@ -90,7 +117,7 @@ final class APIClient {
         self.session = URLSession(configuration: .default)
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
-        self.getResponseStore = GETResponseStore(ttl: 1.2)
+        self.getResponseStore = GETResponseStore()
 
         let raw = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String
         let fallback = "https://cms.zglweb.cn:6606/"
@@ -316,47 +343,97 @@ final class APIClient {
     func downloadFile(id: Int64, suggestedName: String?) async throws -> URL {
         let safeName = sanitizeFilename(suggestedName ?? "preview.bin")
         let cache = try resolveDownloadCacheURLs(fileId: id, safeName: safeName)
-        var request = try makeRequest(path: "api/files/\(id)/download", method: "GET", queryItems: [], bodyData: nil, authorized: true)
-        request.timeoutInterval = 120
-        if FileManager.default.fileExists(atPath: cache.fileURL.path),
-           let cachedEtag = loadCachedEtag(from: cache.etagURL) {
-            request.setValue(cachedEtag, forHTTPHeaderField: "If-None-Match")
-        }
+        let fileExists = FileManager.default.fileExists(atPath: cache.fileURL.path)
+        var cachedEtag = loadCachedEtag(from: cache.etagURL)
 
-        let (tempURL, response) = try await session.download(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.unknown
-        }
-
-        if http.statusCode == 304, FileManager.default.fileExists(atPath: cache.fileURL.path) {
-            try? FileManager.default.removeItem(at: tempURL)
+        if fileExists, let cachedEtag {
+            var validateRequest = try makeRequest(
+                path: "api/files/\(id)/download",
+                method: "GET",
+                queryItems: [],
+                bodyData: nil,
+                authorized: true
+            )
+            validateRequest.timeoutInterval = 35
+            validateRequest.setValue(cachedEtag, forHTTPHeaderField: "If-None-Match")
+            let (_, validateResponse) = try await session.data(for: validateRequest)
+            if let http = validateResponse as? HTTPURLResponse, http.statusCode == 304 {
+                return cache.fileURL
+            }
+        } else if fileExists, cachedEtag == nil {
             return cache.fileURL
         }
 
-        guard (200...299).contains(http.statusCode) else {
+        var resumeOffset = fileByteLength(at: cache.partialURL) ?? 0
+        if resumeOffset > 0, cachedEtag == nil {
+            try? FileManager.default.removeItem(at: cache.partialURL)
+            resumeOffset = 0
+        }
+
+        let downloadChunkSize = 1024 * 1024
+
+        while true {
+            try Task.checkCancellation()
+
+            let chunkStart = max(resumeOffset, 0)
+            let chunkEnd = chunkStart + Int64(downloadChunkSize) - 1
+
+            var request = try makeRequest(
+                path: "api/files/\(id)/download",
+                method: "GET",
+                queryItems: [],
+                bodyData: nil,
+                authorized: true
+            )
+            request.timeoutInterval = 120
+            request.setValue("bytes=\(chunkStart)-\(chunkEnd)", forHTTPHeaderField: "Range")
+            if let cachedEtag, !cachedEtag.isEmpty {
+                request.setValue(cachedEtag, forHTTPHeaderField: "If-Range")
+            }
+
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.unknown
+            }
+
+            if http.statusCode == 304, fileExists {
+                return cache.fileURL
+            }
+
             if http.statusCode == 401 {
                 throw APIError.unauthorized
             }
-            let data = (try? Data(contentsOf: tempURL)) ?? Data()
-            let message = extractErrorMessage(from: data)
-            throw APIError.httpStatus(http.statusCode, message)
-        }
 
-        if FileManager.default.fileExists(atPath: cache.fileURL.path) {
-            try? FileManager.default.removeItem(at: cache.fileURL)
+            guard http.statusCode == 200 || http.statusCode == 206 else {
+                let message = extractErrorMessage(from: data)
+                throw APIError.httpStatus(http.statusCode, message)
+            }
+
+            if let responseEtag = http.value(forHTTPHeaderField: "ETag"),
+               !responseEtag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                cachedEtag = responseEtag
+                saveCachedEtag(responseEtag, to: cache.etagURL)
+            }
+
+            if http.statusCode == 206 {
+                try appendChunk(data, to: cache.partialURL, truncate: resumeOffset == 0)
+                resumeOffset += Int64(data.count)
+
+                if let total = parseTotalLength(fromContentRange: http.value(forHTTPHeaderField: "Content-Range")),
+                   resumeOffset >= total {
+                    return try finalizePartialDownload(from: cache.partialURL, to: cache.fileURL)
+                }
+
+                if data.count < downloadChunkSize {
+                    return try finalizePartialDownload(from: cache.partialURL, to: cache.fileURL)
+                }
+                continue
+            }
+
+            // 200 usually means server returned full file (e.g. no range or etag changed).
+            try writeFile(data, to: cache.partialURL)
+            return try finalizePartialDownload(from: cache.partialURL, to: cache.fileURL)
         }
-        do {
-            try FileManager.default.moveItem(at: tempURL, to: cache.fileURL)
-        } catch {
-            try? FileManager.default.removeItem(at: cache.fileURL)
-            try FileManager.default.copyItem(at: tempURL, to: cache.fileURL)
-            try? FileManager.default.removeItem(at: tempURL)
-        }
-        if let responseEtag = http.value(forHTTPHeaderField: "ETag"),
-           !responseEtag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            saveCachedEtag(responseEtag, to: cache.etagURL)
-        }
-        return cache.fileURL
     }
 
     func settings() async throws -> SettingsDto {
@@ -616,6 +693,7 @@ final class APIClient {
     private struct DownloadCacheURLs {
         let fileURL: URL
         let etagURL: URL
+        let partialURL: URL
     }
 
     private func resolveDownloadCacheURLs(fileId: Int64, safeName: String) throws -> DownloadCacheURLs {
@@ -630,7 +708,8 @@ final class APIClient {
         let baseName = "file_\(fileId)_\(normalizedName)"
         let fileURL = folder.appendingPathComponent(baseName)
         let etagURL = folder.appendingPathComponent(baseName + ".etag")
-        return DownloadCacheURLs(fileURL: fileURL, etagURL: etagURL)
+        let partialURL = folder.appendingPathComponent(baseName + ".part")
+        return DownloadCacheURLs(fileURL: fileURL, etagURL: etagURL, partialURL: partialURL)
     }
 
     private func loadCachedEtag(from url: URL) -> String? {
@@ -703,11 +782,76 @@ final class APIClient {
         }
     }
 
+    private func appendChunk(_ chunk: Data, to url: URL, truncate: Bool) throws {
+        if truncate || !FileManager.default.fileExists(atPath: url.path) {
+            try writeFile(chunk, to: url)
+            return
+        }
+
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: chunk)
+    }
+
+    private func writeFile(_ data: Data, to url: URL) throws {
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: data)
+    }
+
+    private func finalizePartialDownload(from partialURL: URL, to finalURL: URL) throws -> URL {
+        if FileManager.default.fileExists(atPath: finalURL.path) {
+            try? FileManager.default.removeItem(at: finalURL)
+        }
+        do {
+            try FileManager.default.moveItem(at: partialURL, to: finalURL)
+        } catch {
+            try? FileManager.default.removeItem(at: finalURL)
+            try FileManager.default.copyItem(at: partialURL, to: finalURL)
+            try? FileManager.default.removeItem(at: partialURL)
+        }
+        return finalURL
+    }
+
+    private func parseTotalLength(fromContentRange contentRange: String?) -> Int64? {
+        guard let contentRange else { return nil }
+        // bytes 0-1023/4096
+        guard let slash = contentRange.lastIndex(of: "/") else { return nil }
+        let value = String(contentRange[contentRange.index(after: slash)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value != "*", let total = Int64(value) else { return nil }
+        return total
+    }
+
     private func requestCacheKey(for request: URLRequest) -> String {
         let method = request.httpMethod?.uppercased() ?? "GET"
         let url = request.url?.absoluteString ?? ""
         let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
         return "\(method)|\(url)|\(auth)"
+    }
+
+    private func cachePolicy(for request: URLRequest) -> GETCachePolicy {
+        let path = request.url?.path.lowercased() ?? ""
+
+        if path.contains("/api/devices/dashboard") {
+            return GETCachePolicy(freshTTL: 10, staleTTL: 40, allowsStaleWhileRevalidate: true)
+        }
+        if path.contains("/api/devices/paged") || path.contains("/api/audit") || path.contains("/api/change-records") {
+            return GETCachePolicy(freshTTL: 1.2, staleTTL: 5, allowsStaleWhileRevalidate: true)
+        }
+        if path.contains("/api/files") || path.contains("/api/webdav/browse") {
+            return GETCachePolicy(freshTTL: 2, staleTTL: 8, allowsStaleWhileRevalidate: true)
+        }
+        if path.contains("/api/departments")
+            || path.contains("/api/device-statuses")
+            || path.contains("/api/users")
+            || path.contains("/api/webdav/mounts")
+            || path.contains("/api/settings") {
+            return GETCachePolicy(freshTTL: 60, staleTTL: 300, allowsStaleWhileRevalidate: true)
+        }
+        return .default
     }
 
     private func decodeResponse<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
@@ -720,9 +864,19 @@ final class APIClient {
 
     private func sendCachedGet<T: Decodable>(request: URLRequest, as type: T.Type) async throws -> T {
         let key = requestCacheKey(for: request)
+        let policy = cachePolicy(for: request)
 
-        if let cached = await getResponseStore.cachedData(for: key) {
+        switch await getResponseStore.lookupCachedData(for: key, policy: policy) {
+        case let .fresh(cached):
             return try decodeResponse(T.self, from: cached)
+        case let .stale(stale):
+            if let decoded = try? decodeResponse(T.self, from: stale) {
+                await startBackgroundRefreshIfNeeded(key: key, request: request)
+                return decoded
+            }
+            await getResponseStore.removeCache(for: key)
+        case .miss:
+            break
         }
 
         if let running = await getResponseStore.runningTask(for: key) {
@@ -730,11 +884,7 @@ final class APIClient {
             return try decodeResponse(T.self, from: data)
         }
 
-        let task = Task<Data, Error> {
-            let (data, response) = try await self.session.data(for: request)
-            try self.validate(response: response, data: data)
-            return data
-        }
+        let task = makeGETFetchTask(request: request)
         await getResponseStore.setTask(task, for: key)
 
         do {
@@ -745,6 +895,35 @@ final class APIClient {
         } catch {
             await getResponseStore.clearTask(for: key)
             throw error
+        }
+    }
+
+    private func makeGETFetchTask(request: URLRequest) -> Task<Data, Error> {
+        Task<Data, Error> {
+            let (data, response) = try await self.session.data(for: request)
+            try self.validate(response: response, data: data)
+            return data
+        }
+    }
+
+    private func startBackgroundRefreshIfNeeded(key: String, request: URLRequest) async {
+        if await getResponseStore.runningTask(for: key) != nil {
+            return
+        }
+
+        let refreshTask = makeGETFetchTask(request: request)
+        await getResponseStore.setTask(refreshTask, for: key)
+
+        Task.detached { [weak self] in
+            guard let self else { return }
+            defer {
+                Task {
+                    await self.getResponseStore.clearTask(for: key)
+                }
+            }
+            if let data = try? await refreshTask.value {
+                await self.getResponseStore.store(data, for: key)
+            }
         }
     }
 

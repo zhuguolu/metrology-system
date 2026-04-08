@@ -5,6 +5,12 @@ import MainLayout from '../views/MainLayout.vue'
 import DashboardView from '../views/DashboardView.vue'
 import EquipmentView from '../views/EquipmentView.vue'
 import CalibrationView from '../views/CalibrationView.vue'
+import AnalysisView from '../views/AnalysisView.vue'
+import AnalysisCpkView from '../views/analysis/AnalysisCpkView.vue'
+import AnalysisGrrView from '../views/analysis/AnalysisGrrView.vue'
+import AnalysisRepeatabilityView from '../views/analysis/AnalysisRepeatabilityView.vue'
+import AnalysisReproducibilityView from '../views/analysis/AnalysisReproducibilityView.vue'
+import AnalysisLinearityView from '../views/analysis/AnalysisLinearityView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import DeviceStatusView from '../views/DeviceStatusView.vue'
 import UserManagementView from '../views/UserManagementView.vue'
@@ -31,6 +37,18 @@ const router = createRouter({
         { path: 'equipment', component: EquipmentView },
         { path: 'device-status', component: DeviceStatusView },
         { path: 'calibration', component: CalibrationView },
+        {
+          path: 'analysis',
+          component: AnalysisView,
+          children: [
+            { path: '', redirect: '/analysis/cpk' },
+            { path: 'cpk', component: AnalysisCpkView },
+            { path: 'grr', component: AnalysisGrrView },
+            { path: 'repeatability', component: AnalysisRepeatabilityView },
+            { path: 'reproducibility', component: AnalysisReproducibilityView },
+            { path: 'linearity', component: AnalysisLinearityView }
+          ]
+        },
         { path: 'todo', component: TodoView },
         { path: 'departments', component: DepartmentView, meta: { requiresAdmin: true } },
         { path: 'users', component: UserManagementView },
