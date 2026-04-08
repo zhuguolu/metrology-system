@@ -221,7 +221,14 @@ final class FilesViewModel: ObservableObject {
         var failCount = 0
 
         for url in urls {
-            guard let payload = resolveUploadPayload(from: url) else {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            guard let payload = resolveUploadMetadata(from: url) else {
                 failCount += 1
                 continue
             }
@@ -231,7 +238,7 @@ final class FilesViewModel: ObservableObject {
                     parentId: currentFolderId,
                     fileName: payload.name,
                     mimeType: payload.mimeType,
-                    bytes: payload.bytes
+                    fileURL: payload.fileURL
                 )
                 successCount += 1
             } catch {
@@ -446,13 +453,12 @@ final class FilesViewModel: ObservableObject {
             }
             do {
                 let sourceURL = try await APIClient.shared.downloadFile(id: id, suggestedName: item.name)
-                let data = try Data(contentsOf: sourceURL)
                 let copiedName = makeCopyName(from: item.displayName, usedNames: &usedNames)
                 _ = try await APIClient.shared.uploadFile(
                     parentId: currentFolderId,
                     fileName: copiedName,
                     mimeType: item.mimeType,
-                    bytes: data
+                    fileURL: sourceURL
                 )
                 successCount += 1
             } catch {
@@ -520,21 +526,13 @@ final class FilesViewModel: ObservableObject {
         return "扫描同步完成：新增目录 \(foldersCreated)，新增文件 \(filesCreated)，删除目录 \(foldersDeleted)，删除文件 \(filesDeleted)"
     }
 
-    private func resolveUploadPayload(from url: URL) -> UploadPayload? {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
+    private func resolveUploadMetadata(from url: URL) -> UploadPayload? {
         do {
-            let data = try Data(contentsOf: url)
             let name = url.lastPathComponent.isEmpty
                 ? "upload_\(Int(Date().timeIntervalSince1970)).bin"
                 : url.lastPathComponent
             let mimeType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType?.preferredMIMEType
-            return UploadPayload(name: name, mimeType: mimeType, bytes: data)
+            return UploadPayload(name: name, mimeType: mimeType, fileURL: url)
         } catch {
             return nil
         }
@@ -661,5 +659,5 @@ final class FilesViewModel: ObservableObject {
 private struct UploadPayload {
     let name: String
     let mimeType: String?
-    let bytes: Data
+    let fileURL: URL
 }

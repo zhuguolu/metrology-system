@@ -721,7 +721,14 @@ final class WebDavViewModel: ObservableObject {
         let uploadPath = currentPath.isEmpty ? "/" : (currentPath.hasSuffix("/") ? currentPath : currentPath + "/")
 
         for url in urls {
-            guard let payload = readUploadPayload(from: url) else {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            guard let payload = readUploadMetadata(from: url) else {
                 fail += 1
                 continue
             }
@@ -731,7 +738,7 @@ final class WebDavViewModel: ObservableObject {
                     path: uploadPath,
                     fileName: payload.name,
                     mimeType: payload.mimeType,
-                    bytes: payload.bytes
+                    fileURL: payload.fileURL
                 )
                 success += 1
             } catch {
@@ -857,19 +864,11 @@ final class WebDavViewModel: ObservableObject {
         }
     }
 
-    private func readUploadPayload(from url: URL) -> UploadPayload? {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
+    private func readUploadMetadata(from url: URL) -> UploadPayload? {
         do {
-            let data = try Data(contentsOf: url)
             let filename = url.lastPathComponent.isEmpty ? "upload_\(Int(Date().timeIntervalSince1970)).bin" : url.lastPathComponent
             let mimeType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType?.preferredMIMEType
-            return UploadPayload(name: filename, mimeType: mimeType, bytes: data)
+            return UploadPayload(name: filename, mimeType: mimeType, fileURL: url)
         } catch {
             return nil
         }
@@ -904,7 +903,7 @@ final class WebDavViewModel: ObservableObject {
 private struct UploadPayload {
     let name: String
     let mimeType: String?
-    let bytes: Data
+    let fileURL: URL
 }
 
 private struct ActivitySheet: UIViewControllerRepresentable {

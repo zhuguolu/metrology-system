@@ -67,7 +67,7 @@ final class AppState: ObservableObject {
 
     init() {
         session = SessionStore.load()
-        APIClient.shared.tokenProvider = { SessionStore.load()?.token }
+        setAPIToken(session?.token)
         triggerIncomingImportTargetSelection()
     }
 
@@ -92,14 +92,14 @@ final class AppState: ObservableObject {
         )
         session = value
         SessionStore.save(value)
-        APIClient.shared.tokenProvider = { SessionStore.load()?.token }
+        setAPIToken(value.token)
         triggerIncomingImportTargetSelection()
     }
 
     func logout() {
         session = nil
         SessionStore.clear()
-        APIClient.shared.tokenProvider = { nil }
+        setAPIToken(nil)
         incomingImportPicker = nil
     }
 
@@ -238,12 +238,11 @@ final class AppState: ObservableObject {
 
         for pending in currentQueue {
             do {
-                let bytes = try await readIncomingFileBytes(from: pending.localURL)
                 _ = try await APIClient.shared.uploadFile(
                     parentId: targetFolderId,
                     fileName: pending.fileName,
                     mimeType: pending.mimeType,
-                    bytes: bytes
+                    fileURL: pending.localURL
                 )
                 removeLocalIncomingFileIfExists(pending.localURL)
                 successCount += 1
@@ -284,12 +283,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func readIncomingFileBytes(from url: URL) async throws -> Data {
-        try await Task.detached(priority: .utility) {
-            try Data(contentsOf: url)
-        }.value
-    }
-
     private func removeLocalIncomingFileIfExists(_ url: URL) {
         do {
             if FileManager.default.fileExists(atPath: url.path) {
@@ -298,6 +291,10 @@ final class AppState: ObservableObject {
         } catch {
             // Ignore cleanup errors to avoid interrupting user flow.
         }
+    }
+
+    private func setAPIToken(_ token: String?) {
+        APIClient.shared.tokenProvider = { token }
     }
 }
 
@@ -325,8 +322,7 @@ private func stageIncomingExternalFile(from sourceURL: URL) throws -> PendingImp
     do {
         try FileManager.default.copyItem(at: sourceURL, to: targetURL)
     } catch {
-        let bytes = try Data(contentsOf: sourceURL)
-        try bytes.write(to: targetURL, options: .atomic)
+        try copyFileByStreaming(from: sourceURL, to: targetURL)
     }
 
     return PendingImportedFile(
@@ -377,4 +373,26 @@ private func normalizedIncomingFileName(_ value: String) -> String {
         return trimmed
     }
     return "import_\(Int(Date().timeIntervalSince1970)).bin"
+}
+
+private func copyFileByStreaming(from sourceURL: URL, to targetURL: URL) throws {
+    FileManager.default.createFile(atPath: targetURL.path, contents: nil)
+    let input = try FileHandle(forReadingFrom: sourceURL)
+    let output = try FileHandle(forWritingTo: targetURL)
+    do {
+        defer {
+            try? input.close()
+            try? output.close()
+        }
+        while true {
+            let chunk = try input.read(upToCount: 64 * 1024) ?? Data()
+            if chunk.isEmpty {
+                break
+            }
+            try output.write(contentsOf: chunk)
+        }
+    } catch {
+        try? FileManager.default.removeItem(at: targetURL)
+        throw error
+    }
 }

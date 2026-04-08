@@ -34,15 +34,63 @@ final class APIClient {
 
     var tokenProvider: () -> String? = { nil }
 
+    private actor GETResponseStore {
+        struct CacheEntry {
+            let data: Data
+            let timestamp: Date
+        }
+
+        private let ttl: TimeInterval
+        private var cache: [String: CacheEntry] = [:]
+        private var inFlight: [String: Task<Data, Error>] = [:]
+
+        init(ttl: TimeInterval) {
+            self.ttl = ttl
+        }
+
+        func cachedData(for key: String, now: Date = Date()) -> Data? {
+            guard let entry = cache[key] else {
+                return nil
+            }
+            if now.timeIntervalSince(entry.timestamp) > ttl {
+                cache.removeValue(forKey: key)
+                return nil
+            }
+            return entry.data
+        }
+
+        func runningTask(for key: String) -> Task<Data, Error>? {
+            inFlight[key]
+        }
+
+        func setTask(_ task: Task<Data, Error>, for key: String) {
+            inFlight[key] = task
+        }
+
+        func clearTask(for key: String) {
+            inFlight.removeValue(forKey: key)
+        }
+
+        func store(_ data: Data, for key: String, now: Date = Date()) {
+            cache[key] = CacheEntry(data: data, timestamp: now)
+        }
+
+        func invalidateAll() {
+            cache.removeAll(keepingCapacity: true)
+        }
+    }
+
     private let session: URLSession
     private let baseURL: URL
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let getResponseStore: GETResponseStore
 
     private init() {
         self.session = URLSession(configuration: .default)
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+        self.getResponseStore = GETResponseStore(ttl: 1.2)
 
         let raw = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String
         let fallback = "https://cms.zglweb.cn:6606/"
@@ -132,6 +180,7 @@ final class APIClient {
         )
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
+        await getResponseStore.invalidateAll()
 
         if let created = try? decoder.decode(DeviceDto.self, from: data) {
             return .created(created)
@@ -198,27 +247,34 @@ final class APIClient {
         return try await send(path: "api/files/folder", method: "POST", body: payload, authorized: true)
     }
 
-    func uploadFile(parentId: Int64?, fileName: String, mimeType: String?, bytes: Data) async throws -> UserFileItemDto {
+    func uploadFile(parentId: Int64?, fileName: String, mimeType: String?, fileURL: URL) async throws -> UserFileItemDto {
         let boundary = "Boundary-\(UUID().uuidString)"
-        let body = makeMultipartBody(
+        let multipartFileURL = try makeMultipartBodyFile(
             boundary: boundary,
             fileField: "file",
             fileName: fileName,
             mimeType: mimeType ?? "application/octet-stream",
-            fileBytes: bytes
+            sourceFileURL: fileURL
         )
+        defer { try? FileManager.default.removeItem(at: multipartFileURL) }
+
         var query: [URLQueryItem] = []
         if let parentId {
             query.append(URLQueryItem(name: "parentId", value: String(parentId)))
         }
 
-        var request = try makeRequest(path: "api/files/upload", method: "POST", queryItems: query, bodyData: body, authorized: true)
+        var request = try makeRequest(path: "api/files/upload", method: "POST", queryItems: query, bodyData: nil, authorized: true)
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBodyStream = InputStream(url: multipartFileURL)
+        if let bodySize = fileByteLength(at: multipartFileURL) {
+            request.setValue(String(bodySize), forHTTPHeaderField: "Content-Length")
+        }
 
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
-        return try decoder.decode(UserFileItemDto.self, from: data)
+        await getResponseStore.invalidateAll()
+        return try decodeResponse(UserFileItemDto.self, from: data)
     }
 
     func scanSync(parentId: Int64?) async throws -> ScanSyncResultDto {
@@ -267,12 +323,13 @@ final class APIClient {
             request.setValue(cachedEtag, forHTTPHeaderField: "If-None-Match")
         }
 
-        let (data, response) = try await session.data(for: request)
+        let (tempURL, response) = try await session.download(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw APIError.unknown
         }
 
         if http.statusCode == 304, FileManager.default.fileExists(atPath: cache.fileURL.path) {
+            try? FileManager.default.removeItem(at: tempURL)
             return cache.fileURL
         }
 
@@ -280,11 +337,21 @@ final class APIClient {
             if http.statusCode == 401 {
                 throw APIError.unauthorized
             }
+            let data = (try? Data(contentsOf: tempURL)) ?? Data()
             let message = extractErrorMessage(from: data)
             throw APIError.httpStatus(http.statusCode, message)
         }
 
-        try data.write(to: cache.fileURL, options: .atomic)
+        if FileManager.default.fileExists(atPath: cache.fileURL.path) {
+            try? FileManager.default.removeItem(at: cache.fileURL)
+        }
+        do {
+            try FileManager.default.moveItem(at: tempURL, to: cache.fileURL)
+        } catch {
+            try? FileManager.default.removeItem(at: cache.fileURL)
+            try FileManager.default.copyItem(at: tempURL, to: cache.fileURL)
+            try? FileManager.default.removeItem(at: tempURL)
+        }
         if let responseEtag = http.value(forHTTPHeaderField: "ETag"),
            !responseEtag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             saveCachedEtag(responseEtag, to: cache.etagURL)
@@ -485,35 +552,61 @@ final class APIClient {
 
         var request = try makeRequest(path: "api/webdav/download", method: "GET", queryItems: query, bodyData: nil, authorized: true)
         request.timeoutInterval = 180
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
+        let (tempURL, response) = try await session.download(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.unknown
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            let data = (try? Data(contentsOf: tempURL)) ?? Data()
+            let message = extractErrorMessage(from: data)
+            throw APIError.httpStatus(http.statusCode, message)
+        }
 
         let safeName = sanitizeFilename(filename ?? URL(fileURLWithPath: path).lastPathComponent)
         let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "_" + safeName)
-        try data.write(to: fileURL, options: .atomic)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+        do {
+            try FileManager.default.moveItem(at: tempURL, to: fileURL)
+        } catch {
+            try FileManager.default.copyItem(at: tempURL, to: fileURL)
+            try? FileManager.default.removeItem(at: tempURL)
+        }
         return fileURL
     }
 
-    func webDavUpload(mountId: Int64, path: String, fileName: String, mimeType: String?, bytes: Data) async throws -> SimpleMessageResponse {
+    func webDavUpload(mountId: Int64, path: String, fileName: String, mimeType: String?, fileURL: URL) async throws -> SimpleMessageResponse {
         let boundary = "Boundary-\(UUID().uuidString)"
-        let body = makeMultipartBody(
+        let multipartFileURL = try makeMultipartBodyFile(
             boundary: boundary,
             fileField: "file",
             fileName: fileName,
             mimeType: mimeType ?? "application/octet-stream",
-            fileBytes: bytes
+            sourceFileURL: fileURL
         )
+        defer { try? FileManager.default.removeItem(at: multipartFileURL) }
+
         let query = [
             URLQueryItem(name: "mountId", value: String(mountId)),
             URLQueryItem(name: "path", value: path)
         ]
-        var request = try makeRequest(path: "api/webdav/upload", method: "POST", queryItems: query, bodyData: body, authorized: true)
+        var request = try makeRequest(path: "api/webdav/upload", method: "POST", queryItems: query, bodyData: nil, authorized: true)
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBodyStream = InputStream(url: multipartFileURL)
+        if let bodySize = fileByteLength(at: multipartFileURL) {
+            request.setValue(String(bodySize), forHTTPHeaderField: "Content-Length")
+        }
 
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
-        return try decoder.decode(SimpleMessageResponse.self, from: data)
+        await getResponseStore.invalidateAll()
+        return try decodeResponse(SimpleMessageResponse.self, from: data)
     }
 
     private func sanitizeFilename(_ value: String) -> String {
@@ -554,22 +647,109 @@ final class APIClient {
         try? value.write(to: url, atomically: true, encoding: .utf8)
     }
 
-    private func makeMultipartBody(
+    private func fileByteLength(at url: URL) -> Int64? {
+        if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            return Int64(size)
+        }
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let number = attrs[.size] as? NSNumber {
+            return number.int64Value
+        }
+        return nil
+    }
+
+    private func makeMultipartBodyFile(
         boundary: String,
         fileField: String,
         fileName: String,
         mimeType: String,
-        fileBytes: Data
-    ) -> Data {
-        var data = Data()
-        let lineBreak = "\r\n"
-        data.append("--\(boundary)\(lineBreak)".data(using: .utf8)!)
-        data.append("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(fileName)\"\(lineBreak)".data(using: .utf8)!)
-        data.append("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)".data(using: .utf8)!)
-        data.append(fileBytes)
-        data.append(lineBreak.data(using: .utf8)!)
-        data.append("--\(boundary)--\(lineBreak)".data(using: .utf8)!)
-        return data
+        sourceFileURL: URL
+    ) throws -> URL {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("multipart_\(UUID().uuidString).tmp", isDirectory: false)
+        FileManager.default.createFile(atPath: tempURL.path, contents: nil)
+
+        let outputHandle = try FileHandle(forWritingTo: tempURL)
+        do {
+            try appendMultipartText("--\(boundary)\r\n", to: outputHandle)
+            try appendMultipartText("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(fileName)\"\r\n", to: outputHandle)
+            try appendMultipartText("Content-Type: \(mimeType)\r\n\r\n", to: outputHandle)
+            try appendFileContents(from: sourceFileURL, to: outputHandle)
+            try appendMultipartText("\r\n--\(boundary)--\r\n", to: outputHandle)
+            try outputHandle.close()
+            return tempURL
+        } catch {
+            try? outputHandle.close()
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
+        }
+    }
+
+    private func appendMultipartText(_ text: String, to handle: FileHandle) throws {
+        guard let data = text.data(using: .utf8) else { return }
+        try handle.write(contentsOf: data)
+    }
+
+    private func appendFileContents(from sourceURL: URL, to outputHandle: FileHandle) throws {
+        let inputHandle = try FileHandle(forReadingFrom: sourceURL)
+        defer { try? inputHandle.close() }
+
+        while true {
+            let chunk = try inputHandle.read(upToCount: 64 * 1024) ?? Data()
+            if chunk.isEmpty {
+                break
+            }
+            try outputHandle.write(contentsOf: chunk)
+        }
+    }
+
+    private func requestCacheKey(for request: URLRequest) -> String {
+        let method = request.httpMethod?.uppercased() ?? "GET"
+        let url = request.url?.absoluteString ?? ""
+        let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
+        return "\(method)|\(url)|\(auth)"
+    }
+
+    private func decodeResponse<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw APIError.decodingFailed
+        }
+    }
+
+    private func sendCachedGet<T: Decodable>(request: URLRequest, as type: T.Type) async throws -> T {
+        let key = requestCacheKey(for: request)
+
+        if let cached = await getResponseStore.cachedData(for: key) {
+            return try decodeResponse(T.self, from: cached)
+        }
+
+        if let running = await getResponseStore.runningTask(for: key) {
+            let data = try await running.value
+            return try decodeResponse(T.self, from: data)
+        }
+
+        let task = Task<Data, Error> {
+            let (data, response) = try await self.session.data(for: request)
+            try self.validate(response: response, data: data)
+            return data
+        }
+        await getResponseStore.setTask(task, for: key)
+
+        do {
+            let data = try await task.value
+            await getResponseStore.store(data, for: key)
+            await getResponseStore.clearTask(for: key)
+            return try decodeResponse(T.self, from: data)
+        } catch {
+            await getResponseStore.clearTask(for: key)
+            throw error
+        }
+    }
+
+    private func invalidateGetCaches() async {
+        await getResponseStore.invalidateAll()
     }
 
     private func send<T: Decodable>(
@@ -579,13 +759,13 @@ final class APIClient {
         authorized: Bool
     ) async throws -> T {
         let request = try makeRequest(path: path, method: method, queryItems: queryItems, bodyData: nil, authorized: authorized)
+        if method.uppercased() == "GET" {
+            return try await sendCachedGet(request: request, as: T.self)
+        }
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            throw APIError.decodingFailed
-        }
+        await invalidateGetCaches()
+        return try decodeResponse(T.self, from: data)
     }
 
     private func send<T: Decodable, U: Encodable>(
@@ -598,11 +778,8 @@ final class APIClient {
         let request = try makeRequest(path: path, method: method, queryItems: [], bodyData: bodyData, authorized: authorized)
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            throw APIError.decodingFailed
-        }
+        await invalidateGetCaches()
+        return try decodeResponse(T.self, from: data)
     }
 
     private func sendWithoutResponse(
@@ -614,6 +791,7 @@ final class APIClient {
         let request = try makeRequest(path: path, method: method, queryItems: queryItems, bodyData: nil, authorized: authorized)
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
+        await invalidateGetCaches()
     }
 
     private func makeRequest(
