@@ -309,11 +309,13 @@ import { ref, reactive, computed, onMounted, onUnmounted, inject } from 'vue'
 import { deviceApi, deptApi, deviceStatusApi } from '../api/index.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useViewCache } from '../composables/useViewCache.js'
 
 const showToast = inject('showToast')
 const authStore = useAuthStore()
 const calibrationCache = useViewCache('calibration-view', { ttlMs: 30 * 60 * 1000 })
+useScrollMemory('calibration-view')
 const devices = ref([])
 const totalItems = ref(0)
 const summaryCounts = ref({})

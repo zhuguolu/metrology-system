@@ -156,9 +156,15 @@
         <div>创建时间</div>
       </div>
 
-      <div class="files-grid" :class="`${viewMode}-mode`">
+      <div ref="filesGridRef" class="files-grid" :class="`${viewMode}-mode`">
       <div
-        v-for="item in displayItems"
+        v-if="virtualListEnabled && virtualPaddingTop > 0"
+        class="file-list-spacer"
+        :style="{ height: `${virtualPaddingTop}px` }"
+        aria-hidden="true"
+      ></div>
+      <div
+        v-for="item in renderedItems"
         :key="item.id"
         class="file-item"
         :class="{ selected: isSelected(item.id), 'drop-target': dragTargetFolderId === item.id }"
@@ -224,6 +230,12 @@
           </template>
         </div>
       </div>
+      <div
+        v-if="virtualListEnabled && virtualPaddingBottom > 0"
+        class="file-list-spacer"
+        :style="{ height: `${virtualPaddingBottom}px` }"
+        aria-hidden="true"
+      ></div>
     </div>
     </div>
 
@@ -469,11 +481,15 @@
           <span>{{ previewTypeLabel }}</span>
           <span v-if="previewMeta?.lastModified">{{ previewLastModifiedLabel }}</span>
         </div>
+        <div v-if="previewMeta?.previewMessage" class="file-preview-note">
+          {{ previewMeta.previewMessage }}
+        </div>
 
         <div v-if="previewError" class="file-preview-empty">
           <div class="file-preview-error-stack">
             <div>{{ previewError }}</div>
-            <el-button v-if="previewItem" type="primary" plain @click="retryPreview">重新加载</el-button>
+            <el-button v-if="previewHasOfficeAction" type="primary" @click="triggerOfficePreviewFromDialog">在线预览</el-button>
+            <el-button v-else-if="canRetryPreview" type="primary" plain @click="retryPreview">重新加载</el-button>
           </div>
         </div>
 
@@ -543,6 +559,7 @@
       </div>
       <template #footer>
         <el-button @click="closePreview">关闭</el-button>
+        <el-button v-if="previewHasOfficeAction" @click="triggerOfficePreviewFromDialog">在线预览</el-button>
         <el-button v-if="previewItem" type="primary" @click="downloadFile(previewItem)">下载文件</el-button>
       </template>
     </el-dialog>
@@ -556,6 +573,7 @@ import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { fileApi } from '../api/index.js'
 import { usePinchZoom } from '../composables/usePinchZoom.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useAuthStore } from '../stores/auth.js'
 
 const showToast = inject('showToast')
@@ -568,6 +586,7 @@ const currentFolderId = ref(null)
 const currentFolderAccess = ref({ readOnly: false, canWrite: authStore.canAccessFiles })
 const uploadRef = ref(null)
 const gridWrapRef = ref(null)
+const filesGridRef = ref(null)
 
 const searchQuery = ref('')
 const searchResults = ref([])
@@ -668,10 +687,42 @@ const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024
 const previewZoom = usePinchZoom()
 const previewTouchWrapRef = previewZoom.containerRef
 const previewTouchImageRef = previewZoom.contentRef
+const { scheduleRestoreScroll } = useScrollMemory('files-view')
+const LIST_VIRTUAL_THRESHOLD = 80
+const LIST_VIRTUAL_OVERSCAN = 8
+const LIST_ROW_STRIDE_DESKTOP = 62
+const LIST_ROW_STRIDE_MOBILE = 58
+const GRID_CHUNK_THRESHOLD = 180
+const GRID_CHUNK_STEP = 120
+const virtualWindowStart = ref(0)
+const virtualWindowEnd = ref(0)
+const virtualPaddingTop = ref(0)
+const virtualPaddingBottom = ref(0)
+const gridRenderLimit = ref(GRID_CHUNK_STEP)
+let virtualRefreshFrame = 0
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const displayItems = computed(() => (isSearching.value ? searchResults.value : items.value))
+const virtualListEnabled = computed(() =>
+  viewMode.value === 'list'
+  && displayItems.value.length > LIST_VIRTUAL_THRESHOLD
+  && !selectionMode.value
+  && !selectionBox.value.active
+)
+const gridChunkEnabled = computed(() =>
+  viewMode.value === 'grid'
+  && displayItems.value.length > GRID_CHUNK_THRESHOLD
+  && !selectionMode.value
+  && !selectionBox.value.active
+)
+const renderedItems = computed(() =>
+  virtualListEnabled.value
+    ? displayItems.value.slice(virtualWindowStart.value, virtualWindowEnd.value)
+    : (gridChunkEnabled.value
+      ? displayItems.value.slice(0, gridRenderLimit.value)
+      : displayItems.value)
+)
 const currentFolderLabel = computed(() => breadcrumbs.value.at(-1)?.name || '根目录')
 const canWriteCurrentFolder = computed(() => !!currentFolderAccess.value?.canWrite)
 const showWriteActions = computed(() => canWriteCurrentFolder.value && !isSearching.value)
@@ -729,10 +780,19 @@ const previewTypeLabel = computed(() => {
     video: '视频预览',
     audio: '音频预览',
     text: '文本预览',
+    office: 'Office 文件',
+    archive: '压缩文件',
+    binary: '文件预览',
     unsupported: '暂不支持预览',
   }
   return labels[previewType.value] || '文件预览'
 })
+const previewHasOfficeAction = computed(() =>
+  !!previewItem.value && previewMeta.value?.previewMode === 'office-online'
+)
+const canRetryPreview = computed(() =>
+  !!previewItem.value && !previewHasOfficeAction.value && previewMeta.value?.autoPreview !== false
+)
 const previewLastModifiedLabel = computed(() => {
   if (!previewMeta.value?.lastModified) return ''
   const date = new Date(previewMeta.value.lastModified)
@@ -743,6 +803,64 @@ const previewLastModifiedLabel = computed(() => {
 function syncMobilePreviewState() {
   if (typeof window === 'undefined') return
   isMobilePreview.value = window.innerWidth <= 768
+}
+
+function currentListRowStride() {
+  return isMobilePreview.value ? LIST_ROW_STRIDE_MOBILE : LIST_ROW_STRIDE_DESKTOP
+}
+
+function updateVirtualWindow() {
+  if (!virtualListEnabled.value || !filesGridRef.value || typeof window === 'undefined') {
+    virtualWindowStart.value = 0
+    virtualWindowEnd.value = displayItems.value.length
+    virtualPaddingTop.value = 0
+    virtualPaddingBottom.value = 0
+    return
+  }
+
+  const rect = filesGridRef.value.getBoundingClientRect()
+  const pageTop = window.scrollY + rect.top
+  const viewportTop = window.scrollY
+  const viewportHeight = Math.max(window.innerHeight || 0, 1)
+  const stride = currentListRowStride()
+  const total = displayItems.value.length
+  const rawStart = Math.floor((viewportTop - pageTop) / stride)
+  const start = Math.max(0, rawStart - LIST_VIRTUAL_OVERSCAN)
+  const visibleCount = Math.ceil(viewportHeight / stride) + LIST_VIRTUAL_OVERSCAN * 2
+  const end = Math.min(total, start + visibleCount)
+
+  virtualWindowStart.value = start
+  virtualWindowEnd.value = Math.max(start, end)
+  virtualPaddingTop.value = start * stride
+  virtualPaddingBottom.value = Math.max(0, (total - end) * stride)
+}
+
+function updateGridRenderLimit() {
+  if (!gridChunkEnabled.value || !filesGridRef.value || typeof window === 'undefined') {
+    gridRenderLimit.value = Math.max(GRID_CHUNK_STEP, displayItems.value.length)
+    return
+  }
+
+  if (gridRenderLimit.value < GRID_CHUNK_STEP) {
+    gridRenderLimit.value = GRID_CHUNK_STEP
+  }
+
+  const rect = filesGridRef.value.getBoundingClientRect()
+  const preloadOffset = 480
+  const nearBottom = rect.bottom - window.innerHeight <= preloadOffset
+  if (nearBottom) {
+    gridRenderLimit.value = Math.min(displayItems.value.length, gridRenderLimit.value + GRID_CHUNK_STEP)
+  }
+}
+
+function scheduleVirtualRefresh() {
+  if (typeof window === 'undefined') return
+  if (virtualRefreshFrame) window.cancelAnimationFrame(virtualRefreshFrame)
+  virtualRefreshFrame = window.requestAnimationFrame(() => {
+    virtualRefreshFrame = 0
+    updateVirtualWindow()
+    updateGridRenderLimit()
+  })
 }
 const contextDeleteLabel = computed(() => {
   if (!contextMenu.value.item) return '删除'
@@ -786,6 +904,7 @@ function setViewMode(mode) {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem('files-view-mode', viewMode.value)
   }
+  scheduleVirtualRefresh()
 }
 
 function toggleViewMode() {
@@ -1780,13 +1899,17 @@ function resolvePreviewType(item) {
   const textExts = new Set(['txt', 'md', 'json', 'csv', 'log', 'xml', 'html', 'htm', 'js', 'ts', 'css', 'java', 'sql', 'yml', 'yaml'])
   const videoExts = new Set(['mp4', 'webm', 'ogg', 'mov'])
   const audioExts = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac'])
+  const officeExts = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
+  const archiveExts = new Set(['zip', 'rar', '7z', 'tar', 'gz'])
 
   if (mime.startsWith('image/') || imageExts.has(ext)) return 'image'
   if (mime.includes('pdf') || ext === 'pdf') return 'pdf'
   if (mime.startsWith('video/') || videoExts.has(ext)) return 'video'
   if (mime.startsWith('audio/') || audioExts.has(ext)) return 'audio'
   if (mime.startsWith('text/') || textExts.has(ext) || mime.includes('json') || mime.includes('xml')) return 'text'
-  return 'unsupported'
+  if (officeExts.has(ext)) return 'office'
+  if (archiveExts.has(ext)) return 'archive'
+  return 'binary'
 }
 
 function isImagePreviewable(item) {
@@ -2049,6 +2172,11 @@ function retryPreview() {
   previewFile(previewItem.value, { forceRefresh: true })
 }
 
+function triggerOfficePreviewFromDialog() {
+  if (!previewItem.value) return
+  openOnlinePreview(previewItem.value)
+}
+
 watch(showPreviewDialog, visible => {
   if (!visible) {
     handlePreviewDialogClose()
@@ -2066,15 +2194,18 @@ async function previewFile(item, options = {}) {
   previewLoading.value = true
   previewType.value = resolvePreviewType(item)
 
-  if (previewType.value === 'unsupported') {
-    previewLoading.value = false
-    return
-  }
-
   try {
     const metaResponse = await fileApi.info(item.id)
     if (requestToken !== previewRequestToken || !showPreviewDialog.value) return
     previewMeta.value = metaResponse.data || null
+    if (previewMeta.value?.previewType) {
+      previewType.value = previewMeta.value.previewType
+    }
+    if (previewMeta.value?.autoPreview === false || previewMeta.value?.previewSupported === false) {
+      previewError.value = previewMeta.value?.previewMessage || '当前文件类型暂不支持在线预览，请直接下载查看。'
+      previewLoading.value = false
+      return
+    }
     const cacheKey = buildPreviewCacheKey(item, previewMeta.value)
     currentPreviewCacheKey = cacheKey
     if (!forceRefresh && applyPreviewCacheEntry(previewCache.get(cacheKey))) {
@@ -2256,9 +2387,23 @@ async function refreshFilesPage() {
     doSearch(searchQuery.value.trim())
   }
   await loadBreadcrumb(currentFolderId.value)
+  scheduleVirtualRefresh()
+  scheduleRestoreScroll()
 }
 
 useResumeRefresh(refreshFilesPage)
+
+watch(
+  () => [displayItems.value.length, viewMode.value, selectionMode.value, selectionBox.value.active, isMobilePreview.value],
+  () => {
+    if (gridChunkEnabled.value) {
+      gridRenderLimit.value = GRID_CHUNK_STEP
+    } else {
+      gridRenderLimit.value = Math.max(GRID_CHUNK_STEP, displayItems.value.length)
+    }
+    scheduleVirtualRefresh()
+  }
+)
 
 onMounted(() => {
   syncMobilePreviewState()
@@ -2268,8 +2413,12 @@ onMounted(() => {
   window.addEventListener('drop', onDrop)
   window.addEventListener('resize', closeContextMenu)
   window.addEventListener('resize', syncMobilePreviewState)
+  window.addEventListener('resize', scheduleVirtualRefresh)
   window.addEventListener('scroll', closeContextMenu, true)
+  window.addEventListener('scroll', scheduleVirtualRefresh, true)
   loadFiles(null)
+  scheduleVirtualRefresh()
+  scheduleRestoreScroll()
 })
 
 onBeforeUnmount(() => {
@@ -2279,7 +2428,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('drop', onDrop)
   window.removeEventListener('resize', closeContextMenu)
   window.removeEventListener('resize', syncMobilePreviewState)
+  window.removeEventListener('resize', scheduleVirtualRefresh)
   window.removeEventListener('scroll', closeContextMenu, true)
+  window.removeEventListener('scroll', scheduleVirtualRefresh, true)
   clearLongPressState()
   closeContextMenu()
   stopSelectionTracking()
@@ -2289,6 +2440,10 @@ onBeforeUnmount(() => {
   resetPreviewState()
   Array.from(previewCache.keys()).forEach(removePreviewCacheEntry)
   invalidateFilesPageCache()
+  if (virtualRefreshFrame && typeof window !== 'undefined') {
+    window.cancelAnimationFrame(virtualRefreshFrame)
+    virtualRefreshFrame = 0
+  }
 })
 </script>
 
@@ -2980,6 +3135,11 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr;
   gap: 6px;
 }
+.file-list-spacer {
+  width: 100%;
+  grid-column: 1 / -1;
+  pointer-events: none;
+}
 .files-grid.list-mode .file-item {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
@@ -3422,6 +3582,17 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
+}
+
+.file-preview-note {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(239, 246, 255, 0.88);
+  color: #4a6289;
+  font-size: 13px;
+  line-height: 1.6;
 }
 @media (max-width: 768px) {
   .file-toolbar {

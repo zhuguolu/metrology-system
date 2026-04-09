@@ -23,9 +23,12 @@
       <div class="grr-hint">
         按模板可直接粘贴 Excel 数据。最少需要 {{ requiredSampleCount }} 个样本值，当前已识别 {{ sampleCount }} 个。
       </div>
+      <div v-if="isResultStale" class="grr-stale-banner">
+        当前 GRR 结果已与输入数据不一致，请重新计算后再导出完整报告。
+      </div>
       <div class="grr-actions">
         <el-button :loading="calculating" type="success" @click="calculateGrr">计算 GRR</el-button>
-        <el-button @click="exportFullReport">导出完整报告(.xls)</el-button>
+        <el-button :disabled="!grrResult || isResultStale" @click="exportFullReport">导出完整报告(.xls)</el-button>
         <el-button @click="copyTrialData">复制试验数据</el-button>
         <el-button @click="clearData">清空数据</el-button>
       </div>
@@ -87,7 +90,7 @@
           </div>
           <div class="grr-inline-actions">
             <el-button :loading="calculating" type="success" @click="calculateGrr">计算 GRR</el-button>
-            <el-button @click="exportFullReport">导出完整报告(.xls)</el-button>
+            <el-button :disabled="!grrResult || isResultStale" @click="exportFullReport">导出完整报告(.xls)</el-button>
             <el-button @click="copyTrialData">复制试验数据</el-button>
             <el-button @click="clearData">清空数据</el-button>
           </div>
@@ -261,6 +264,11 @@ const sampleCount = computed(() => {
   })
   return count
 })
+const isResultStale = computed(() =>
+  !!grrResult.value
+  && !!calculatedSignature.value
+  && currentDataSignature.value !== calculatedSignature.value
+)
 
 const currentDataSignature = computed(() => {
   const tolerance = toFiniteNumber(form.tolerance)
@@ -1200,6 +1208,10 @@ async function exportFullReport() {
     showToast(`样本值不足，当前 ${values.length} / 需要 ${requiredSampleCount.value}`, 'error')
     return
   }
+  if (!grrResult.value || isResultStale.value) {
+    showToast('当前结果与输入不一致，请先重新计算后再导出完整报告', 'error')
+    return
+  }
   try {
     const response = await analysisApi.grrReport(payload)
     const filename = parseFilenameFromDisposition(response?.headers?.['content-disposition'])
@@ -1382,6 +1394,17 @@ async function calculateGrr() {
   color: #64748b;
   font-size: 12px;
   padding: 10px 12px 0;
+}
+
+.grr-stale-banner {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .grr-actions {

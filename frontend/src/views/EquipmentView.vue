@@ -714,11 +714,13 @@ import { ref, reactive, computed, onMounted, onUnmounted, inject, nextTick } fro
 import { deviceApi, settingsApi, deviceStatusApi, deptApi } from '../api/index.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useViewCache } from '../composables/useViewCache.js'
 
 const showToast = inject('showToast')
 const authStore = useAuthStore()
 const equipmentCache = useViewCache('equipment-view', { ttlMs: 30 * 60 * 1000 })
+useScrollMemory('equipment-view')
 const loading = ref(false)
 const devices = ref([])
 const deviceStatuses = ref([])

@@ -141,12 +141,14 @@ import * as echarts from 'echarts'
 import { deviceApi } from '../api/index.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useViewCache } from '../composables/useViewCache.js'
 
 const authStore = useAuthStore()
 const stats = ref({ total:0, dueThisMonth:0, expired:0, warning:0, valid:0, monthlyTrend:[], deptStats:[] })
 const isMobile = ref(false)
 const dashboardCache = useViewCache('dashboard', { ttlMs: 30 * 60 * 1000 })
+useScrollMemory('dashboard-view')
 
 const barChartRef = ref(null)
 const pieChartRef = ref(null)

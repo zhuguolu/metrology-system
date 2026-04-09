@@ -7,6 +7,8 @@ struct Session: Codable {
     let username: String
     let role: String?
     let departments: [String]?
+    let permissions: [String]?
+    let readonlyFolderIds: [Int64]?
 }
 
 struct AppNotice: Identifiable {
@@ -66,6 +68,16 @@ final class AppState: ObservableObject {
         session != nil
     }
 
+    var canAccessFiles: Bool {
+        guard let session else { return false }
+        if (session.role ?? "").uppercased() == "ADMIN" {
+            return true
+        }
+        let hasFilePermission = (session.permissions ?? []).contains(PermissionCode.fileAccess)
+        let hasReadonlyFolder = !(session.readonlyFolderIds ?? []).isEmpty
+        return hasFilePermission || hasReadonlyFolder
+    }
+
     init() {
         APIClient.shared.unauthorizedHandler = { [weak self] in
             self?.handleUnauthorizedSignal()
@@ -85,7 +97,11 @@ final class AppState: ObservableObject {
             token: token,
             username: username,
             role: response.role,
-            departments: departmentValues
+            departments: departmentValues,
+            permissions: response.permissions,
+            readonlyFolderIds: response.readonlyFolderIds
+                ?? response.readonlyFolders?.compactMap(\.folderId)
+                ?? response.fileReadonlyFolders?.compactMap(\.folderId)
         )
         session = value
         SessionStore.save(value)
@@ -316,7 +332,12 @@ final class AppState: ObservableObject {
                 token: currentSession.token,
                 username: nextUsername,
                 role: profile.role ?? currentSession.role,
-                departments: normalizedDepartments(from: profile) ?? currentSession.departments
+                departments: normalizedDepartments(from: profile) ?? currentSession.departments,
+                permissions: profile.permissions ?? currentSession.permissions,
+                readonlyFolderIds: profile.readonlyFolderIds
+                    ?? profile.readonlyFolders?.compactMap(\.folderId)
+                    ?? profile.fileReadonlyFolders?.compactMap(\.folderId)
+                    ?? currentSession.readonlyFolderIds
             )
             session = refreshed
             SessionStore.save(refreshed)
@@ -373,6 +394,10 @@ final class AppState: ObservableObject {
             }
         }
     }
+}
+
+private enum PermissionCode {
+    static let fileAccess = "FILE_ACCESS"
 }
 
 private func stageIncomingExternalFile(from sourceURL: URL) throws -> PendingImportedFile {

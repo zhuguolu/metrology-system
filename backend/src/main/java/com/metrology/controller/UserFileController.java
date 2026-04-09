@@ -25,6 +25,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -351,6 +352,7 @@ public class UserFileController {
     }
 
     private FileMetadataDto buildMetadata(UserFile file, File target) {
+        FilePreviewProfile previewProfile = buildPreviewProfile(file.getName(), file.getMimeType(), target.length());
         return new FileMetadataDto(
                 file.getId(),
                 file.getName(),
@@ -358,8 +360,170 @@ public class UserFileController {
                 file.getMimeType(),
                 buildWeakEtag(target),
                 Instant.ofEpochMilli(target.lastModified()).toString(),
-                Boolean.TRUE
+                Boolean.TRUE,
+                previewProfile.previewType(),
+                previewProfile.previewMode(),
+                previewProfile.previewSupported(),
+                previewProfile.autoPreview(),
+                previewProfile.previewMessage(),
+                previewProfile.largeFile()
         );
+    }
+
+    private FilePreviewProfile buildPreviewProfile(String fileName, String mimeType, long fileSize) {
+        String ext = extensionOf(fileName);
+        String mime = mimeType == null ? "" : mimeType.toLowerCase(Locale.ROOT);
+
+        if (isImage(ext, mime)) {
+            return new FilePreviewProfile(
+                    "image",
+                    "inline",
+                    true,
+                    true,
+                    fileSize > 40L * 1024 * 1024 ? "图片较大，首次预览可能稍慢。" : null,
+                    fileSize > 40L * 1024 * 1024
+            );
+        }
+        if (isPdf(ext, mime)) {
+            return new FilePreviewProfile(
+                    "pdf",
+                    "inline",
+                    true,
+                    true,
+                    fileSize > 60L * 1024 * 1024 ? "PDF 较大，建议优先外部打开或下载查看。" : null,
+                    fileSize > 60L * 1024 * 1024
+            );
+        }
+        if (isVideo(ext, mime)) {
+            return new FilePreviewProfile(
+                    "video",
+                    "inline",
+                    true,
+                    true,
+                    fileSize > 120L * 1024 * 1024 ? "视频文件较大，在线播放可能较慢。" : null,
+                    fileSize > 120L * 1024 * 1024
+            );
+        }
+        if (isAudio(ext, mime)) {
+            return new FilePreviewProfile(
+                    "audio",
+                    "inline",
+                    true,
+                    true,
+                    fileSize > 80L * 1024 * 1024 ? "音频文件较大，首次加载可能稍慢。" : null,
+                    fileSize > 80L * 1024 * 1024
+            );
+        }
+        if (isText(ext, mime)) {
+            boolean tooLarge = fileSize > 2L * 1024 * 1024;
+            return new FilePreviewProfile(
+                    "text",
+                    tooLarge ? "download-only" : "inline",
+                    !tooLarge,
+                    !tooLarge,
+                    tooLarge ? "文本文件较大，建议直接下载后查看。" : null,
+                    tooLarge
+            );
+        }
+        if (isOffice(ext)) {
+            return new FilePreviewProfile(
+                    "office",
+                    "office-online",
+                    true,
+                    false,
+                    "Office 文件建议使用在线预览或外部应用打开。",
+                    fileSize > 30L * 1024 * 1024
+            );
+        }
+        if (isArchive(ext)) {
+            return new FilePreviewProfile(
+                    "archive",
+                    "download-only",
+                    false,
+                    false,
+                    "压缩文件暂不支持在线预览，请下载后查看。",
+                    fileSize > 0
+            );
+        }
+        return new FilePreviewProfile(
+                "binary",
+                "download-only",
+                false,
+                false,
+                "当前文件类型暂不支持在线预览，请下载或外部打开。",
+                fileSize > 0
+        );
+    }
+
+    private String extensionOf(String fileName) {
+        if (!StringUtils.hasText(fileName)) {
+            return "";
+        }
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == fileName.length() - 1) {
+            return "";
+        }
+        return fileName.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isImage(String ext, String mime) {
+        return mime.startsWith("image/") || switch (ext) {
+            case "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "heic", "heif", "tif", "tiff" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isPdf(String ext, String mime) {
+        return "pdf".equals(ext) || mime.contains("pdf");
+    }
+
+    private boolean isVideo(String ext, String mime) {
+        return mime.startsWith("video/") || switch (ext) {
+            case "mp4", "mov", "m4v", "avi", "wmv", "mkv", "flv", "webm" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isAudio(String ext, String mime) {
+        return mime.startsWith("audio/") || switch (ext) {
+            case "mp3", "wav", "m4a", "aac", "flac", "ogg", "wma" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isText(String ext, String mime) {
+        return mime.startsWith("text/")
+                || mime.contains("json")
+                || mime.contains("xml")
+                || switch (ext) {
+                    case "txt", "md", "json", "csv", "log", "xml", "html", "htm", "js", "ts",
+                         "css", "java", "sql", "yml", "yaml", "kt", "swift", "py", "sh" -> true;
+                    default -> false;
+                };
+    }
+
+    private boolean isOffice(String ext) {
+        return switch (ext) {
+            case "doc", "docx", "xls", "xlsx", "ppt", "pptx" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isArchive(String ext) {
+        return switch (ext) {
+            case "zip", "rar", "7z", "tar", "gz", "bz2", "xz" -> true;
+            default -> false;
+        };
+    }
+
+    private record FilePreviewProfile(
+            String previewType,
+            String previewMode,
+            boolean previewSupported,
+            boolean autoPreview,
+            String previewMessage,
+            boolean largeFile
+    ) {
     }
 
     private boolean matchesIfNoneMatch(String ifNoneMatch, String etag) {

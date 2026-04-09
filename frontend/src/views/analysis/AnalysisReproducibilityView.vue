@@ -23,9 +23,12 @@
       <div class="repro-hint">
         与 GRR 模板一致：行为操作者+重复次数，列为零件。当前已识别 {{ sampleCount }} / {{ requiredCount }}。
       </div>
+      <div v-if="isResultStale" class="repro-stale-banner">
+        当前再现性结果已与输入数据不一致，请重新计算后再导出专业报告。
+      </div>
       <div class="repro-actions">
         <el-button :loading="calculating" type="primary" @click="calculate">计算再现性</el-button>
-        <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+        <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
         <el-button @click="clearData">清空数据</el-button>
       </div>
     </div>
@@ -36,7 +39,7 @@
           <div class="repro-card-title">再现性结果</div>
           <div class="repro-title-actions">
             <el-button :loading="calculating" type="primary" @click="calculate">计算再现性</el-button>
-            <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+            <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
           </div>
         </div>
         <div class="repro-stats-grid">
@@ -158,6 +161,11 @@ watch([appraiserCountInt, partCountInt, trialCountInt], ([a, p, t]) => {
 }, { immediate: true })
 
 const sampleCount = computed(() => measurements.value.flat(2).filter(v => toFiniteNumber(v) != null).length)
+const isResultStale = computed(() =>
+  !!result.value
+  && !!calculatedSignature.value
+  && currentSignature.value !== calculatedSignature.value
+)
 
 const displayRows = computed(() => {
   const rows = []
@@ -381,6 +389,10 @@ function triggerBlobDownload(blob, filename) {
 async function exportProfessionalReport() {
   const payload = buildReportPayload()
   if (!payload) return
+  if (!result.value || isResultStale.value) {
+    showToast('当前结果与输入不一致，请先重新计算后再导出专业报告', 'error')
+    return
+  }
 
   exportingReport.value = true
   try {
@@ -588,6 +600,17 @@ function resizeCharts() {
   font-size: 12px;
   line-height: 1.35;
   padding: 10px 12px 0;
+}
+
+.repro-stale-banner {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .repro-actions {

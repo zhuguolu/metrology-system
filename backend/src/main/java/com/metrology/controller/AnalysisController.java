@@ -116,7 +116,7 @@ public class AnalysisController {
         try {
             byte[] data = analysisService.exportRepeatabilityProfessionalReport(request);
             String filename = URLEncoder.encode(
-                    "重复性_专业报告-" + LocalDate.now() + ".xls",
+                    "重复性专业报告-" + LocalDate.now() + ".xls",
                     StandardCharsets.UTF_8
             ).replace("+", "%20");
             return ResponseEntity.ok()
@@ -140,7 +140,7 @@ public class AnalysisController {
         try {
             byte[] data = analysisService.exportReproducibilityProfessionalReport(request);
             String filename = URLEncoder.encode(
-                    "再现性_专业报告-" + LocalDate.now() + ".xls",
+                    "再现性专业报告-" + LocalDate.now() + ".xls",
                     StandardCharsets.UTF_8
             ).replace("+", "%20");
             return ResponseEntity.ok()
@@ -164,7 +164,7 @@ public class AnalysisController {
         try {
             byte[] data = analysisService.exportLinearityProfessionalReport(request);
             String filename = URLEncoder.encode(
-                    "线性分析_专业报告-" + LocalDate.now() + ".xls",
+                    "线性分析专业报告-" + LocalDate.now() + ".xls",
                     StandardCharsets.UTF_8
             ).replace("+", "%20");
             return ResponseEntity.ok()

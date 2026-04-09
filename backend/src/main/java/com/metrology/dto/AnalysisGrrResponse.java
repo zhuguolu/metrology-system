@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -59,4 +61,10 @@ public class AnalysisGrrResponse {
 
     private double ndc;
     private String summary;
+    private String assessmentLevel;
+    private String professionalConclusion;
+    private String recommendedAction;
+    private Boolean readyForReport;
+    private String rulesVersion;
+    private List<AnalysisValidationItem> validationMessages;
 }

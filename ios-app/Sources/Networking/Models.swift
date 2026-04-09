@@ -13,6 +13,9 @@ struct LoginResponse: Codable {
     let permissions: [String]?
     let department: String?
     let departments: [String]?
+    let fileReadonlyFolders: [UserFolderGrantDto]?
+    let readonlyFolders: [UserFolderGrantDto]?
+    let readonlyFolderIds: [Int64]?
 }
 
 struct DashboardStats: Codable {
@@ -249,6 +252,12 @@ struct FileMetadataDto: Codable {
     let etag: String?
     let lastModified: String?
     let supportsRange: Bool?
+    let previewType: String?
+    let previewMode: String?
+    let previewSupported: Bool?
+    let autoPreview: Bool?
+    let previewMessage: String?
+    let largeFile: Bool?
 }
 
 struct BreadcrumbItemDto: Codable {

@@ -309,10 +309,12 @@ import { Search } from '@element-plus/icons-vue'
 import { changeRecordApi } from '../api/index.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useViewCache } from '../composables/useViewCache.js'
 
 const authStore = useAuthStore()
 const changeRecordCache = useViewCache('change-record-view', { ttlMs: 30 * 60 * 1000 })
+useScrollMemory('change-record-view')
 const loading = ref(false)
 const detailLoading = ref(false)
 const rows = ref([])

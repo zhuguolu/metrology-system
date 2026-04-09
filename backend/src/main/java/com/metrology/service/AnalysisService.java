@@ -71,56 +71,51 @@ public class AnalysisService {
             Map.entry(10, 0.3146)
     );
 
-    public AnalysisCapabilityResponse calculateCapability(AnalysisCapabilityRequest request) {
+        public AnalysisCapabilityResponse calculateCapability(AnalysisCapabilityRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("璇锋眰涓嶈兘涓虹┖");
+            throw new IllegalArgumentException("鐠囬攱鐪伴崣鍌涙殶娑撳秷鍏樻稉铏光敄");
         }
-        double lsl = requireFinite(request.getLsl(), "LSL 涓嶈兘涓虹┖");
-        double usl = requireFinite(request.getUsl(), "USL 涓嶈兘涓虹┖");
+        double lsl = requireFinite(request.getLsl(), "LSL 娑撳秷鍏樻稉铏光敄");
+        double usl = requireFinite(request.getUsl(), "USL 娑撳秷鍏樻稉铏光敄");
         if (usl <= lsl) {
-            throw new IllegalArgumentException("USL 蹇呴』澶т簬 LSL");
+            throw new IllegalArgumentException("USL 韫囧懘銆忔径褌绨?LSL");
         }
         double target = request.getTarget() != null && Double.isFinite(request.getTarget())
                 ? request.getTarget()
                 : (lsl + usl) / 2.0;
-
         List<Double> values = resolveValues(request.getGridValues(), request.getRawValues());
         if (values.size() < 2) {
-            throw new IllegalArgumentException("样本数量至少需要 2 个");
+            throw new IllegalArgumentException("閺嶉攱婀伴弫浼村櫤閼峰啿鐨棁鈧憰?2 娑?);
         }
-
         int subgroupSize = request.getSubgroupSize() == null ? 0 : request.getSubgroupSize();
         if (subgroupSize < 0) {
-            throw new IllegalArgumentException("瀛愮粍澶у皬涓嶈兘灏忎簬 0");
+            throw new IllegalArgumentException("鐎涙劗绮嶆径褍鐨稉宥堝厴鐏忓繋绨?0");
         }
         if (subgroupSize == 1) {
-            throw new IllegalArgumentException("子组大小为 1 时无法计算组内波动，请输入 2~25 或留空");
+            throw new IllegalArgumentException("鐎涙劗绮嶆径褍鐨稉?1 閺冭埖妫ゅ▔鏇☆吀缁犳绮嶉崘鍛皾閸旑煉绱濈拠鐤翻閸?2~25 閹存牜鏆€缁?);
         }
         if (subgroupSize > 25) {
-            throw new IllegalArgumentException("瀛愮粍澶у皬浠呮敮鎸?2~25");
+            throw new IllegalArgumentException("鐎涙劗绮嶆径褍鐨禒鍛暜閹?2~25");
         }
-
         double mean = mean(values);
         double min = values.stream().min(Double::compareTo).orElse(0.0);
         double max = values.stream().max(Double::compareTo).orElse(0.0);
         double sigmaOverall = sampleStdDev(values);
         if (sigmaOverall <= 0) {
-            throw new IllegalArgumentException("样本波动为 0，无法计算能力指数");
+            throw new IllegalArgumentException("閺嶉攱婀板▔銏犲З娑?0閿涘本妫ゅ▔鏇☆吀缁犳鍏橀崝娑欏瘹閺?);
         }
-
         String chartType = "MR";
         int groupCount = Math.max(values.size() - 1, 1);
         double sigmaWithin;
-
         if (subgroupSize > 1) {
             if (values.size() % subgroupSize != 0) {
-                throw new IllegalArgumentException("鏍锋湰鏁伴噺蹇呴』鑳借瀛愮粍澶у皬鏁撮櫎");
+                throw new IllegalArgumentException("閺嶉攱婀伴弫浼村櫤韫囧懘銆忛懗鍊燁潶鐎涙劗绮嶆径褍鐨弫鎾珟");
             }
             List<List<Double>> groups = chunk(values, subgroupSize);
             if (groups.size() < 2) {
-                throw new IllegalArgumentException("至少需要 2 个子组");
+                throw new IllegalArgumentException("閼峰啿鐨棁鈧憰?2 娑擃亜鐡欑紒?);
             }
-            double d2 = requireD2(subgroupSize, "瀛愮粍澶у皬");
+            double d2 = requireD2(subgroupSize, "鐎涙劗绮嶆径褍鐨?);
             double avgRange = groups.stream().mapToDouble(this::range).average().orElse(0.0);
             sigmaWithin = avgRange / d2;
             groupCount = groups.size();
@@ -128,18 +123,16 @@ public class AnalysisService {
         } else {
             List<Double> movingRanges = movingRanges(values);
             if (movingRanges.isEmpty()) {
-                throw new IllegalArgumentException("样本数量不足，无法计算移动极差");
+                throw new IllegalArgumentException("閺嶉攱婀伴弫浼村櫤娑撳秷鍐婚敍灞炬￥濞夋洝顓哥粻妤冃╅崝銊︾€?);
             }
-            double d2 = requireD2(2, "绉诲姩鏋佸樊");
+            double d2 = requireD2(2, "缁夎濮╅弸浣告▕");
             sigmaWithin = mean(movingRanges) / d2;
             subgroupSize = 2;
             groupCount = movingRanges.size();
         }
-
         if (sigmaWithin <= 0) {
-            throw new IllegalArgumentException("缁勫唴娉㈠姩涓?0锛屾棤娉曡绠?Cpk");
+            throw new IllegalArgumentException("缂佸嫬鍞村▔銏犲З娑?0閿涘本妫ゅ▔鏇☆吀缁?Cpk");
         }
-
         double specWidth = usl - lsl;
         double cp = specWidth / (6.0 * sigmaWithin);
         double cpl = (mean - lsl) / (3.0 * sigmaWithin);
@@ -164,8 +157,19 @@ public class AnalysisService {
         double overallPpmLower = normalTailPpmLower(lsl, mean, sigmaOverall);
         double overallPpmUpper = normalTailPpmUpper(usl, mean, sigmaOverall);
 
-        List<AnalysisHistogramBin> histogram = buildHistogram(values, request.getBins());
-
+                List<AnalysisHistogramBin> histogram = buildHistogram(values, request.getBins());
+        List<AnalysisValidationItem> validationMessages = buildCapabilityValidationMessages(
+                values.size(),
+                subgroupSize,
+                groupCount,
+                cpk,
+                ppk,
+                cpl,
+                cpu,
+                observedPpmTotal,
+                overallPpmLower + overallPpmUpper
+        );
+        String assessmentLevel = capabilityAssessmentLevel(cpk, ppk);
         return AnalysisCapabilityResponse.builder()
                 .sampleCount(values.size())
                 .subgroupSize(subgroupSize)
@@ -202,6 +206,12 @@ public class AnalysisService {
                 .predictedPpmBelowLslOverall(overallPpmLower)
                 .predictedPpmAboveUslOverall(overallPpmUpper)
                 .predictedPpmTotalOverall(overallPpmLower + overallPpmUpper)
+                .assessmentLevel(assessmentLevel)
+                .professionalConclusion(capabilityConclusion(assessmentLevel, cpk, ppk, cpl, cpu))
+                .recommendedAction(capabilityRecommendedAction(assessmentLevel, validationMessages))
+                .readyForReport(isReadyForReport(validationMessages))
+                .rulesVersion("capability-v1")
+                .validationMessages(validationMessages)
                 .values(values)
                 .histogram(histogram)
                 .build();
@@ -262,7 +272,7 @@ public class AnalysisService {
         double svPartToPart = rp * k3;
         double svTotal = Math.sqrt(Math.pow(svGrr, 2) + Math.pow(svPartToPart, 2));
         if (!Double.isFinite(svTotal) || svTotal <= 0) {
-            throw new IllegalArgumentException("总变差为 0，无法计算 GRR");
+            throw new IllegalArgumentException("闁诡剝顕цぐ澶婎啅椤旀槒绀?0闁挎稑鏈Λ銈呪枖閺団槅鍚€缂?GRR");
         }
 
         double sdRepeatability = svRepeatability / 6.0;
@@ -299,8 +309,16 @@ public class AnalysisService {
             pctTolerancePartToPart = percent(svPartToPart, tolerance);
         }
 
-        double ndc = (svGrr <= 0) ? 0.0 : 1.41 * svPartToPart / svGrr;
-
+                double ndc = (svGrr <= 0) ? 0.0 : 1.41 * svPartToPart / svGrr;
+        List<AnalysisValidationItem> validationMessages = buildGrrValidationMessages(
+                pctStudyVarGrr,
+                ndc,
+                tolerance,
+                appraiserCount,
+                partCount,
+                trialCount
+        );
+        String assessmentLevel = grrAssessmentLevel(pctStudyVarGrr, ndc);
         return AnalysisGrrResponse.builder()
                 .sampleCount(requiredCount)
                 .appraiserCount(appraiserCount)
@@ -343,6 +361,12 @@ public class AnalysisService {
                 .pctTolerancePartToPart(pctTolerancePartToPart)
                 .ndc(ndc)
                 .summary(grrSummary(pctStudyVarGrr, ndc))
+                .assessmentLevel(assessmentLevel)
+                .professionalConclusion(grrConclusion(assessmentLevel, pctStudyVarGrr, ndc))
+                .recommendedAction(grrRecommendedAction(assessmentLevel, validationMessages))
+                .readyForReport(isReadyForReport(validationMessages))
+                .rulesVersion("grr-v1")
+                .validationMessages(validationMessages)
                 .build();
     }
     public byte[] exportGrrFullReport(AnalysisGrrRequest request) throws IOException {
@@ -371,20 +395,20 @@ public class AnalysisService {
             for (int c = 0; c <= 7; c++) {
                 setColumnWidth(summary, c, c == 0 ? 18 : 14);
             }
-            setText(row(summary, 0), 0, "CPK/PPK 能力分析报告（专业模板）", styles.title());
+            setText(row(summary, 0), 0, "CPK/PPK Professional Report", styles.title());
             summary.addMergedRegion(new CellRangeAddress(0, 0, 0, 7));
 
             HSSFRow meta = row(summary, 2);
-            setText(meta, 0, "生成日期", styles.label());
+            setText(meta, 0, "Report Date", styles.label());
             setText(meta, 1, LocalDate.now().toString(), styles.text());
-            setText(meta, 2, "图表类型", styles.label());
+            setText(meta, 2, "Chart Type", styles.label());
             setText(meta, 3, capability.getChartType(), styles.text());
-            setText(meta, 4, "样本数", styles.label());
+            setText(meta, 4, "Sample Count", styles.label());
             setNumber(meta, 5, capability.getSampleCount(), styles.number0());
-            setText(meta, 6, "子组大小", styles.label());
+            setText(meta, 6, "Subgroup Size", styles.label());
             setNumber(meta, 7, capability.getSubgroupSize(), styles.number0());
 
-            setText(row(summary, 4), 0, "规格与过程参数", styles.section());
+            setText(row(summary, 4), 0, "Capability Summary", styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow param = row(summary, 5);
             setText(param, 0, "LSL", styles.label()); setNumber(param, 1, capability.getLsl(), styles.number4());
@@ -398,7 +422,7 @@ public class AnalysisService {
             setText(param2, 4, "Min", styles.label()); setNumber(param2, 5, capability.getMin(), styles.number4());
             setText(param2, 6, "Max", styles.label()); setNumber(param2, 7, capability.getMax(), styles.number4());
 
-            setText(row(summary, 8), 0, "能力指标", styles.section());
+            setText(row(summary, 8), 0, "闁煎疇妫勬慨蹇涘箰閸ャ劎鍨?, styles.section());
             summary.addMergedRegion(new CellRangeAddress(8, 8, 0, 7));
             HSSFRow idx1 = row(summary, 9);
             setText(idx1, 0, "CPK", styles.label()); setNumber(idx1, 1, capability.getCpk(), styles.number4());
@@ -416,13 +440,13 @@ public class AnalysisService {
             setText(ppm, 0, "Observed PPM Total", styles.label()); setNumber(ppm, 1, capability.getObservedPpmTotal(), styles.number2());
             setText(ppm, 2, "Pred PPM (Within)", styles.label()); setNumber(ppm, 3, capability.getPredictedPpmTotalWithin(), styles.number2());
             setText(ppm, 4, "Pred PPM (Overall)", styles.label()); setNumber(ppm, 5, capability.getPredictedPpmTotalOverall(), styles.number2());
-            setText(ppm, 6, "评价", styles.label()); setText(ppm, 7, capability.getSummary(), styles.text());
+            setText(ppm, 6, "Conclusion", styles.label()); setText(ppm, 7, capability.getSummary(), styles.text());
 
             HSSFSheet raw = workbook.createSheet("RawValues");
             setColumnWidth(raw, 0, 10);
             setColumnWidth(raw, 1, 16);
-            setText(row(raw, 0), 0, "序号", styles.header());
-            setText(row(raw, 0), 1, "样本值", styles.header());
+            setText(row(raw, 0), 0, "Index", styles.header());
+            setText(row(raw, 0), 1, "Sample Value", styles.header());
             for (int i = 0; i < rawValues.size(); i++) {
                 HSSFRow rr = row(raw, i + 1);
                 setNumber(rr, 0, i + 1, styles.number0());
@@ -458,21 +482,21 @@ public class AnalysisService {
             for (int c = 0; c <= 7; c++) {
                 setColumnWidth(summary, c, c == 0 ? 18 : 14);
             }
-            setText(row(summary, 0), 0, "重复性分析报告（专业模板）", styles.title());
+            setText(row(summary, 0), 0, "Repeatability Professional Report", styles.title());
             summary.addMergedRegion(new CellRangeAddress(0, 0, 0, 7));
 
             HSSFRow meta = row(summary, 2);
-            setText(meta, 0, "生成日期", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
-            setText(meta, 2, "零件数", styles.label()); setNumber(meta, 3, rr.partCount(), styles.number0());
-            setText(meta, 4, "重复次数", styles.label()); setNumber(meta, 5, rr.trialCount(), styles.number0());
-            setText(meta, 6, "样本点数", styles.label()); setNumber(meta, 7, rr.sampleCount(), styles.number0());
+            setText(meta, 0, "Report Date", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
+            setText(meta, 2, "Part Count", styles.label()); setNumber(meta, 3, rr.partCount(), styles.number0());
+            setText(meta, 4, "闂佹彃绉撮ˇ鎻掆枎閳╁啯娈?, styles.label()); setNumber(meta, 5, rr.trialCount(), styles.number0());
+            setText(meta, 6, "闁哄秹鏀卞﹢浼存倷鐟欏嫭娈?, styles.label()); setNumber(meta, 7, rr.sampleCount(), styles.number0());
 
-            setText(row(summary, 4), 0, "关键指标", styles.section());
+            setText(row(summary, 4), 0, "闁稿繑濞婇弫顓㈠箰閸ャ劎鍨?, styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow k1 = row(summary, 5);
             setText(k1, 0, "Rbar", styles.label()); setNumber(k1, 1, rr.rbar(), styles.number6());
             setText(k1, 2, "Sigma Repeatability", styles.label()); setNumber(k1, 3, rr.sigmaRepeatability(), styles.number6());
-            setText(k1, 4, "EV (6σ)", styles.label()); setNumber(k1, 5, rr.ev(), styles.number4());
+            setText(k1, 4, "EV (6sigma)", styles.label()); setNumber(k1, 5, rr.ev(), styles.number4());
             setText(k1, 6, "%Tolerance", styles.label()); setText(k1, 7, pctText(rr.pctTolerance()), styles.text());
 
             HSSFRow k2 = row(summary, 6);
@@ -480,7 +504,7 @@ public class AnalysisService {
             setText(k2, 1, String.format(Locale.ROOT, "%.4f / %.4f", rr.rUcl(), rr.rLcl()), styles.text());
             setText(k2, 2, "Xbar UCL/LCL", styles.label());
             setText(k2, 3, String.format(Locale.ROOT, "%.4f / %.4f", rr.xUcl(), rr.xLcl()), styles.text());
-            setText(k2, 4, "评价", styles.label());
+            setText(k2, 4, "閻犲洤瀚悳?, styles.label());
             setText(k2, 5, rr.summary(), styles.text());
             summary.addMergedRegion(new CellRangeAddress(6, 6, 5, 7));
 
@@ -492,12 +516,12 @@ public class AnalysisService {
             setColumnWidth(data, rr.trialCount() + 1, 12);
             setColumnWidth(data, rr.trialCount() + 2, 12);
             HSSFRow head = row(data, 0);
-            setText(head, 0, "零件", styles.header());
+            setText(head, 0, "Part", styles.header());
             for (int t = 0; t < rr.trialCount(); t++) {
-                setText(head, t + 1, "测量" + (t + 1), styles.header());
+                setText(head, t + 1, "Trial " + (t + 1), styles.header());
             }
-            setText(head, rr.trialCount() + 1, "均值", styles.header());
-            setText(head, rr.trialCount() + 2, "极差", styles.header());
+            setText(head, rr.trialCount() + 1, "Mean", styles.header());
+            setText(head, rr.trialCount() + 2, "Range", styles.header());
 
             for (int p = 0; p < rr.partCount(); p++) {
                 HSSFRow dr = row(data, p + 1);
@@ -539,26 +563,26 @@ public class AnalysisService {
             for (int c = 0; c <= 7; c++) {
                 setColumnWidth(summary, c, c == 0 ? 18 : 14);
             }
-            setText(row(summary, 0), 0, "再现性分析报告（专业模板）", styles.title());
+            setText(row(summary, 0), 0, "Reproducibility Professional Report", styles.title());
             summary.addMergedRegion(new CellRangeAddress(0, 0, 0, 7));
 
             HSSFRow meta = row(summary, 2);
-            setText(meta, 0, "生成日期", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
-            setText(meta, 2, "操作者数", styles.label()); setNumber(meta, 3, grr.getAppraiserCount(), styles.number0());
-            setText(meta, 4, "零件数", styles.label()); setNumber(meta, 5, grr.getPartCount(), styles.number0());
-            setText(meta, 6, "重复次数", styles.label()); setNumber(meta, 7, grr.getTrialCount(), styles.number0());
+            setText(meta, 0, "Report Date", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
+            setText(meta, 2, "闁瑰灝绉崇紞鏃堟嚀閸涱喗娈?, styles.label()); setNumber(meta, 3, grr.getAppraiserCount(), styles.number0());
+            setText(meta, 4, "Part Count", styles.label()); setNumber(meta, 5, grr.getPartCount(), styles.number0());
+            setText(meta, 6, "闂佹彃绉撮ˇ鎻掆枎閳╁啯娈?, styles.label()); setNumber(meta, 7, grr.getTrialCount(), styles.number0());
 
-            setText(row(summary, 4), 0, "关键指标", styles.section());
+            setText(row(summary, 4), 0, "闁稿繑濞婇弫顓㈠箰閸ャ劎鍨?, styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow k1 = row(summary, 5);
-            setText(k1, 0, "AV (6σ)", styles.label()); setNumber(k1, 1, grr.getSvReproducibility(), styles.number4());
-            setText(k1, 2, "EV (6σ)", styles.label()); setNumber(k1, 3, grr.getSvRepeatability(), styles.number4());
+            setText(k1, 0, "AV (6sigma)", styles.label()); setNumber(k1, 1, grr.getSvReproducibility(), styles.number4());
+            setText(k1, 2, "EV (6閿?", styles.label()); setNumber(k1, 3, grr.getSvRepeatability(), styles.number4());
             setText(k1, 4, "%StudyVar AV", styles.label()); setNumber(k1, 5, grr.getPctStudyVarReproducibility(), styles.percent2());
             setText(k1, 6, "%Tolerance AV", styles.label()); setText(k1, 7, pctText(grr.getPctToleranceReproducibility()), styles.text());
 
             HSSFRow k2 = row(summary, 6);
-            setText(k2, 0, "操作者均值极差", styles.label()); setNumber(k2, 1, operatorMeanDiff, styles.number6());
-            setText(k2, 2, "总评", styles.label()); setText(k2, 3, grrSummary(grr.getPctStudyVarReproducibility(), grr.getNdc()), styles.text());
+            setText(k2, 0, "Operator Mean Diff", styles.label()); setNumber(k2, 1, operatorMeanDiff, styles.number6());
+            setText(k2, 2, "Conclusion", styles.label()); setText(k2, 3, grrSummary(grr.getPctStudyVarReproducibility(), grr.getNdc()), styles.text());
             summary.addMergedRegion(new CellRangeAddress(6, 6, 3, 7));
 
             HSSFSheet data = workbook.createSheet("RawData");
@@ -568,8 +592,8 @@ public class AnalysisService {
                 setColumnWidth(data, p + 2, 12);
             }
             HSSFRow head = row(data, 0);
-            setText(head, 0, "操作者", styles.header());
-            setText(head, 1, "重复", styles.header());
+            setText(head, 0, "Operator", styles.header());
+            setText(head, 1, "Trial", styles.header());
             for (int p = 0; p < ds.partCount(); p++) {
                 setText(head, p + 2, "C" + (p + 1), styles.header());
             }
@@ -600,25 +624,25 @@ public class AnalysisService {
             for (int c = 0; c <= 7; c++) {
                 setColumnWidth(summary, c, c == 0 ? 18 : 14);
             }
-            setText(row(summary, 0), 0, "线性分析报告（专业模板）", styles.title());
+            setText(row(summary, 0), 0, "Linearity Professional Report", styles.title());
             summary.addMergedRegion(new CellRangeAddress(0, 0, 0, 7));
 
             HSSFRow meta = row(summary, 2);
-            setText(meta, 0, "生成日期", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
-            setText(meta, 2, "有效点位", styles.label()); setNumber(meta, 3, linearity.sampleCount(), styles.number0());
-            setText(meta, 4, "平均偏倚", styles.label()); setNumber(meta, 5, linearity.meanBias(), styles.number6());
-            setText(meta, 6, "最大绝对偏倚", styles.label()); setNumber(meta, 7, linearity.maxAbsBias(), styles.number6());
+            setText(meta, 0, "闁汇垻鍠愰崹姘跺籍閵夛附鍩?, styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
+            setText(meta, 2, "闁哄牆顦伴弲銉╂倷闁稓绉?, styles.label()); setNumber(meta, 3, linearity.sampleCount(), styles.number0());
+            setText(meta, 4, "Mean Bias", styles.label()); setNumber(meta, 5, linearity.meanBias(), styles.number6());
+            setText(meta, 6, "Max Abs Bias", styles.label()); setNumber(meta, 7, linearity.maxAbsBias(), styles.number6());
 
-            setText(row(summary, 4), 0, "回归结果", styles.section());
+            setText(row(summary, 4), 0, "闁搞儳鍋涚紞濠勭磼閹惧浜?, styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow reg = row(summary, 5);
-            setText(reg, 0, "斜率", styles.label()); setNumber(reg, 1, linearity.slope(), styles.number6());
-            setText(reg, 2, "截距", styles.label()); setNumber(reg, 3, linearity.intercept(), styles.number6());
-            setText(reg, 4, "R²", styles.label()); setNumber(reg, 5, linearity.r2(), styles.number6());
+            setText(reg, 0, "Slope", styles.label()); setNumber(reg, 1, linearity.slope(), styles.number6());
+            setText(reg, 2, "Intercept", styles.label()); setNumber(reg, 3, linearity.intercept(), styles.number6());
+            setText(reg, 4, "R2", styles.label()); setNumber(reg, 5, linearity.r2(), styles.number6());
             setText(reg, 6, "%Tolerance", styles.label()); setText(reg, 7, pctText(linearity.pctTolerance()), styles.text());
 
             HSSFRow conclusion = row(summary, 6);
-            setText(conclusion, 0, "评价", styles.label());
+            setText(conclusion, 0, "Conclusion", styles.label());
             setText(conclusion, 1, linearity.summary(), styles.text());
             summary.addMergedRegion(new CellRangeAddress(6, 6, 1, 7));
 
@@ -633,13 +657,13 @@ public class AnalysisService {
             setColumnWidth(data, maxMeasures + 3, 14);
 
             HSSFRow head = row(data, 0);
-            setText(head, 0, "序号", styles.header());
-            setText(head, 1, "参考值", styles.header());
+            setText(head, 0, "Index", styles.header());
+            setText(head, 1, "Reference", styles.header());
             for (int m = 0; m < maxMeasures; m++) {
-                setText(head, m + 2, "测量" + (m + 1), styles.header());
+                setText(head, m + 2, "Trial " + (m + 1), styles.header());
             }
-            setText(head, maxMeasures + 2, "平均测量", styles.header());
-            setText(head, maxMeasures + 3, "偏倚", styles.header());
+            setText(head, maxMeasures + 2, "妤犵偛鍟垮搴∶圭€ｎ喖娅?, styles.header());
+            setText(head, maxMeasures + 3, "Bias", styles.header());
 
             for (int i = 0; i < linearity.points().size(); i++) {
                 LinearityPoint point = linearity.points().get(i);
@@ -660,24 +684,24 @@ public class AnalysisService {
 
     private RepeatabilityResult calculateRepeatability(AnalysisRepeatabilityRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("请求参数不能为空");
+            throw new IllegalArgumentException("Request payload cannot be null");
         }
-        int partCount = requirePositive(request.getPartCount(), "零件数必须大于0");
-        int trialCount = requirePositive(request.getTrialCount(), "重复次数必须大于0");
+        int partCount = requirePositive(request.getPartCount(), "Part count is required");
+        int trialCount = requirePositive(request.getTrialCount(), "Trial count is required");
         if (partCount < 2) {
-            throw new IllegalArgumentException("零件数至少为2");
+            throw new IllegalArgumentException("Part count must be at least 2");
         }
         if (trialCount < 2) {
-            throw new IllegalArgumentException("重复次数至少为2");
+            throw new IllegalArgumentException("Trial count must be at least 2");
         }
         if (trialCount > 25) {
-            throw new IllegalArgumentException("重复次数支持范围为2~25");
+            throw new IllegalArgumentException("Trial count must be within 2~25");
         }
 
         List<Double> values = resolveValues(request.getGridValues(), request.getRawValues());
         int required = partCount * trialCount;
         if (values.size() < required) {
-            throw new IllegalArgumentException("样本数量不足，至少需要 " + required + " 个值");
+            throw new IllegalArgumentException("Sample count is insufficient, at least " + required + " values are required");
         }
 
         double[][] data = new double[partCount][trialCount];
@@ -700,7 +724,7 @@ public class AnalysisService {
         }
 
         double rbar = mean(arrayToList(partRanges));
-        double sigmaRepeatability = rbar / requireD2(trialCount, "重复次数");
+        double sigmaRepeatability = rbar / requireD2(trialCount, "闂佹彃绉撮ˇ鎻掆枎閳╁啯娈?);
         double ev = sigmaRepeatability * 6.0;
         double xbarbar = mean(arrayToList(partMeans));
         double a2 = nearestConstant(A2_BY_TRIAL, trialCount, 1.023);
@@ -726,11 +750,11 @@ public class AnalysisService {
 
     private LinearityResult calculateLinearity(AnalysisLinearityRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("请求参数不能为空");
+            throw new IllegalArgumentException("Request payload cannot be null");
         }
         List<List<Double>> grid = request.getGridValues();
         if (grid == null || grid.isEmpty()) {
-            throw new IllegalArgumentException("线性分析至少需要3个有效点位");
+            throw new IllegalArgumentException("Linearity analysis requires at least 3 valid rows");
         }
 
         List<LinearityPoint> points = new ArrayList<>();
@@ -757,7 +781,7 @@ public class AnalysisService {
         }
 
         if (points.size() < 3) {
-            throw new IllegalArgumentException("线性分析至少需要3个有效点位");
+            throw new IllegalArgumentException("缂佺偓瀵ч埀顑啫鐎婚柡瀣姌閸わ妇浜搁幋锔戒粯閻?濞戞搩浜濆﹢渚€寮崼銏犱化濞?);
         }
 
         double xMean = mean(points.stream().map(LinearityPoint::reference).toList());
@@ -798,25 +822,25 @@ public class AnalysisService {
 
     private GrrDataset resolveGrrDataset(AnalysisGrrRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("璇锋眰涓嶈兘涓虹┖");
+            throw new IllegalArgumentException("Request payload cannot be null");
         }
-        int appraiserCount = requirePositive(request.getAppraiserCount(), "鎿嶄綔鑰呮暟閲忓繀椤诲ぇ浜?0");
-        int partCount = requirePositive(request.getPartCount(), "闆朵欢鏁伴噺蹇呴』澶т簬 0");
-        int trialCount = requirePositive(request.getTrialCount(), "閲嶅娆℃暟蹇呴』澶т簬 0");
+        int appraiserCount = requirePositive(request.getAppraiserCount(), "Appraiser count must be greater than 0");
+        int partCount = requirePositive(request.getPartCount(), "Part count must be greater than 0");
+        int trialCount = requirePositive(request.getTrialCount(), "Trial count must be greater than 0");
         if (appraiserCount < 2) {
-            throw new IllegalArgumentException("鎿嶄綔鑰呮暟閲忚嚦灏戜负 2");
+            throw new IllegalArgumentException("Appraiser count must be at least 2");
         }
         if (partCount < 2) {
-            throw new IllegalArgumentException("闆朵欢鏁伴噺鑷冲皯涓?2");
+            throw new IllegalArgumentException("Part count must be at least 2");
         }
         if (trialCount < 2) {
-            throw new IllegalArgumentException("閲嶅娆℃暟鑷冲皯涓?2");
+            throw new IllegalArgumentException("Trial count must be at least 2");
         }
 
         List<Double> rawValues = resolveValues(request.getGridValues(), request.getRawValues());
         int requiredCount = appraiserCount * partCount * trialCount;
         if (rawValues.size() < requiredCount) {
-            throw new IllegalArgumentException("样本数量不足，至少需要 " + requiredCount + " 个值");
+            throw new IllegalArgumentException("Sample count is insufficient, at least " + requiredCount + " values are required");
         }
 
         List<Double> values = rawValues.subList(0, requiredCount);
@@ -833,7 +857,7 @@ public class AnalysisService {
     }
 
     private GrrDataRefs buildDataSheet(HSSFWorkbook workbook, ReportStyles styles, GrrDataset ds) {
-        HSSFSheet sheet = workbook.createSheet("鏁版嵁");
+        HSSFSheet sheet = workbook.createSheet("DataSheet");
         int partStartCol = 2;
         int partEndCol = partStartCol + ds.partCount() - 1;
         int meanCol = partEndCol + 1;
@@ -852,21 +876,21 @@ public class AnalysisService {
         setColumnWidth(sheet, meanCol + 3, 10);
 
         HSSFRow row1 = row(sheet, 0);
-        setText(row1, Math.max(meanCol - 2, 0), "密级：", styles.metaLabel());
-        setText(row1, meanCol, "鍏紑", styles.metaValue());
+        setText(row1, Math.max(meanCol - 2, 0), "Form No.", styles.metaLabel());
+        setText(row1, meanCol, "J-27-05-B", styles.metaValue());
 
         HSSFRow row2 = row(sheet, 1);
-        setText(row2, 0, "计量型测量系统分析记录（均值极差法）", styles.title());
+        setText(row2, 0, "Gage R&R raw data sheet", styles.title());
         sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, meanCol));
 
         HSSFRow row3 = row(sheet, 2);
-        setText(row3, 0, "编号：", styles.metaLabel());
-        setText(row3, Math.max(meanCol - 1, 0), "琛ㄧ爜锛欳KJ-27-05-B", styles.metaValue());
+        setText(row3, 0, "Specification", styles.metaLabel());
+        setText(row3, Math.max(meanCol - 1, 0), "J-27-05-B", styles.metaValue());
 
         HSSFRow row4 = row(sheet, headerRow);
-        setText(row4, 0, "测试人", styles.header());
-        setText(row4, partStartCol, "零件编号及测试记录", styles.header());
-        setText(row4, meanCol, "均值", styles.header());
+        setText(row4, 0, "Trial", styles.header());
+        setText(row4, partStartCol, "Part Number", styles.header());
+        setText(row4, meanCol, "Mean", styles.header());
 
         HSSFRow row5 = row(sheet, partHeaderRow);
         for (int p = 0; p < ds.partCount(); p++) {
@@ -899,7 +923,7 @@ public class AnalysisService {
             int meanRow = operatorStartRow + ds.trialCount();
             HSSFRow rowMean = row(sheet, meanRow);
             setText(rowMean, 0, serial + ".", styles.textCell());
-            setText(rowMean, 1, "均值", styles.centerTextCell());
+            setText(rowMean, 1, "Mean", styles.centerTextCell());
             for (int p = 0; p < ds.partCount(); p++) {
                 String col = colName(partStartCol + p);
                 String formula = "AVERAGE(" + col + (operatorStartRow + 1) + ":" + col + (operatorStartRow + ds.trialCount()) + ")";
@@ -912,7 +936,7 @@ public class AnalysisService {
             int rangeRow = meanRow + 1;
             HSSFRow rowRange = row(sheet, rangeRow);
             setText(rowRange, 0, serial + ".", styles.textCell());
-            setText(rowRange, 1, "鏋佸樊", styles.centerTextCell());
+            setText(rowRange, 1, "Range", styles.centerTextCell());
             for (int p = 0; p < ds.partCount(); p++) {
                 String col = colName(partStartCol + p);
                 String formula = "MAX(" + col + (operatorStartRow + 1) + ":" + col + (operatorStartRow + ds.trialCount())
@@ -927,7 +951,7 @@ public class AnalysisService {
         int partMeanRow = dataStartRow + ds.appraiserCount() * groupHeight;
         HSSFRow rowPartMean = row(sheet, partMeanRow);
         setText(rowPartMean, 0, serial + ".", styles.textCell());
-        setText(rowPartMean, 1, "零件平均值（X）", styles.centerTextCell());
+        setText(rowPartMean, 1, "Part Mean", styles.centerTextCell());
         for (int p = 0; p < ds.partCount(); p++) {
             String col = colName(partStartCol + p);
             List<String> blocks = new ArrayList<>();
@@ -944,7 +968,7 @@ public class AnalysisService {
         int partRangeRow = partMeanRow + 1;
         HSSFRow rowPartRange = row(sheet, partRangeRow);
         setText(rowPartRange, 0, serial + ".", styles.textCell());
-        setText(rowPartRange, 1, "零件极差（Rp）", styles.centerTextCell());
+        setText(rowPartRange, 1, "Part Range", styles.centerTextCell());
         for (int p = 0; p < ds.partCount(); p++) {
             String col = colName(partStartCol + p);
             List<String> refs = new ArrayList<>();
@@ -980,17 +1004,17 @@ public class AnalysisService {
         setFormula(rpRow, 1, "MAX(" + partRangeExpr + ")-MIN(" + partRangeExpr + ")", styles.number4());
 
         HSSFRow noteRow = row(sheet, calcStartRow + 5);
-        setText(noteRow, 0, "说明：可直接粘贴试验数据，均值/极差/统计区将自动计算。", styles.tip());
+        setText(noteRow, 0, "Reference formulas kept for backward compatibility and manual review.", styles.tip());
         sheet.addMergedRegion(new CellRangeAddress(calcStartRow + 5, calcStartRow + 5, 0, meanCol));
 
         HSSFRow refTitle = row(sheet, 5);
-        setText(refTitle, meanCol + 2, "参考值", styles.metaLabel());
+        setText(refTitle, meanCol + 2, "Reference", styles.metaLabel());
         HSSFRow refSub = row(sheet, 6);
         setText(refSub, meanCol + 2, "%R&R", styles.metaLabel());
         setText(refSub, meanCol + 3, "Ndc", styles.metaLabel());
         HSSFRow refVal = row(sheet, 7);
-        setFormula(refVal, meanCol + 2, "'鍒嗘瀽'!D12", styles.number3());
-        setFormula(refVal, meanCol + 3, "'鍒嗘瀽'!B18", styles.number3());
+        setFormula(refVal, meanCol + 2, "'闂佸憡甯掑Λ娆撴倵?!D12", styles.number3());
+        setFormula(refVal, meanCol + 3, "'闂佸憡甯掑Λ娆撴倵?!B18", styles.number3());
 
         sheet.createFreezePane(2, 5);
         return new GrrDataRefs(
@@ -1005,27 +1029,27 @@ public class AnalysisService {
                                     GrrDataset ds,
                                     GrrDataRefs refs,
                                     AnalysisGrrResponse result) {
-        HSSFSheet sheet = workbook.createSheet("鍒嗘瀽");
+        HSSFSheet sheet = workbook.createSheet("AnalysisSheet");
         for (int c = 0; c <= 7; c++) {
             setColumnWidth(sheet, c, c == 0 ? 20 : 14);
         }
 
         HSSFRow titleRow = row(sheet, 0);
-        setText(titleRow, 0, "测量系统分析完整报告（均值极差法）", styles.title());
+        setText(titleRow, 0, "Gage R&R Analysis Summary", styles.title());
         sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 7));
 
         HSSFRow meta = row(sheet, 2);
-        setText(meta, 0, "零件数", styles.metaLabel());
+        setText(meta, 0, "Part Count", styles.metaLabel());
         setNumber(meta, 1, ds.partCount(), styles.metaValueNumber());
-        setText(meta, 2, "鎿嶄綔鑰呮暟", styles.metaLabel());
+        setText(meta, 2, "Appraiser Count", styles.metaLabel());
         setNumber(meta, 3, ds.appraiserCount(), styles.metaValueNumber());
-        setText(meta, 4, "閲嶅娆℃暟", styles.metaLabel());
+        setText(meta, 4, "Trial Count", styles.metaLabel());
         setNumber(meta, 5, ds.trialCount(), styles.metaValueNumber());
-        setText(meta, 6, "瀵煎嚭鏃ユ湡", styles.metaLabel());
+        setText(meta, 6, "Report Date", styles.metaLabel());
         setText(meta, 7, LocalDate.now().toString(), styles.metaValue());
 
         HSSFRow section1 = row(sheet, 4);
-        setText(section1, 0, "公式计算区（自动）", styles.section());
+        setText(section1, 0, "Core Calculation", styles.section());
         sheet.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
 
         double k1 = k1ForTrial(ds.trialCount());
@@ -1034,11 +1058,11 @@ public class AnalysisService {
 
         HSSFRow base = row(sheet, 5);
         setText(base, 0, "Rbar", styles.label());
-        setFormula(base, 1, "'鏁版嵁'!" + refs.rbarCell(), styles.number4());
+        setFormula(base, 1, "'闂佽桨鑳舵晶妤€鐣?!" + refs.rbarCell(), styles.number4());
         setText(base, 2, "XDIFF", styles.label());
-        setFormula(base, 3, "'鏁版嵁'!" + refs.xDiffCell(), styles.number4());
+        setFormula(base, 3, "'闂佽桨鑳舵晶妤€鐣?!" + refs.xDiffCell(), styles.number4());
         setText(base, 4, "RP", styles.label());
-        setFormula(base, 5, "'鏁版嵁'!" + refs.rpCell(), styles.number4());
+        setFormula(base, 5, "'闂佽桨鑳舵晶妤€鐣?!" + refs.rpCell(), styles.number4());
         setText(base, 6, "K1", styles.label());
         setNumber(base, 7, k1, styles.number4());
 
@@ -1049,13 +1073,13 @@ public class AnalysisService {
         setNumber(kRow, 7, k3, styles.number4());
 
         HSSFRow evRow = row(sheet, 7);
-        setText(evRow, 0, "EV锛堥噸澶嶆€э級", styles.label());
+        setText(evRow, 0, "EV", styles.label());
         setFormula(evRow, 1, "B6*H6", styles.number4());
         setText(evRow, 2, "%EV", styles.label());
         setFormula(evRow, 3, "IF(B16=0,0,B8/B16*100)", styles.percent2());
 
         HSSFRow avRow = row(sheet, 9);
-        setText(avRow, 0, "AV锛堝啀鐜版€э級", styles.label());
+        setText(avRow, 0, "AV", styles.label());
         setFormula(avRow, 1, "SQRT(MAX((D6*F7)^2-(B8^2/(B3*F3)),0))", styles.number4());
         setText(avRow, 2, "%AV", styles.label());
         setFormula(avRow, 3, "IF(B16=0,0,B10/B16*100)", styles.percent2());
@@ -1067,13 +1091,13 @@ public class AnalysisService {
         setFormula(rrRow, 3, "IF(B16=0,0,B12/B16*100)", styles.percent2Emphasis());
 
         HSSFRow pvRow = row(sheet, 13);
-        setText(pvRow, 0, "PV锛堥浂浠跺彉宸級", styles.label());
+        setText(pvRow, 0, "PV", styles.label());
         setFormula(pvRow, 1, "F6*H7", styles.number4());
         setText(pvRow, 2, "%PV", styles.label());
         setFormula(pvRow, 3, "IF(B16=0,0,B14/B16*100)", styles.percent2());
 
         HSSFRow tvRow = row(sheet, 15);
-        setText(tvRow, 0, "TV锛堟€诲彉宸級", styles.label());
+        setText(tvRow, 0, "TV", styles.label());
         setFormula(tvRow, 1, "SQRT(B12^2+B14^2)", styles.number4());
 
         HSSFRow ndcRow = row(sheet, 17);
@@ -1081,48 +1105,48 @@ public class AnalysisService {
         setFormula(ndcRow, 1, "IF(B12=0,0,1.41*B14/B12)", styles.number2Emphasis());
 
         HSSFRow conclusion = row(sheet, 19);
-        setText(conclusion, 0, "分析结论", styles.label());
-        setFormula(conclusion, 1,
-                "IF(OR(D12>30,B18<5),\"R&R% (\"&TEXT(D12,\"0.00\")&\"%) > 30% 或 NDC<5，测量系统不可接受，需要改进。\","
-                        + "IF(D12<10,\"R&R% (\"&TEXT(D12,\"0.00\")&\"%) < 10%，测量系统可接受。\","
-                        + "\"10% <= R&R% (\"&TEXT(D12,\"0.00\")&\"%) <= 30%，需结合业务风险评估可用性。\"))",
-                styles.conclusion());
+        setText(conclusion, 0, "Conclusion", styles.label());
+        setText(conclusion, 1, result.getSummary(), styles.conclusion());
+        // Legacy formula-based conclusion removed during UTF-8 cleanup.
+        // The runtime summary text above is now used directly.
+        // Reserved for future formula restoration if needed.
+        //
         sheet.addMergedRegion(new CellRangeAddress(19, 21, 1, 7));
 
         HSSFRow section2 = row(sheet, 23);
-        setText(section2, 0, "鏈嶅姟璁＄畻缁撴灉锛堝鐓э級", styles.section());
+        setText(section2, 0, "闂佸搫鐗嗙粔瀛樻叏閻旂儤濯奸柨娑樺閺嗩剛绱撴担瑙勫鞍闁诲繐顦甸弫宥夊醇濠垫劕娈搁梺缁樻寙瀹ュ洨顦?, styles.section());
         sheet.addMergedRegion(new CellRangeAddress(23, 23, 0, 7));
 
         HSSFRow s1 = row(sheet, 24);
-        setText(s1, 0, "GRR(6蟽)", styles.label());
+        setText(s1, 0, "GRR(6闁?", styles.label());
         setNumber(s1, 1, result.getSvGrr(), styles.number4());
         setText(s1, 2, "%StudyVar GRR", styles.label());
         setNumber(s1, 3, result.getPctStudyVarGrr(), styles.percent2Emphasis());
 
         HSSFRow s2 = row(sheet, 25);
-        setText(s2, 0, "PV(6蟽)", styles.label());
+        setText(s2, 0, "PV(6闁?", styles.label());
         setNumber(s2, 1, result.getSvPartToPart(), styles.number4());
         setText(s2, 2, "NDC", styles.label());
         setNumber(s2, 3, result.getNdc(), styles.number2Emphasis());
 
         HSSFRow s3 = row(sheet, 26);
-        setText(s3, 0, "绯荤粺鍒ゅ畾", styles.label());
+        setText(s3, 0, "Summary", styles.label());
         setText(s3, 1, result.getSummary(), styles.metaValue());
         sheet.addMergedRegion(new CellRangeAddress(26, 26, 1, 7));
     }
 
     private ReportStyles createReportStyles(HSSFWorkbook workbook) {
         HSSFFont normalFont = workbook.createFont();
-        normalFont.setFontName("瀹嬩綋");
+        normalFont.setFontName("Microsoft YaHei");
         normalFont.setFontHeightInPoints((short) 10);
 
         HSSFFont boldFont = workbook.createFont();
-        boldFont.setFontName("瀹嬩綋");
+        boldFont.setFontName("Microsoft YaHei");
         boldFont.setBold(true);
         boldFont.setFontHeightInPoints((short) 10);
 
         HSSFFont titleFont = workbook.createFont();
-        titleFont.setFontName("瀹嬩綋");
+        titleFont.setFontName("Microsoft YaHei");
         titleFont.setBold(true);
         titleFont.setFontHeightInPoints((short) 14);
 
@@ -1313,34 +1337,34 @@ public class AnalysisService {
 
     private String repeatabilitySummary(Double pctTolerance) {
         if (pctTolerance == null || !Double.isFinite(pctTolerance)) {
-            return "已完成重复性分析";
+            return "Tolerance was not provided; only repeatability sigma is reported.";
         }
         if (pctTolerance <= 10) {
-            return "重复性优秀（≤10%）";
+            return "Repeatability is excellent: tolerance ratio <= 10%.";
         }
         if (pctTolerance <= 30) {
-            return "重复性可接受（10%~30%）";
+            return "Repeatability is acceptable: tolerance ratio within 10%~30%.";
         }
-        return "重复性偏高（>30%），建议优化量具/方法";
+        return "Repeatability is high: tolerance ratio > 30%, please inspect fixture or method consistency.";
     }
 
     private String linearitySummary(Double pctTolerance, double slope) {
         if (pctTolerance != null && Double.isFinite(pctTolerance)) {
             if (pctTolerance <= 10 && Math.abs(slope) <= 0.1) {
-                return "线性优秀（偏倚小、斜率稳定）";
+                return "Linearity is excellent and slope is close to zero.";
             }
             if (pctTolerance <= 30) {
-                return "线性可接受（建议持续监控）";
+                return "缂佺偓瀵ч埀顑啫璁查柟鎭掑劚瑜板牓鏁嶉崼婵堢处閻犱緡鍠楃€垫梻绱掗鐘崇＇闁硅矇宥囩";
             }
-            return "线性偏差较大，建议校准量具";
+            return "Linearity is high, please inspect reference standard and test method.";
         }
         if (Math.abs(slope) <= 0.05) {
-            return "线性趋势稳定";
+            return "Linearity drift is very small.";
         }
         if (Math.abs(slope) <= 0.15) {
-            return "线性存在轻微趋势";
+            return "Linearity drift is noticeable and should be reviewed.";
         }
-        return "线性趋势明显，建议优化测量系统";
+        return "Linearity drift is large, please review calibration method and reference samples.";
     }
 
     private String pctText(Double value) {
@@ -1556,10 +1580,10 @@ public class AnalysisService {
         return value;
     }
 
-    private double requireD2(int n, String context) {
+        private double requireD2(int n, String context) {
         Double d2 = D2_CONSTANTS.get(n);
         if (d2 == null) {
-            throw new IllegalArgumentException(context + " 鏆備笉鏀寔 n=" + n + "锛岃浣跨敤 2~25");
+            throw new IllegalArgumentException(context + " 閺嗗倷绗夐弨顖涘瘮 n=" + n + "閿涘矁顕担璺ㄦ暏 2~25");
         }
         return d2;
     }
@@ -1637,29 +1661,166 @@ public class AnalysisService {
         return numerator * 100.0 / denominator;
     }
 
-    private String capabilitySummary(double cpk, double ppk) {
+        private String capabilitySummary(double cpk, double ppk) {
         if (cpk >= 1.67 && ppk >= 1.67) {
-            return "能力优秀";
+            return "閼宠棄濮忔导妯碱潊";
         }
         if (cpk >= 1.33 && ppk >= 1.33) {
-            return "能力良好";
+            return "閼宠棄濮忛懝顖氥偨";
         }
         if (cpk >= 1.00 && ppk >= 1.00) {
-            return "能力一般";
+            return "閼宠棄濮忔稉鈧懜?;
         }
-        return "能力偏低";
+        return "閼宠棄濮忛崑蹇庣秵";
     }
-
-    private String grrSummary(double pctStudyVarGrr, double ndc) {
+    private String capabilityAssessmentLevel(double cpk, double ppk) {
+        if (cpk >= 1.67 && ppk >= 1.67) {
+            return "娴兼顫?;
+        }
+        if (cpk >= 1.33 && ppk >= 1.33) {
+            return "閼诡垰銈?;
+        }
+        if (cpk >= 1.00 && ppk >= 1.00) {
+            return "閸欘垱甯撮崣?;
+        }
+        return "闂団偓閺佸瓨鏁?;
+    }
+    private String capabilityConclusion(String assessmentLevel, double cpk, double ppk, double cpl, double cpu) {
+        return switch (assessmentLevel) {
+            case "娴兼顫? -> "鏉╁洨鈻奸懗钘夊閸忓懓鍐婚敍宀€绮嶉崘鍛瑢閺佺繝缍嬬悰銊у箛闁€熺窛缁嬪啿鐣鹃敍灞藉讲娴ｆ粈璐熸导妯哄帥閸欏倽鈧啰绮ㄩ弸婧库偓?;
+            case "閼诡垰銈? -> "鏉╁洨鈻奸懗钘夊鏉堟儳鍩岀敮姝岊潐閹貉冨煑鐟曚焦鐪伴敍灞界紦鐠侇喚鎴风紒顓濈箽閹镐椒鑵戣箛鍐ㄢ偓闂寸瑢濞夈垹濮╅幒褍鍩楅妴?;
+            case "閸欘垱甯撮崣? -> "鏉╁洨鈻奸懗钘夊婢跺嫪绨稉瀵告櫕閸欘垱甯撮崣妤€灏梻杈剧礉瀵ら缚顔呮径宥嗙壋娑擃厼绺鹃崑蹇曅╅獮鑸靛瘮缂侇叀顫囩€电喆鈧?;
+            default -> (cpl < cpu
+                    ? "鏉╁洨鈻奸懗钘夊娑撳秷鍐婚敍灞煎瘜鐟曚線顥撻梽鈺呮肠娑擃厼婀棃鐘虹箮娑撳顫夐弽濂告娑撯偓娓氀佲偓?
+                    : "鏉╁洨鈻奸懗钘夊娑撳秷鍐婚敍灞煎瘜鐟曚線顥撻梽鈺呮肠娑擃厼婀棃鐘虹箮娑撳﹨顫夐弽濂告娑撯偓娓氀佲偓?)
+                    + " 瀵ら缚顔呴崗鍫滅喘閸栨牞绻冪粙瀣倵閸愬秴褰傜敮鍐╊劀瀵繒绮ㄧ拋鎭掆偓?;
+        };
+    }
+    private String capabilityRecommendedAction(String assessmentLevel, List<AnalysisValidationItem> items) {
+        boolean hasShift = items.stream().anyMatch(item -> "CAP_SHIFT".equals(item.getCode()) || "CAP_CENTER_OFF".equals(item.getCode()));
+        return switch (assessmentLevel) {
+            case "娴兼顫? -> "瀵ら缚顔呴幐澶婄秼閸撳秴寮弫鎵埛缂侇厾娲冮幒褝绱濋獮璺虹殺閺堫剚顐肩紒鎾寸亯娴ｆ粈璐熼崺铏瑰殠閻楀牊婀版穱婵嗙摠閵?;
+            case "閼诡垰銈? -> hasShift
+                    ? "瀵ら缚顔呮导妯哄帥濡偓閺屻儴绻冪粙瀣╄厬韫囧啫浜哥粔浼欑礉閸愬秵瀵旂紒顓＄闊亝澹掗梻瀛樺皾閸斻劊鈧?
+                    : "瀵ら缚顔呮穱婵囧瘮瑜版挸澧犲銉ㄥ閸欏倹鏆熼敍灞借嫙閹稿顓搁崚鎺戞噯閺堢喎顦插ù瀣ㄢ偓?;
+            case "閸欘垱甯撮崣? -> "瀵ら缚顔呯悰銉ュ帠閺嶉攱婀伴獮璺侯槻閺嶆瓕绻冪粙瀣╄厬韫囧喛绱濊箛鍛邦洣閺冨爼鍣搁弬鎷岊啎鐎规碍甯堕崚鍓佹櫕闂勬劑鈧?;
+            default -> "瀵ら缚顔呴弳鍌氫粻閻╁瓨甯村鏇犳暏閺堫剛绮ㄩ弸婊冧粵濮濓絽绱￠弨鎹愵攽閿涘苯鍘涙禒搴ゎ啎婢跺洢鈧礁浼愰懝鍝勬嫲閸欐牗鐗遍弬瑙勭《娑撳鏌熼棃銏℃殻閺€骞库偓?;
+        };
+    }
+        private String grrSummary(double pctStudyVarGrr, double ndc) {
         if (pctStudyVarGrr <= 10 && ndc >= 5) {
-            return "GRR 优秀，可直接用于过程控制";
+            return "GRR 娴兼顫呴敍灞藉讲閻╁瓨甯撮悽銊ょ艾鏉╁洨鈻奸幒褍鍩?;
         }
         if (pctStudyVarGrr <= 30) {
-            return "GRR 可接受，建议结合业务风险评估使用";
+            return "GRR 閸欘垱甯撮崣妤嬬礉瀵ら缚顔呯紒鎾虫値娑撴艾濮熸搴ㄦ珦鐠囧嫪鍙婇崥搴濆▏閻?;
         }
-        return "GRR 偏高，建议优化量具/方法/操作员一致性";
+        return "GRR 閸嬪繘鐝敍灞界紦鐠侇喕绱崗鍫滅喘閸栨牠鍣洪崗鏋偓浣规煙濞夋洘鍨ㄩ幙宥勭稊閸涙ü绔撮懛瀛樷偓?;
     }
-
+    private String grrAssessmentLevel(double pctStudyVarGrr, double ndc) {
+        if (pctStudyVarGrr <= 10 && ndc >= 5) {
+            return "娴兼顫?;
+        }
+        if (pctStudyVarGrr <= 30 && ndc >= 3) {
+            return "閸欘垱甯撮崣?;
+        }
+        return "闂団偓閺佸瓨鏁?;
+    }
+    private String grrConclusion(String assessmentLevel, double pctStudyVarGrr, double ndc) {
+        return switch (assessmentLevel) {
+            case "娴兼顫? -> "濞村鍣虹化鑽ょ埠闁插秴顦查幀褌绗岄崘宥囧箛閹嗐€冮悳鎷屽婵傛枻绱濋崣顖滄纯閹恒儲鏁幘鎴ｇ箖缁嬪甯堕崚韬测偓?;
+            case "閸欘垱甯撮崣? -> "濞村鍣虹化鑽ょ埠閸╃儤婀伴崣顖滄暏閿涘奔绲炬禒宥呯紦鐠侇喚绮ㄩ崥鍫滅瑹閸旓繝顥撻梽鈺佹嫲閸忔娊鏁悧瑙勨偓褌濞囬悽銊ｂ偓?;
+            default -> "濞村鍣虹化鑽ょ埠濞夈垹濮╅崑蹇涚彯閹存牕灏崚鍡氬厴閸旀稐绗夌搾绛圭礉瑜版挸澧犳稉宥呯紦鐠侇喚娲块幒銉ょ稊娑撶儤娓剁紒鍫濆灲鐎规矮绶烽幑顔衡偓?;
+        } + " 瑜版挸澧?%Study Var=" + String.format(Locale.ROOT, "%.2f", pctStudyVarGrr)
+                + "%閿涘DC=" + String.format(Locale.ROOT, "%.2f", ndc) + "閵?;
+    }
+    private String grrRecommendedAction(String assessmentLevel, List<AnalysisValidationItem> items) {
+        boolean lowNdc = items.stream().anyMatch(item -> "GRR_NDC_LOW".equals(item.getCode()));
+        return switch (assessmentLevel) {
+            case "娴兼顫? -> "瀵ら缚顔呯紒瀛樺瘮瑜版挸澧犻柌蹇撳徔娑撳孩鎼锋担婊嗩潐閼煎喛绱濋獮鏈电稊娑撴椽鍣哄ù瀣兇缂佺喎鐔€缁惧じ绻氱€涙ǜ鈧?;
+            case "閸欘垱甯撮崣? -> lowNdc
+                    ? "瀵ら缚顔呮导妯哄帥婢х偛濮為梿鏈垫瀹割喖绱撻弽閿嬫拱閿涘苯鍟€婢跺秵鐗抽幙宥勭稊閸涙顔勭紒鍐х閼峰瓨鈧佲偓?
+                    : "瀵ら缚顔呯紒鎾虫値娴溠冩惂妞嬪酣娅撶紒褏鐢绘担璺ㄦ暏閿涘苯鑻熺€瑰甯撻崥搴ｇ敾婢跺秵绁寸涵顔款吇閵?;
+            default -> "瀵ら缚顔呮导妯哄帥閹烘帗鐓￠柌蹇撳徔閻樿埖鈧降鈧礁銇欏▽璇插徔閵嗕焦鎼锋担婊勬煙濞夋洖鎷伴幙宥勭稊閸涙顔勭紒鍐跨礉閸愬秹鍣搁弬鐗堝⒔鐞?GRR閵?;
+        };
+    }
+    private List<AnalysisValidationItem> buildCapabilityValidationMessages(
+            int sampleCount,
+            int subgroupSize,
+            int groupCount,
+            double cpk,
+            double ppk,
+            double cpl,
+            double cpu,
+            double observedPpmTotal,
+            double predictedPpmTotalOverall
+    ) {
+        List<AnalysisValidationItem> items = new ArrayList<>();
+        if (sampleCount < 30) {
+            items.add(validation("CAP_SAMPLE_LOW", "WARNING", "閺嶉攱婀伴柌蹇撶毌娴?30閿涘苯缂撶拋顔藉⒖閸忓懏鐗遍張顒€鎮楅崘宥呭絺鐢啯顒滃蹇曠波鐠佹亽鈧?));
+        } else {
+            items.add(validation("CAP_SAMPLE_OK", "INFO", "閺嶉攱婀伴柌蹇斿姬鐡掑啿鐖剁憴鍕厴閸旀稑鍨庨弸鎰畱閸╄櫣顢呯憰浣圭湴閵?));
+        }
+        if (subgroupSize > 1 && groupCount < 20) {
+            items.add(validation("CAP_GROUP_LOW", "WARNING", "鐎涙劗绮嶉弫浼村櫤閸嬪繐鐨敍宀€绮嶉崘鍛皾閸斻劋鍙婄拋锛勄旂€规碍鈧傜閼割兙鈧?));
+        }
+        if (Math.abs(cpk - ppk) >= 0.20) {
+            items.add(validation("CAP_SHIFT", "WARNING", "CPK 娑?PPK 瀹割喖绱撴潏鍐ㄣ亣閿涘矁绻冪粙瀣讲閼宠棄鐡ㄩ崷銊︾磽缁夌粯鍨ㄩ幍褰掓？濞夈垹濮╅妴?));
+        }
+        if (Math.abs(cpl - cpu) >= 0.20) {
+            items.add(validation("CAP_CENTER_OFF", "WARNING", "鏉╁洨鈻奸崸鍥р偓鐓庝焊閸氭垼顫夐弽闂寸娓氀嶇礉瀵ら缚顔呭Λ鈧弻銉よ厬韫囧啫鈧壈顔曠€规哎鈧?));
+        }
+        if (cpk < 1.00 || ppk < 1.00) {
+            items.add(validation("CAP_NOT_CAPABLE", "RISK", "瑜版挸澧犳潻鍥┾柤閼宠棄濮忔稉宥堝喕閿涘苯缂撶拋顔芥畯閸嬫粌鐨㈤張顒傜波閺嬫粈缍旀稉鐑橆劀瀵繑鏂佺悰灞肩贩閹诡喓鈧?));
+        } else if (cpk >= 1.33 && ppk >= 1.33) {
+            items.add(validation("CAP_GOOD", "INFO", "鏉╁洨鈻奸懗钘夊鏉堟儳鍩岀敮姝岊潐闁插繋楠囩憰浣圭湴閵?));
+        }
+        if (observedPpmTotal > 1000 || predictedPpmTotalOverall > 1000) {
+            items.add(validation("CAP_PPM_HIGH", "WARNING", "娑撳秷澹?ppm 閸嬪繘鐝敍灞界紦鐠侇喚绮ㄩ崥鍫濈磽鐢摜鍋ｆ稉搴ゎ啎婢跺洨濮搁幀浣界箻娑撯偓濮濄儱顦查弽鎼炩偓?));
+        }
+        return items;
+    }
+    private List<AnalysisValidationItem> buildGrrValidationMessages(
+            double pctStudyVarGrr,
+            double ndc,
+            Double tolerance,
+            int appraiserCount,
+            int partCount,
+            int trialCount
+    ) {
+        List<AnalysisValidationItem> items = new ArrayList<>();
+        if (pctStudyVarGrr > 30) {
+            items.add(validation("GRR_HIGH", "RISK", "GRR 閸楃姵鐦搾鍛扮箖 30%閿涘本绁撮柌蹇曢兇缂佺喐娈忔稉宥呯紦鐠侇喚娲块幒銉ф暏娴滃孩顒滃蹇撳灲鐎规哎鈧?));
+        } else if (pctStudyVarGrr > 10) {
+            items.add(validation("GRR_MEDIUM", "WARNING", "GRR 婢跺嫪绨?10%~30%閿涘苯缂撶拋顔剧波閸氬牅绗熼崝锟狀棑闂勨晞鐦庢导鏉挎倵娴ｈ法鏁ら妴?));
+        } else {
+            items.add(validation("GRR_OK", "INFO", "GRR 閸楃姵鐦潏鍐х秵閿涘本绁撮柌蹇曢兇缂佺喕銆冮悳鎷屽婵傚鈧?));
+        }
+        if (ndc < 5) {
+            items.add(validation("GRR_NDC_LOW", "WARNING", "NDC 鐏忓繋绨?5閿涘苯灏崚鍡曠瑝閸氬矂娴傛禒鍓佹畱閼宠棄濮忛崑蹇撴€ラ妴?));
+        } else {
+            items.add(validation("GRR_NDC_OK", "INFO", "NDC 濠娐ゅ喕閸栧搫鍨庨懗钘夊鐟曚焦鐪伴妴?));
+        }
+        if (tolerance == null || !Double.isFinite(tolerance) || tolerance <= 0) {
+            items.add(validation("GRR_NO_TOL", "INFO", "閺堫亝褰佹笟娑樺彆瀹割噯绱濊ぐ鎾冲缂佹捁顔戦張顏勫瘶閸氼偄鍙曞顔煎窗濮ｆ柨鍨介弬顓溾偓?));
+        }
+        if (appraiserCount < 3) {
+            items.add(validation("GRR_APPRAISER_LOW", "INFO", "閹垮秳缍旈崨妯绘殶闁插繗绶濈亸鎴礉瀵ら缚顔呴崥搴ｇ敾閹碘晛鍘栭幙宥勭稊閸涙ɑ鐗遍張顒€顦查弽鎼炩偓?));
+        }
+        if (partCount < 10 || trialCount < 3) {
+            items.add(validation("GRR_DESIGN_LIGHT", "WARNING", "闂嗘湹娆㈤弫鐗堝灗闁插秴顦插▎鈩冩殶閸嬪繐鐨敍灞界紦鐠侇喛藟閸忓懎鎮楅崘宥呬粵閺堚偓缂佸牆缍婂锝冣偓?));
+        }
+        return items;
+    }
+    private AnalysisValidationItem validation(String code, String severity, String message) {
+        return AnalysisValidationItem.builder()
+                .code(code)
+                .severity(severity)
+                .message(message)
+                .build();
+    }
+    private boolean isReadyForReport(List<AnalysisValidationItem> items) {
+        return items.stream().noneMatch(item -> "RISK".equalsIgnoreCase(item.getSeverity()));
+    }
     private double normalTailPpmLower(double threshold, double mean, double sigma) {
         if (sigma <= 0) {
             return 0.0;

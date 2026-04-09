@@ -332,10 +332,12 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth.js'
 import { auditApi } from '../api/index.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useViewCache } from '../composables/useViewCache.js'
 
 const authStore = useAuthStore()
 const auditCache = useViewCache('audit-view', { ttlMs: 30 * 60 * 1000 })
+useScrollMemory('audit-view')
 const activeTab = ref(authStore.isAdmin ? 'pending' : 'my')
 
 const pendingList = ref([])

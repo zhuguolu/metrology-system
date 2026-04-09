@@ -19,9 +19,12 @@
       <div class="lin-hint">
         每行录入一个参考点，填写参考值和重复测量值；系统自动计算平均值、偏倚与线性回归。
       </div>
+      <div v-if="isResultStale" class="lin-stale-banner">
+        当前线性结果已与输入数据不一致，请重新计算后再导出专业报告。
+      </div>
       <div class="lin-actions">
         <el-button :loading="calculating" type="primary" @click="calculate">计算线性</el-button>
-        <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+        <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
         <el-button @click="clearData">清空数据</el-button>
       </div>
     </div>
@@ -32,7 +35,7 @@
           <div class="lin-card-title">线性结果</div>
           <div class="lin-title-actions">
             <el-button :loading="calculating" type="primary" @click="calculate">计算线性</el-button>
-            <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+            <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
           </div>
         </div>
         <div class="lin-stats-grid">
@@ -160,6 +163,11 @@ const repeatCountInt = computed(() => clampInt(form.repeatCount, 1, 10, 3))
 watch([pointCountInt, repeatCountInt], ([points, repeats]) => {
   rowsData.value = resizeRows(rowsData.value, points, repeats)
 }, { immediate: true })
+const isResultStale = computed(() =>
+  !!result.value
+  && !!calculatedSignature.value
+  && currentSignature.value !== calculatedSignature.value
+)
 
 const currentSignature = computed(() => {
   const tol = toFiniteNumber(form.tolerance)
@@ -359,6 +367,10 @@ function triggerBlobDownload(blob, filename) {
 async function exportProfessionalReport() {
   const payload = buildReportPayload()
   if (!payload) return
+  if (!result.value || isResultStale.value) {
+    showToast('当前结果与输入不一致，请先重新计算后再导出专业报告', 'error')
+    return
+  }
 
   exportingReport.value = true
   try {
@@ -588,6 +600,17 @@ function resizeCharts() {
   font-size: 12px;
   line-height: 1.35;
   padding: 10px 12px 0;
+}
+
+.lin-stale-banner {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .lin-actions {

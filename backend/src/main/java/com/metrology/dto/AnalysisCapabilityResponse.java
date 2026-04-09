@@ -51,6 +51,13 @@ public class AnalysisCapabilityResponse {
     private double predictedPpmAboveUslOverall;
     private double predictedPpmTotalOverall;
 
+    private String assessmentLevel;
+    private String professionalConclusion;
+    private String recommendedAction;
+    private Boolean readyForReport;
+    private String rulesVersion;
+    private List<AnalysisValidationItem> validationMessages;
+
     private List<Double> values;
     private List<AnalysisHistogramBin> histogram;
 }

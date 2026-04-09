@@ -7,6 +7,12 @@ public record FileMetadataDto(
         String mimeType,
         String etag,
         String lastModified,
-        Boolean supportsRange
+        Boolean supportsRange,
+        String previewType,
+        String previewMode,
+        Boolean previewSupported,
+        Boolean autoPreview,
+        String previewMessage,
+        Boolean largeFile
 ) {
 }

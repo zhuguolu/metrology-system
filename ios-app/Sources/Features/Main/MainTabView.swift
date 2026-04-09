@@ -115,6 +115,16 @@ private enum MoreModuleEntry: String, Identifiable, Hashable {
         }
     }
 }
+
+private struct MoreModuleCardItem: Identifiable {
+    let entry: MoreModuleEntry
+    let icon: String
+    let title: String
+    let tint: Color
+
+    var id: String { entry.rawValue }
+}
+
 struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedTab: MainTab = .ledger
@@ -494,6 +504,35 @@ private struct MoreHubView: View {
     @EnvironmentObject private var appState: AppState
     @State private var logoutConfirmOpen = false
 
+    private var collaborationModules: [MoreModuleCardItem] {
+        var items: [MoreModuleCardItem] = []
+        if appState.canAccessFiles {
+            items.append(
+                MoreModuleCardItem(
+                    entry: .files,
+                    icon: "folder.fill",
+                    title: "我的文件",
+                    tint: Color(hex: 0x1D4ED8)
+                )
+            )
+        }
+        items.append(
+            contentsOf: [
+                MoreModuleCardItem(entry: .webdav, icon: "network", title: "网络挂载", tint: Color(hex: 0x047857)),
+                MoreModuleCardItem(entry: .changeRecord, icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8)),
+                MoreModuleCardItem(entry: .dataAnalysis, icon: "chart.xyaxis.line", title: "数据分析", tint: Color(hex: 0x0F766E)),
+                MoreModuleCardItem(entry: .deviceStatus, icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857))
+            ]
+        )
+        return items
+    }
+
+    private let managementModules: [MoreModuleCardItem] = [
+        MoreModuleCardItem(entry: .department, icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309)),
+        MoreModuleCardItem(entry: .userManagement, icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9)),
+        MoreModuleCardItem(entry: .systemMaintenance, icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155))
+    ]
+
     var body: some View {
         GeometryReader { proxy in
             let scale = AndroidScale(containerWidth: proxy.size.width, containerHeight: proxy.size.height)
@@ -515,19 +554,29 @@ private struct MoreHubView: View {
                         VStack(alignment: .leading, spacing: max(scale.vertical(18), 14)) {
                             section(title: "协作与数据", scale: scale) {
                                 LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    moduleEntryButton(entry: .files, icon: "folder.fill", title: "我的文件", tint: Color(hex: 0x1D4ED8), scale: scale)
-                                    moduleEntryButton(entry: .webdav, icon: "network", title: "网络挂载", tint: Color(hex: 0x047857), scale: scale)
-                                    moduleEntryButton(entry: .changeRecord, icon: "clock.arrow.circlepath", title: "变更记录", tint: Color(hex: 0x1D4ED8), scale: scale)
-                                    moduleEntryButton(entry: .dataAnalysis, icon: "chart.xyaxis.line", title: "数据分析", tint: Color(hex: 0x0F766E), scale: scale)
-                                    moduleEntryButton(entry: .deviceStatus, icon: "waveform.path.ecg", title: "使用状态", tint: Color(hex: 0x047857), scale: scale)
+                                    ForEach(collaborationModules) { item in
+                                        moduleEntryButton(
+                                            entry: item.entry,
+                                            icon: item.icon,
+                                            title: item.title,
+                                            tint: item.tint,
+                                            scale: scale
+                                        )
+                                    }
                                 }
                             }
 
                             section(title: "管理与配置", scale: scale) {
                                 LazyVGrid(columns: columns, spacing: gridSpacing) {
-                                    moduleEntryButton(entry: .department, icon: "building.2.fill", title: "部门管理", tint: Color(hex: 0xB45309), scale: scale)
-                                    moduleEntryButton(entry: .userManagement, icon: "person.2.fill", title: "用户管理", tint: Color(hex: 0x6D28D9), scale: scale)
-                                    moduleEntryButton(entry: .systemMaintenance, icon: "gearshape.fill", title: "系统维护", tint: Color(hex: 0x334155), scale: scale)
+                                    ForEach(managementModules) { item in
+                                        moduleEntryButton(
+                                            entry: item.entry,
+                                            icon: item.icon,
+                                            title: item.title,
+                                            tint: item.tint,
+                                            scale: scale
+                                        )
+                                    }
                                 }
                             }
 

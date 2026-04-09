@@ -27,6 +27,20 @@
       <div class="analysis-hint">
         支持按表格整块复制粘贴样本数据，当前已识别 {{ sampleCount }} 个数值。
       </div>
+      <div v-if="isResultStale" class="analysis-stale-banner">
+        当前结果基于旧输入生成，请先重新计算，再导出报告或图表。
+      </div>
+      <div v-if="inputDiagnostics.length" class="analysis-diagnostics">
+        <div
+          v-for="item in inputDiagnostics"
+          :key="item.key"
+          class="analysis-diagnostic-item"
+          :class="diagnosticToneClass(item.severity)"
+        >
+          <span>{{ item.label }}</span>
+          <span>{{ item.message }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="analysis-main-grid">
@@ -101,11 +115,40 @@
             </template>
             <div v-else class="analysis-empty-tip">点击“计算 CPK/PPK”后显示结果</div>
           </div>
+          <div v-if="result" class="analysis-result-guidance">
+            <div class="analysis-guidance-head">
+              <span>专业结论</span>
+              <b :class="toneClass(result.cpk)">{{ result.assessmentLevel || result.summary || '-' }}</b>
+            </div>
+            <div class="analysis-guidance-copy">{{ result.professionalConclusion || result.summary || '-' }}</div>
+            <div class="analysis-guidance-action">
+              {{ result.recommendedAction || '建议结合样本量、过程稳定性与 ppm 风险综合判断。' }}
+            </div>
+            <div class="analysis-guidance-tags">
+              <span class="analysis-guidance-tag" :class="result.readyForReport ? 'ok' : 'warn'">
+                {{ result.readyForReport ? '可导出归档' : '建议复核后归档' }}
+              </span>
+              <span class="analysis-guidance-tag subtle">
+                规则版本 {{ result.rulesVersion || 'capability-v1' }}
+              </span>
+            </div>
+            <div v-if="result.validationMessages?.length" class="analysis-validation-list">
+              <div
+                v-for="item in result.validationMessages"
+                :key="item.code || item.message"
+                class="analysis-validation-item"
+                :class="`severity-${String(item.severity || '').toLowerCase()}`"
+              >
+                <strong>{{ validationSeverityText(item.severity) }}</strong>
+                <span>{{ item.message }}</span>
+              </div>
+            </div>
+          </div>
           <div class="analysis-inline-actions">
             <el-button :loading="calculating" type="primary" @click="calculate">计算 CPK/PPK</el-button>
-            <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+            <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
             <el-button @click="clearData">清空数据</el-button>
-            <el-button @click="exportCharts">导出图表</el-button>
+            <el-button :disabled="!result || isResultStale" @click="exportCharts">导出图表</el-button>
           </div>
         </div>
       </div>
@@ -196,6 +239,15 @@ const sampleCount = computed(() =>
     0
   )
 )
+const isResultStale = computed(() =>
+  !!result.value
+  && !!calculatedSignature.value
+  && currentDataSignature.value !== calculatedSignature.value
+)
+const inputDiagnostics = computed(() => buildInputDiagnostics())
+const inputHasBlockingIssue = computed(() =>
+  inputDiagnostics.value.some(item => item.severity === 'error')
+)
 
 const currentDataSignature = computed(() => {
   const values = buildGridPayload().flat().map(v => (v == null ? '' : v))
@@ -246,6 +298,83 @@ function toIntOrNull(value) {
 
 function buildGridPayload() {
   return grid.value.map(row => row.map(cell => toFiniteNumber(cell)))
+}
+
+function buildInputDiagnostics() {
+  const diagnostics = []
+  const lsl = toFiniteNumber(form.lsl)
+  const usl = toFiniteNumber(form.usl)
+  const subgroupSize = toIntOrNull(form.subgroupSize)
+  const bins = toIntOrNull(form.bins)
+
+  diagnostics.push({
+    key: 'sample-count',
+    severity: sampleCount.value >= 30 ? 'success' : (sampleCount.value >= 2 ? 'warning' : 'error'),
+    label: '样本量',
+    message: sampleCount.value >= 30
+      ? `当前样本量 ${sampleCount.value}，满足常规能力分析建议。`
+      : sampleCount.value >= 2
+        ? `当前样本量 ${sampleCount.value}，可以计算，但建议补充到 30 个以上。`
+        : '样本数不足，至少需要 2 个有效值。'
+  })
+
+  diagnostics.push({
+    key: 'spec-range',
+    severity: lsl != null && usl != null && usl > lsl ? 'success' : 'error',
+    label: '规格限',
+    message: lsl != null && usl != null && usl > lsl
+      ? `LSL=${lsl}，USL=${usl}，规格区间有效。`
+      : 'LSL / USL 必须完整填写，且 USL 必须大于 LSL。'
+  })
+
+  if (subgroupSize != null) {
+    diagnostics.push({
+      key: 'subgroup-size',
+      severity: subgroupSize >= 2 && subgroupSize <= 25 ? 'success' : 'error',
+      label: '子组设置',
+      message: subgroupSize >= 2 && subgroupSize <= 25
+        ? `当前子组大小为 ${subgroupSize}。`
+        : '子组大小仅支持 2~25；留空则按移动极差模式计算。'
+    })
+    if (subgroupSize >= 2) {
+      diagnostics.push({
+        key: 'subgroup-match',
+        severity: sampleCount.value > 0 && sampleCount.value % subgroupSize === 0 ? 'success' : 'warning',
+        label: '子组整除',
+        message: sampleCount.value > 0 && sampleCount.value % subgroupSize === 0
+          ? '样本数可被子组大小整除。'
+          : '当前样本数不能整除子组大小，计算时会被后端拦截。'
+      })
+    }
+  }
+
+  if (bins != null) {
+    diagnostics.push({
+      key: 'bins',
+      severity: bins >= 5 && bins <= 30 ? 'success' : 'warning',
+      label: '分箱数',
+      message: bins >= 5 && bins <= 30
+        ? `分箱数 ${bins} 在推荐区间内。`
+        : '建议将分箱数设置在 5~30 之间。'
+    })
+  }
+
+  return diagnostics
+}
+
+function diagnosticToneClass(severity) {
+  return {
+    error: severity === 'error',
+    warning: severity === 'warning',
+    success: severity === 'success',
+  }
+}
+
+function validationSeverityText(severity) {
+  const normalized = String(severity || '').toUpperCase()
+  if (normalized === 'RISK') return '高风险'
+  if (normalized === 'WARNING') return '提醒'
+  return '提示'
 }
 
 function focusNextRow(rowIndex, colIndex) {
@@ -490,6 +619,11 @@ async function calculate() {
 function buildCapabilityPayload() {
   const lsl = toFiniteNumber(form.lsl)
   const usl = toFiniteNumber(form.usl)
+  if (inputHasBlockingIssue.value) {
+    const blockingItem = inputDiagnostics.value.find(item => item.severity === 'error')
+    showToast(blockingItem?.message || '请先修正输入项', 'error')
+    return null
+  }
   if (lsl == null || usl == null) {
     showToast('请先输入有效的 LSL / USL', 'error')
     return null
@@ -532,6 +666,10 @@ function triggerBlobDownload(blob, filename) {
 async function exportProfessionalReport() {
   const payload = buildCapabilityPayload()
   if (!payload) return
+  if (!result.value || isResultStale.value) {
+    showToast('当前结果与输入不一致，请先重新计算后再导出报告', 'error')
+    return
+  }
 
   exportingReport.value = true
   try {
@@ -560,8 +698,8 @@ function exportCharts() {
     showToast('图表尚未初始化', 'error')
     return
   }
-  if (!result.value) {
-    showToast('请先计算 CPK/PPK 后再导出', 'error')
+  if (!result.value || isResultStale.value) {
+    showToast('当前结果与输入不一致，请先重新计算后再导出图表', 'error')
     return
   }
 
@@ -684,6 +822,17 @@ onUnmounted(() => {
   padding: 10px 12px 0;
 }
 
+.analysis-stale-banner {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .analysis-actions {
   display: flex;
   flex-wrap: wrap;
@@ -738,6 +887,137 @@ onUnmounted(() => {
   color: #94a3b8;
   font-size: 13px;
   padding: 8px 2px 6px;
+}
+
+.analysis-diagnostics {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-diagnostic-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.86);
+  color: #475569;
+  font-size: 13px;
+}
+
+.analysis-diagnostic-item span:first-child {
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.analysis-diagnostic-item.error {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(254, 242, 242, 0.92);
+}
+
+.analysis-diagnostic-item.warning {
+  border-color: rgba(245, 158, 11, 0.22);
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.analysis-diagnostic-item.success {
+  border-color: rgba(16, 185, 129, 0.22);
+  background: rgba(236, 253, 245, 0.92);
+}
+
+.analysis-result-guidance {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.96), rgba(241, 245, 249, 0.9));
+}
+
+.analysis-guidance-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.analysis-guidance-copy,
+.analysis-guidance-action {
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.analysis-guidance-action {
+  margin-top: 8px;
+}
+
+.analysis-guidance-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.analysis-guidance-tag {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analysis-guidance-tag.ok {
+  color: #047857;
+  background: rgba(209, 250, 229, 0.92);
+}
+
+.analysis-guidance-tag.warn {
+  color: #b45309;
+  background: rgba(254, 243, 199, 0.95);
+}
+
+.analysis-guidance-tag.subtle {
+  color: #4f46e5;
+  background: rgba(224, 231, 255, 0.9);
+}
+
+.analysis-validation-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-validation-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.analysis-validation-item strong {
+  min-width: 42px;
+}
+
+.analysis-validation-item.severity-risk {
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.95);
+}
+
+.analysis-validation-item.severity-warning {
+  color: #92400e;
+  background: rgba(255, 251, 235, 0.95);
+}
+
+.analysis-validation-item.severity-info {
+  color: #1d4ed8;
+  background: rgba(239, 246, 255, 0.95);
 }
 
 .analysis-stat-row .tone-good {

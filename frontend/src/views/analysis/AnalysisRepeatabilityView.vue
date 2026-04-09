@@ -19,9 +19,12 @@
       <div class="rp-hint">
         每行一个零件，每列一个重复测量值；支持从 Excel 整块粘贴。当前已识别 {{ sampleCount }} / {{ requiredCount }}。
       </div>
+      <div v-if="isResultStale" class="rp-stale-banner">
+        当前重复性结果已与输入数据不一致，请重新计算后再导出专业报告。
+      </div>
       <div class="rp-actions">
         <el-button :loading="calculating" type="primary" @click="calculate">计算重复性</el-button>
-        <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+        <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
         <el-button @click="clearData">清空数据</el-button>
       </div>
     </div>
@@ -32,7 +35,7 @@
           <div class="rp-card-title">重复性结果</div>
           <div class="rp-title-actions">
             <el-button :loading="calculating" type="primary" @click="calculate">计算重复性</el-button>
-            <el-button :loading="exportingReport" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
+            <el-button :loading="exportingReport" :disabled="!result || isResultStale" @click="exportProfessionalReport">导出专业报告(.xls)</el-button>
           </div>
         </div>
         <div class="rp-stats-grid">
@@ -163,6 +166,11 @@ watch([partCountInt, trialCountInt], ([parts, trials]) => {
 }, { immediate: true })
 
 const sampleCount = computed(() => measurements.value.flat().filter(v => toFiniteNumber(v) != null).length)
+const isResultStale = computed(() =>
+  !!result.value
+  && !!calculatedSignature.value
+  && currentSignature.value !== calculatedSignature.value
+)
 
 const currentSignature = computed(() => {
   const tol = toFiniteNumber(form.tolerance)
@@ -352,6 +360,10 @@ function triggerBlobDownload(blob, filename) {
 async function exportProfessionalReport() {
   const payload = buildReportPayload()
   if (!payload) return
+  if (!result.value || isResultStale.value) {
+    showToast('当前结果与输入不一致，请先重新计算后再导出专业报告', 'error')
+    return
+  }
 
   exportingReport.value = true
   try {
@@ -549,6 +561,17 @@ function resizeCharts() {
   font-size: 12px;
   line-height: 1.35;
   padding: 10px 12px 0;
+}
+
+.rp-stale-banner {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .rp-actions,

@@ -3,6 +3,7 @@
 enum APIError: Error, LocalizedError {
     case invalidURL
     case unauthorized
+    case forbidden(String?)
     case serverMessage(String)
     case httpStatus(Int, String?)
     case decodingFailed
@@ -14,6 +15,11 @@ enum APIError: Error, LocalizedError {
             return "接口地址无效"
         case .unauthorized:
             return "登录状态已失效，请重新登录"
+        case let .forbidden(message):
+            if let message, !message.isEmpty {
+                return message
+            }
+            return "当前账号没有访问权限"
         case let .serverMessage(message):
             return message
         case let .httpStatus(code, message):
@@ -1095,6 +1101,11 @@ final class APIClient {
                 notifyUnauthorizedIfNeeded()
             }
             throw APIError.unauthorized
+        }
+
+        if http.statusCode == 403 {
+            let message = extractErrorMessage(from: data)
+            throw APIError.forbidden(message)
         }
 
         let message = extractErrorMessage(from: data)

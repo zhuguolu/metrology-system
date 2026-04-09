@@ -388,11 +388,13 @@ import * as XLSX from 'xlsx'
 import { deviceApi, deptApi, deviceStatusApi } from '../api/index.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
+import { useScrollMemory } from '../composables/useScrollMemory.js'
 import { useViewCache } from '../composables/useViewCache.js'
 
 const showToast = inject('showToast')
 const authStore = useAuthStore()
 const todoCache = useViewCache('todo-view', { ttlMs: 30 * 60 * 1000 })
+useScrollMemory('todo-view')
 const canRecordCalibration = computed(() => authStore.canRecordCalibration)
 const allTodos = ref([])
 const totalItems = ref(0)

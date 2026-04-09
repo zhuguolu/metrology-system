@@ -167,6 +167,10 @@ final class FilesViewModel: ObservableObject {
 
             do {
                 let metadata = try await self.fileMetadata(id: id)
+                if let previewMessage = metadata.previewMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !previewMessage.isEmpty {
+                    self.hint = previewMessage
+                }
                 let cacheKey = self.previewCacheKey(fileId: id, item: item, metadata: metadata)
                 if let cachedURL = self.cachedPreviewURL(for: cacheKey) {
                     guard self.shouldApplyPreviewResult(for: token) else { return }
@@ -734,7 +738,17 @@ final class FilesViewModel: ObservableObject {
     }
 
     private func localizedMessage(from error: Error) -> String {
-        (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .forbidden:
+                return "当前账号没有文件模块访问权限"
+            case .decodingFailed:
+                return "文件模块数据解析失败，请检查后端接口返回格式"
+            default:
+                return apiError.localizedDescription
+            }
+        }
+        return error.localizedDescription
     }
 
     private func resetToRoot() {
