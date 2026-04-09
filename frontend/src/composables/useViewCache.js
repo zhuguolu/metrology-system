@@ -10,19 +10,42 @@ export function useViewCache(key, options = {}) {
     if (!isAvailable()) return null
 
     try {
-      // Disable view-level cache restore so pages always fetch live data on open.
-      window.sessionStorage.removeItem(storageKey)
+      const raw = window.sessionStorage.getItem(storageKey)
+      if (!raw) return null
+
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object') {
+        window.sessionStorage.removeItem(storageKey)
+        return null
+      }
+
+      if (parsed.version !== version) {
+        window.sessionStorage.removeItem(storageKey)
+        return null
+      }
+
+      if (typeof parsed.expiresAt !== 'number' || parsed.expiresAt <= Date.now()) {
+        window.sessionStorage.removeItem(storageKey)
+        return null
+      }
+
+      return parsed.payload ?? null
     } catch {
       return null
     }
-
-    return null
   }
 
   function save(payload) {
-    void payload
-    void ttlMs
-    void version
+    if (!isAvailable()) return
+
+    try {
+      window.sessionStorage.setItem(storageKey, JSON.stringify({
+        version,
+        savedAt: Date.now(),
+        expiresAt: Date.now() + Math.max(1000, Number(ttlMs) || 0),
+        payload
+      }))
+    } catch {}
   }
 
   function clear() {

@@ -1,6 +1,9 @@
 package com.metrology.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.metrology.dto.ApiErrorResponse;
 import com.metrology.security.JwtAuthFilter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -31,27 +34,40 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login").permitAll()
-                .requestMatchers("/api/public/shares/**").permitAll()
-                .requestMatchers("/uploads/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint((request, response, authException) ->
-                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "未登录或登录已过期"))
-                .accessDeniedHandler((request, response, accessDeniedException) ->
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN, "权限不足"))
-            )
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/public/shares/**").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeJsonError(
+                                        request,
+                                        response,
+                                        HttpServletResponse.SC_UNAUTHORIZED,
+                                        "UNAUTHORIZED",
+                                        "登录状态已失效，请重新登录"
+                                ))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeJsonError(
+                                        request,
+                                        response,
+                                        HttpServletResponse.SC_FORBIDDEN,
+                                        "FORBIDDEN",
+                                        "当前账号没有此操作权限"
+                                ))
+                )
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
@@ -84,5 +100,24 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private void writeJsonError(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            int status,
+            String code,
+            String message
+    ) {
+        response.setStatus(status);
+        response.setContentType("application/json;charset=UTF-8");
+        try {
+            objectMapper.writeValue(
+                    response.getWriter(),
+                    ApiErrorResponse.of(status, code, message, request.getRequestURI())
+            );
+        } catch (Exception ignored) {
+            response.setStatus(status);
+        }
     }
 }

@@ -20,6 +20,31 @@ struct DashboardDeptStat: Identifiable {
     }
 }
 
+private struct DashboardSnapshot: Codable {
+    struct TrendItem: Codable {
+        let label: String
+        let value: Int64
+    }
+
+    struct DeptItem: Codable {
+        let name: String
+        let total: Int64
+        let valid: Int64
+        let warning: Int64
+        let expired: Int64
+    }
+
+    let savedAt: Date
+    let total: Int64
+    let dueThisMonth: Int64
+    let valid: Int64
+    let warning: Int64
+    let expired: Int64
+    let risk: Int64
+    let trend: [TrendItem]
+    let deptStats: [DeptItem]
+}
+
 @MainActor
 final class DashboardViewModel: ObservableObject {
     @Published var isLoading: Bool = false
@@ -35,6 +60,12 @@ final class DashboardViewModel: ObservableObject {
 
     @Published var trend: [DashboardTrendPoint] = []
     @Published var deptStats: [DashboardDeptStat] = []
+
+    private let snapshotKey = "dashboard.snapshot.v1"
+
+    init() {
+        restoreSnapshotIfAvailable()
+    }
 
     func load() async {
         isLoading = true
@@ -53,6 +84,7 @@ final class DashboardViewModel: ObservableObject {
             trend = parseTrend(result.monthlyTrend)
             deptStats = parseDeptStats(result.deptStats)
             hintText = "\u{6570}\u{636E}\u{66F4}\u{65B0}\u{65F6}\u{95F4}\u{FF1A}\u{521A}\u{521A}"
+            saveSnapshot()
         } catch {
             if let apiError = error as? APIError {
                 errorMessage = apiError.localizedDescription
@@ -148,5 +180,58 @@ final class DashboardViewModel: ObservableObject {
         }
 
         return text
+    }
+
+    private func restoreSnapshotIfAvailable() {
+        guard let data = UserDefaults.standard.data(forKey: snapshotKey) else { return }
+        guard let snapshot = try? JSONDecoder().decode(DashboardSnapshot.self, from: data) else { return }
+
+        total = snapshot.total
+        dueThisMonth = snapshot.dueThisMonth
+        valid = snapshot.valid
+        warning = snapshot.warning
+        expired = snapshot.expired
+        risk = snapshot.risk
+        trend = snapshot.trend.map { DashboardTrendPoint(label: $0.label, value: $0.value) }
+        deptStats = snapshot.deptStats.map {
+            DashboardDeptStat(
+                name: $0.name,
+                total: $0.total,
+                valid: $0.valid,
+                warning: $0.warning,
+                expired: $0.expired
+            )
+        }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.unitsStyle = .short
+        let relative = formatter.localizedString(for: snapshot.savedAt, relativeTo: Date())
+        hintText = "\u{6570}\u{636E}\u{66F4}\u{65B0}\u{65F6}\u{95F4}\u{FF1A}\(relative)"
+    }
+
+    private func saveSnapshot() {
+        let snapshot = DashboardSnapshot(
+            savedAt: Date(),
+            total: total,
+            dueThisMonth: dueThisMonth,
+            valid: valid,
+            warning: warning,
+            expired: expired,
+            risk: risk,
+            trend: trend.map { DashboardSnapshot.TrendItem(label: $0.label, value: $0.value) },
+            deptStats: deptStats.map {
+                DashboardSnapshot.DeptItem(
+                    name: $0.name,
+                    total: $0.total,
+                    valid: $0.valid,
+                    warning: $0.warning,
+                    expired: $0.expired
+                )
+            }
+        )
+
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: snapshotKey)
     }
 }

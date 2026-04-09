@@ -37,6 +37,11 @@ final class FilesViewModel: ObservableObject {
         let cachedAt: Date
     }
 
+    private struct FileMetadataSnapshot {
+        let metadata: FileMetadataDto
+        let cachedAt: Date
+    }
+
     private let rootFolder = FolderStackEntry(id: nil, name: "")
     private var folderStack: [FolderStackEntry] = [FolderStackEntry(id: nil, name: "")]
     private var currentLoadToken: UInt64 = 0
@@ -45,6 +50,8 @@ final class FilesViewModel: ObservableObject {
     private var activePreviewTask: Task<Void, Never>?
     private var folderCache: [String: FolderSnapshot] = [:]
     private let folderCacheTTL: TimeInterval = 20
+    private var fileMetadataCache: [Int64: FileMetadataSnapshot] = [:]
+    private let fileMetadataCacheTTL: TimeInterval = 15
     private var currentPreviewURL: URL?
     private var previewCache: [String: URL] = [:]
     private var previewCacheOrder: [String] = []
@@ -89,7 +96,7 @@ final class FilesViewModel: ObservableObject {
            Date().timeIntervalSince(cached.cachedAt) <= folderCacheTTL {
             items = cached.items
             applyAccess(cached.access)
-            hint = "共 \(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+            hint = "共\(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
         }
 
         do {
@@ -98,7 +105,7 @@ final class FilesViewModel: ObservableObject {
 
             items = result.items ?? []
             applyAccess(result.access)
-            hint = "共 \(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+            hint = "共\(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
             folderCache[folderKey] = FolderSnapshot(
                 items: items,
                 access: result.access,
@@ -143,15 +150,6 @@ final class FilesViewModel: ObservableObject {
             return
         }
 
-        let cacheKey = previewCacheKey(fileId: id, item: item)
-        if let cachedURL = cachedPreviewURL(for: cacheKey) {
-            cancelActivePreviewDownload(resetLoading: false)
-            currentPreviewURL = cachedURL
-            previewLoadingFileId = nil
-            previewItem = PreviewItem(url: cachedURL, title: item.displayName)
-            return
-        }
-
         cancelActivePreviewDownload(resetLoading: false)
         previewLoadingFileId = id
         let token = beginPreviewLoad()
@@ -168,6 +166,15 @@ final class FilesViewModel: ObservableObject {
             }
 
             do {
+                let metadata = try await self.fileMetadata(id: id)
+                let cacheKey = self.previewCacheKey(fileId: id, item: item, metadata: metadata)
+                if let cachedURL = self.cachedPreviewURL(for: cacheKey) {
+                    guard self.shouldApplyPreviewResult(for: token) else { return }
+                    self.currentPreviewURL = cachedURL
+                    self.previewItem = PreviewItem(url: cachedURL, title: title)
+                    return
+                }
+
                 let url = try await APIClient.shared.downloadFile(id: id, suggestedName: fileName)
                 guard self.shouldApplyPreviewResult(for: token) else { return }
                 self.storePreviewURL(url, for: cacheKey)
@@ -281,7 +288,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "上传完成：成功 \(successCount)，失败 \(failCount)"
+        scanSyncMessage = "上传完成：成功\(successCount)，失败\(failCount)"
         invalidateFolderCache()
         await load()
     }
@@ -380,7 +387,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "移动完成：成功 \(successCount)，失败 \(failCount)"
+        scanSyncMessage = "移动完成：成功\(successCount)，失败\(failCount)"
         invalidateFolderCache()
         await load()
     }
@@ -421,7 +428,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "删除完成：成功 \(successCount)，失败 \(failCount)"
+        scanSyncMessage = "删除完成：成功\(successCount)，失败\(failCount)"
         invalidateFolderCache()
         await load()
     }
@@ -505,7 +512,7 @@ final class FilesViewModel: ObservableObject {
         )
 
         if skippedFolders > 0 || failed > 0 {
-            scanSyncMessage = "下载准备完成：成功 \(urls.count)，文件夹跳过 \(skippedFolders)，失败 \(failed)"
+            scanSyncMessage = "下载准备完成：成功\(urls.count)，文件夹跳过 \(skippedFolders)，失败\(failed)"
         }
         return urls
     }
@@ -586,7 +593,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "复制完成：成功 \(successCount)，文件夹跳过 \(skippedFolders)，失败 \(failedCount)"
+        scanSyncMessage = "复制完成：成功\(successCount)，文件夹跳过 \(skippedFolders)，失败\(failedCount)"
         invalidateFolderCache()
         await load()
     }
@@ -640,7 +647,7 @@ final class FilesViewModel: ObservableObject {
         let filesCreated = result.filesCreated ?? 0
         let foldersDeleted = result.foldersDeleted ?? 0
         let filesDeleted = result.filesDeleted ?? 0
-        return "扫描同步完成：新增目录 \(foldersCreated)，新增文件 \(filesCreated)，删除目录 \(foldersDeleted)，删除文件 \(filesDeleted)"
+        return "扫描同步完成：新增目录\(foldersCreated)，新增文件\(filesCreated)，删除目录\(foldersDeleted)，删除文件\(filesDeleted)"
     }
 
     private func resolveUploadMetadata(from url: URL) -> UploadPayload? {
@@ -764,10 +771,22 @@ final class FilesViewModel: ObservableObject {
 
     private func invalidateFolderCache() {
         folderCache.removeAll(keepingCapacity: true)
+        fileMetadataCache.removeAll(keepingCapacity: true)
     }
 
-    private func previewCacheKey(fileId: Int64, item: UserFileItemDto) -> String {
-        "\(fileId)|\(item.createdAt ?? "")|\(item.fileSize ?? -1)"
+    private func fileMetadata(id: Int64) async throws -> FileMetadataDto {
+        if let cached = fileMetadataCache[id],
+           Date().timeIntervalSince(cached.cachedAt) <= fileMetadataCacheTTL {
+            return cached.metadata
+        }
+
+        let metadata = try await APIClient.shared.fileMetadata(id: id)
+        fileMetadataCache[id] = FileMetadataSnapshot(metadata: metadata, cachedAt: Date())
+        return metadata
+    }
+
+    private func previewCacheKey(fileId: Int64, item: UserFileItemDto, metadata: FileMetadataDto?) -> String {
+        "\(fileId)|\(metadata?.etag ?? "")|\(metadata?.lastModified ?? item.createdAt ?? "")|\(metadata?.fileSize ?? item.fileSize ?? -1)"
     }
 
     private func cachedPreviewURL(for key: String) -> URL? {

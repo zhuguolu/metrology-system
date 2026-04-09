@@ -328,6 +328,10 @@ final class APIClient {
         return try await send(path: "api/files/breadcrumb", method: "GET", queryItems: query, authorized: true)
     }
 
+    func fileMetadata(id: Int64) async throws -> FileMetadataDto {
+        try await send(path: "api/files/\(id)/meta", method: "GET", authorized: true)
+    }
+
     func grantableFolders() async throws -> [GrantableFolderDto] {
         try await send(path: "api/files/grantable-folders", method: "GET", authorized: true)
     }
@@ -888,11 +892,17 @@ final class APIClient {
         if path.contains("/api/devices/dashboard") {
             return GETCachePolicy(freshTTL: 10, staleTTL: 40, allowsStaleWhileRevalidate: true)
         }
+        if path.contains("/api/files/") && path.contains("/meta") {
+            return GETCachePolicy(freshTTL: 12, staleTTL: 60, allowsStaleWhileRevalidate: true)
+        }
+        if path.contains("/api/files/breadcrumb") {
+            return GETCachePolicy(freshTTL: 10, staleTTL: 45, allowsStaleWhileRevalidate: true)
+        }
         if path.contains("/api/devices/paged") || path.contains("/api/audit") || path.contains("/api/change-records") {
             return GETCachePolicy(freshTTL: 1.2, staleTTL: 5, allowsStaleWhileRevalidate: true)
         }
         if path.contains("/api/files") || path.contains("/api/webdav/browse") {
-            return GETCachePolicy(freshTTL: 2, staleTTL: 8, allowsStaleWhileRevalidate: true)
+            return GETCachePolicy(freshTTL: 4, staleTTL: 15, allowsStaleWhileRevalidate: true)
         }
         if path.contains("/api/departments")
             || path.contains("/api/device-statuses")

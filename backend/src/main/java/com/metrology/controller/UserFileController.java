@@ -1,5 +1,6 @@
 package com.metrology.controller;
 
+import com.metrology.dto.FileMetadataDto;
 import com.metrology.entity.UserFile;
 import com.metrology.service.PermissionService;
 import com.metrology.service.UserFileService;
@@ -22,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -35,14 +37,14 @@ public class UserFileController {
 
     private ResponseEntity<?> checkFileAccess(String username) {
         if (!permissionService.hasFileModuleAccess(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "无权访问文件模块"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "当前账号没有文件模块访问权限"));
         }
         return null;
     }
 
     private ResponseEntity<?> checkFileWriteAccess(String username) {
         if (!permissionService.hasPermission(username, PermissionService.FILE_ACCESS)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "当前账号只有文件只读权限"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "当前账号仅有文件只读权限"));
         }
         return null;
     }
@@ -141,6 +143,25 @@ public class UserFileController {
         }
     }
 
+    @GetMapping("/{id}/meta")
+    public ResponseEntity<?> metadata(
+            @AuthenticationPrincipal UserDetails u,
+            @PathVariable Long id
+    ) {
+        ResponseEntity<?> check = checkFileAccess(u.getUsername());
+        if (check != null) return check;
+        try {
+            UserFile file = service.getFile(u.getUsername(), id);
+            File target = service.resolveDownloadTarget(file);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "private, max-age=15, stale-while-revalidate=45")
+                    .lastModified(target.lastModified())
+                    .body(buildMetadata(file, target));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{id}/download")
     public ResponseEntity<?> download(
             @AuthenticationPrincipal UserDetails u,
@@ -161,6 +182,7 @@ public class UserFileController {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
                     .header(HttpHeaders.ETAG, etag)
+                    .lastModified(target.lastModified())
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
                     .build();
@@ -180,6 +202,7 @@ public class UserFileController {
                 return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
                         .header(HttpHeaders.ETAG, etag)
+                        .lastModified(target.lastModified())
                         .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                         .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
                         .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + target.length())
@@ -190,6 +213,7 @@ public class UserFileController {
                 return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
                         .header(HttpHeaders.CONTENT_RANGE, "bytes */" + target.length())
                         .header(HttpHeaders.ETAG, etag)
+                        .lastModified(target.lastModified())
                         .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                         .build();
             }
@@ -198,6 +222,7 @@ public class UserFileController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
                 .header(HttpHeaders.ETAG, etag)
+                .lastModified(target.lastModified())
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
                 .contentType(mediaType)
@@ -323,6 +348,18 @@ public class UserFileController {
 
     private String buildWeakEtag(File file) {
         return "W/\"" + Long.toHexString(file.lastModified()) + "-" + Long.toHexString(file.length()) + "\"";
+    }
+
+    private FileMetadataDto buildMetadata(UserFile file, File target) {
+        return new FileMetadataDto(
+                file.getId(),
+                file.getName(),
+                target.length(),
+                file.getMimeType(),
+                buildWeakEtag(target),
+                Instant.ofEpochMilli(target.lastModified()).toString(),
+                Boolean.TRUE
+        );
     }
 
     private boolean matchesIfNoneMatch(String ifNoneMatch, String etag) {

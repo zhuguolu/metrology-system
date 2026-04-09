@@ -241,6 +241,16 @@ struct FileListResponseDto: Codable {
     let access: FileAccessDto?
 }
 
+struct FileMetadataDto: Codable {
+    let id: Int64?
+    let name: String?
+    let fileSize: Int64?
+    let mimeType: String?
+    let etag: String?
+    let lastModified: String?
+    let supportsRange: Bool?
+}
+
 struct BreadcrumbItemDto: Codable {
     let id: Int64?
     let name: String?

@@ -5,6 +5,9 @@ const publicApi = axios.create({ baseURL: '/api', timeout: 30000 })
 const transferApi = axios.create({ baseURL: '/api', timeout: 0 })
 const publicTransferApi = axios.create({ baseURL: '/api', timeout: 0 })
 
+let authRecheckPromise = null
+let authRedirecting = false
+
 function attachAuthRequestInterceptor(client) {
   client.interceptors.request.use(config => {
     const token = localStorage.getItem('token')
@@ -13,31 +16,58 @@ function attachAuthRequestInterceptor(client) {
   })
 }
 
-function handleAuthResponseError(err) {
+async function recheckSession() {
+  const token = localStorage.getItem('token')
+  if (!token) return false
+  if (authRecheckPromise) return authRecheckPromise
+
+  authRecheckPromise = axios.get('/api/auth/me', {
+    timeout: 10000,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }).then(() => true)
+    .catch(error => error?.response?.status !== 401)
+    .finally(() => {
+      authRecheckPromise = null
+    })
+
+  return authRecheckPromise
+}
+
+function redirectToLogin() {
+  if (authRedirecting) return
+  authRedirecting = true
+  localStorage.clear()
+  window.location.href = '/login'
+}
+
+async function handleAuthResponseError(err) {
   if (err.response?.status === 401) {
-    localStorage.clear()
-    window.location.href = '/login'
+    const requestURL = String(err?.config?.url || '')
+    if (!requestURL.includes('/auth/login')) {
+      const stillValid = await recheckSession()
+      if (!stillValid) {
+        redirectToLogin()
+      }
+    }
   } else if (err.response?.status === 403) {
-    // 403 may be a permission denial (not auth failure), don't redirect to login
-    // Only redirect if not authenticated at all (no token)
     const token = localStorage.getItem('token')
     if (!token) {
-      localStorage.clear()
-      window.location.href = '/login'
+      redirectToLogin()
     }
   } else if (!err.response) {
-    console.error('网络错误，请检查网络连接')
+    console.error('Network error, please check your connection')
   }
   return Promise.reject(err)
 }
 
 function handlePublicResponseError(err) {
   if (!err.response) {
-    console.error('网络错误，请检查网络连接')
+    console.error('Network error, please check your connection')
   }
   return Promise.reject(err)
 }
-
 attachAuthRequestInterceptor(api)
 attachAuthRequestInterceptor(transferApi)
 
@@ -125,6 +155,7 @@ export const fileApi = {
   list: parentId => api.get('/files', { params: parentId != null ? { parentId } : {} }),
   search: q => api.get('/files/search', { params: { q } }),
   breadcrumb: folderId => api.get('/files/breadcrumb', { params: { folderId } }),
+  info: id => api.get(`/files/${id}/meta`),
   createFolder: (name, parentId) => api.post('/files/folder', { name, parentId: parentId ?? null }),
   scanSync: parentId => api.post('/files/scan-sync', { parentId: parentId ?? null }),
   grantableFolders: () => api.get('/files/grantable-folders'),

@@ -464,13 +464,17 @@
           ×
         </button>
         <div v-if="previewItem" class="file-preview-meta">
-          <span>{{ previewItem.name }}</span>
-          <span>{{ formatSize(fileSize(previewItem)) }}</span>
+          <span>{{ previewMeta?.name || previewItem.name }}</span>
+          <span>{{ formatSize(previewMeta?.fileSize ?? fileSize(previewItem)) }}</span>
           <span>{{ previewTypeLabel }}</span>
+          <span v-if="previewMeta?.lastModified">{{ previewLastModifiedLabel }}</span>
         </div>
 
         <div v-if="previewError" class="file-preview-empty">
-          {{ previewError }}
+          <div class="file-preview-error-stack">
+            <div>{{ previewError }}</div>
+            <el-button v-if="previewItem" type="primary" plain @click="retryPreview">重新加载</el-button>
+          </div>
         </div>
 
         <div v-else-if="previewType === 'image'" class="file-preview-body image">
@@ -613,6 +617,7 @@ const sharePasswordValue = ref('')
 
 const showPreviewDialog = ref(false)
 const previewItem = ref(null)
+const previewMeta = ref(null)
 const previewLoading = ref(false)
 const previewType = ref('')
 const previewUrl = ref('')
@@ -647,11 +652,18 @@ let previewAbortController = null
 let previewRequestToken = 0
 let activePdfRenderToken = 0
 let activePdfDocument = null
+let currentPreviewCacheKey = ''
+const previewCache = new Map()
+const previewCacheOrder = []
+const PREVIEW_CACHE_LIMIT = 12
 let dragCounter = 0
 let longPressTimer = null
 let longPressTouch = null
 let suppressPointerUntil = 0
 const uploadCleanupTimers = new Map()
+const folderListCache = new Map()
+const breadcrumbCache = new Map()
+const FILE_LIST_CACHE_TTL = 20 * 1000
 const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024
 const previewZoom = usePinchZoom()
 const previewTouchWrapRef = previewZoom.containerRef
@@ -720,6 +732,12 @@ const previewTypeLabel = computed(() => {
     unsupported: '暂不支持预览',
   }
   return labels[previewType.value] || '文件预览'
+})
+const previewLastModifiedLabel = computed(() => {
+  if (!previewMeta.value?.lastModified) return ''
+  const date = new Date(previewMeta.value.lastModified)
+  if (Number.isNaN(date.getTime())) return ''
+  return `更新于 ${formatDateTime(date)}`
 })
 
 function syncMobilePreviewState() {
@@ -792,13 +810,18 @@ function fileTypeLabel(item) {
   return `${ext.toUpperCase()} 文件`
 }
 
+function formatDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  const pad = n => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function formatFileTime(item) {
   const value = item?.createdAt || item?.created_at || item?.createdTime
   if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  const pad = n => String(n).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const full = formatDateTime(value)
+  return full === '-' ? '-' : full.slice(5)
 }
 
 async function collectMoveFolderOptions(parentId = null, depth = 0, visited = new Set()) {
@@ -838,17 +861,73 @@ async function loadMoveFolderOptions() {
   }
 }
 
+function fileFolderCacheKey(folderId = null) {
+  return folderId == null ? 'root' : String(folderId)
+}
+
+function readFolderListCache(folderId = null) {
+  const cached = folderListCache.get(fileFolderCacheKey(folderId))
+  if (!cached) return null
+  if (Date.now() - cached.timestamp > FILE_LIST_CACHE_TTL) {
+    folderListCache.delete(fileFolderCacheKey(folderId))
+    return null
+  }
+  return cached.payload
+}
+
+function writeFolderListCache(folderId = null, payload) {
+  folderListCache.set(fileFolderCacheKey(folderId), {
+    timestamp: Date.now(),
+    payload,
+  })
+}
+
+function readBreadcrumbCache(folderId) {
+  if (!folderId) return null
+  const cached = breadcrumbCache.get(String(folderId))
+  if (!cached) return null
+  if (Date.now() - cached.timestamp > FILE_LIST_CACHE_TTL) {
+    breadcrumbCache.delete(String(folderId))
+    return null
+  }
+  return cached.payload
+}
+
+function writeBreadcrumbCache(folderId, payload) {
+  if (!folderId) return
+  breadcrumbCache.set(String(folderId), {
+    timestamp: Date.now(),
+    payload,
+  })
+}
+
+function invalidateFilesPageCache() {
+  folderListCache.clear()
+  breadcrumbCache.clear()
+}
+
+function applyFileListPayload(payload) {
+  items.value = extractListItems(payload)
+  currentFolderAccess.value = extractListAccess(payload)
+  if (!isSearching.value) {
+    pruneSelection(items.value)
+  }
+}
+
 async function loadFiles(folderId = null) {
-  loading.value = true
+  const cachedPayload = readFolderListCache(folderId)
+  loading.value = !cachedPayload
+  if (cachedPayload) {
+    applyFileListPayload(cachedPayload)
+  }
   try {
     const res = await fileApi.list(folderId)
-    items.value = extractListItems(res.data)
-    currentFolderAccess.value = extractListAccess(res.data)
-    if (!isSearching.value) {
-      pruneSelection(items.value)
-    }
+    applyFileListPayload(res.data)
+    writeFolderListCache(folderId, res.data)
   } catch {
-    showToast('加载文件列表失败', 'error')
+    if (!cachedPayload) {
+      showToast('加载文件列表失败', 'error')
+    }
   } finally {
     loading.value = false
   }
@@ -859,11 +938,18 @@ async function loadBreadcrumb(folderId) {
     breadcrumbs.value = []
     return
   }
+  const cachedPayload = readBreadcrumbCache(folderId)
+  if (cachedPayload) {
+    breadcrumbs.value = cachedPayload
+  }
   try {
     const res = await fileApi.breadcrumb(folderId)
     breadcrumbs.value = res.data || []
+    writeBreadcrumbCache(folderId, breadcrumbs.value)
   } catch {
-    breadcrumbs.value = []
+    if (!cachedPayload) {
+      breadcrumbs.value = []
+    }
   }
 }
 
@@ -971,6 +1057,7 @@ async function handleScanSync() {
     ].filter(Boolean).join('，')
 
     showToast(summary || '扫描完成，当前目录没有需要同步的内容')
+    invalidateFilesPageCache()
 
     if (isSearching.value && searchQuery.value.trim()) {
       await doSearch(searchQuery.value.trim())
@@ -1198,6 +1285,7 @@ async function moveItemsToFolder(itemIds, folderId) {
   if (successCount > 0) {
     showToast(successCount === 1 ? '已移动到目标文件夹' : `已移动 ${successCount} 项到目标文件夹`)
     selectedIds.value = selectedIds.value.filter(id => !itemIds.includes(id))
+    invalidateFilesPageCache()
     await refreshFilesPage()
   }
 
@@ -1499,6 +1587,7 @@ async function createFolder() {
     await fileApi.createFolder(name, currentFolderId.value)
     showToast('文件夹创建成功')
     showCreateFolderDialog.value = false
+    invalidateFilesPageCache()
     loadFiles(currentFolderId.value)
   } catch (e) {
     showToast(e.response?.data?.message || '创建失败', 'error')
@@ -1641,6 +1730,7 @@ async function uploadFiles(files) {
 
   if (successCount > 0) {
     showToast(`成功上传 ${successCount} 个文件`)
+    invalidateFilesPageCache()
     await loadFiles(currentFolderId.value)
     if (isSearching.value && searchQuery.value.trim()) {
       doSearch(searchQuery.value.trim())
@@ -1854,6 +1944,65 @@ async function renderPdfAsImages(pdfData) {
   }
 }
 
+function buildPreviewCacheKey(item, meta) {
+  return [
+    item?.id ?? 'unknown',
+    meta?.etag || '',
+    meta?.fileSize ?? item?.fileSize ?? '',
+    meta?.lastModified || '',
+  ].join('|')
+}
+
+function touchPreviewCacheKey(key) {
+  const index = previewCacheOrder.indexOf(key)
+  if (index >= 0) previewCacheOrder.splice(index, 1)
+  previewCacheOrder.push(key)
+}
+
+function removePreviewCacheEntry(key) {
+  const index = previewCacheOrder.indexOf(key)
+  if (index >= 0) previewCacheOrder.splice(index, 1)
+  const entry = previewCache.get(key)
+  if (!entry) return
+  if (entry.url) {
+    URL.revokeObjectURL(entry.url)
+  }
+  previewCache.delete(key)
+}
+
+function trimPreviewCache() {
+  while (previewCacheOrder.length > PREVIEW_CACHE_LIMIT) {
+    const key = previewCacheOrder.shift()
+    if (key === currentPreviewCacheKey) {
+      previewCacheOrder.push(key)
+      break
+    }
+    removePreviewCacheEntry(key)
+  }
+}
+
+function storePreviewCache(key, entry) {
+  if (previewCache.has(key)) {
+    removePreviewCacheEntry(key)
+  }
+  previewCache.set(key, { ...entry, key })
+  touchPreviewCacheKey(key)
+  trimPreviewCache()
+}
+
+function applyPreviewCacheEntry(entry) {
+  if (!entry) return false
+  touchPreviewCacheKey(entry.key)
+  previewType.value = entry.type
+  previewText.value = entry.text || ''
+  previewUrl.value = entry.url || ''
+  activePreviewUrl = entry.url || ''
+  pdfPageImages.value = entry.pdfPageImages ? [...entry.pdfPageImages] : []
+  previewLoading.value = false
+  previewError.value = ''
+  return true
+}
+
 function resetPreviewState() {
   cancelPreviewRequest()
   previewZoom.reset()
@@ -1862,10 +2011,12 @@ function resetPreviewState() {
   previewType.value = ''
   previewText.value = ''
   previewError.value = ''
-  if (activePreviewUrl) {
+  previewMeta.value = null
+  if (activePreviewUrl && (!currentPreviewCacheKey || !previewCache.has(currentPreviewCacheKey))) {
     URL.revokeObjectURL(activePreviewUrl)
-    activePreviewUrl = ''
   }
+  activePreviewUrl = ''
+  currentPreviewCacheKey = ''
   previewUrl.value = ''
 }
 
@@ -1893,13 +2044,19 @@ function closePreview() {
   resetPreviewState()
 }
 
+function retryPreview() {
+  if (!previewItem.value) return
+  previewFile(previewItem.value, { forceRefresh: true })
+}
+
 watch(showPreviewDialog, visible => {
   if (!visible) {
     handlePreviewDialogClose()
   }
 })
 
-async function previewFile(item) {
+async function previewFile(item, options = {}) {
+  const forceRefresh = options.forceRefresh === true
   cancelPreviewRequest()
   const requestToken = ++previewRequestToken
   previewItem.value = item
@@ -1915,6 +2072,15 @@ async function previewFile(item) {
   }
 
   try {
+    const metaResponse = await fileApi.info(item.id)
+    if (requestToken !== previewRequestToken || !showPreviewDialog.value) return
+    previewMeta.value = metaResponse.data || null
+    const cacheKey = buildPreviewCacheKey(item, previewMeta.value)
+    currentPreviewCacheKey = cacheKey
+    if (!forceRefresh && applyPreviewCacheEntry(previewCache.get(cacheKey))) {
+      return
+    }
+
     const res = await fileApi.download(item.id, { signal: previewAbortController.signal })
     if (requestToken !== previewRequestToken || !showPreviewDialog.value) return
     const blob = res.data
@@ -1923,6 +2089,10 @@ async function previewFile(item) {
         previewError.value = '文本文件较大，暂不直接展开，请下载后查看。'
       } else {
         previewText.value = await blob.text()
+        storePreviewCache(cacheKey, {
+          type: previewType.value,
+          text: previewText.value,
+        })
       }
     } else {
       activePreviewUrl = URL.createObjectURL(blob)
@@ -1931,6 +2101,20 @@ async function previewFile(item) {
         const pdfBuffer = await blob.arrayBuffer()
         if (requestToken !== previewRequestToken || !showPreviewDialog.value) return
         await renderPdfAsImages(new Uint8Array(pdfBuffer))
+        storePreviewCache(cacheKey, {
+          type: previewType.value,
+          pdfPageImages: [...pdfPageImages.value],
+        })
+        if (activePreviewUrl) {
+          URL.revokeObjectURL(activePreviewUrl)
+          activePreviewUrl = ''
+          previewUrl.value = ''
+        }
+      } else {
+        storePreviewCache(cacheKey, {
+          type: previewType.value,
+          url: activePreviewUrl,
+        })
       }
     }
   } catch (error) {
@@ -1952,6 +2136,7 @@ async function deleteItem(item) {
     showToast('已删除')
     selectedIds.value = selectedIds.value.filter(id => id !== item.id)
     items.value = items.value.filter(i => i.id !== item.id)
+    invalidateFilesPageCache()
     if (isSearching.value) {
       searchResults.value = searchResults.value.filter(i => i.id !== item.id)
     }
@@ -2007,6 +2192,7 @@ async function confirmDeleteAction() {
     if (successCount > 0) {
       showToast(`已删除 ${successCount} 项`)
       clearSelection()
+      invalidateFilesPageCache()
       await refreshFilesPage()
     }
 
@@ -2042,6 +2228,7 @@ async function doRename() {
     await fileApi.rename(renameItem.value.id, name)
     showToast('重命名成功')
     showRenameDialog.value = false
+    invalidateFilesPageCache()
     const itemIndex = items.value.findIndex(i => i.id === renameItem.value.id)
     if (itemIndex !== -1) items.value[itemIndex] = { ...items.value[itemIndex], name }
     if (isSearching.value) {
@@ -2100,6 +2287,8 @@ onBeforeUnmount(() => {
   uploadCleanupTimers.clear()
   cancelPreviewRequest()
   resetPreviewState()
+  Array.from(previewCache.keys()).forEach(removePreviewCacheEntry)
+  invalidateFilesPageCache()
 })
 </script>
 
@@ -3227,6 +3416,12 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
   text-align: center;
   background: #f8fafc;
+}
+.file-preview-error-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 @media (max-width: 768px) {
   .file-toolbar {
