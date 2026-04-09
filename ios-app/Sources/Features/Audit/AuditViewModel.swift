@@ -278,7 +278,7 @@ final class AuditViewModel: ObservableObject {
             return false
         case .forbidden:
             return false
-        case let .httpStatus(code, message):
+        case let .httpStatus(code, message, _):
             guard (400...499).contains(code), code != 401 else {
                 return false
             }
