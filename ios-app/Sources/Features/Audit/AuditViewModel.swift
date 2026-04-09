@@ -276,6 +276,8 @@ final class AuditViewModel: ObservableObject {
         switch apiError {
         case .unauthorized:
             return false
+        case .forbidden:
+            return false
         case let .httpStatus(code, message):
             guard (400...499).contains(code), code != 401 else {
                 return false
