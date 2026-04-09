@@ -5,7 +5,7 @@ enum APIError: Error, LocalizedError {
     case unauthorized
     case forbidden(String?)
     case serverMessage(String)
-    case httpStatus(Int, String?)
+    case httpStatus(Int, String?, String?)
     case decodingFailed
     case unknown
 
@@ -22,9 +22,12 @@ enum APIError: Error, LocalizedError {
             return "当前账号没有访问权限"
         case let .serverMessage(message):
             return message
-        case let .httpStatus(code, message):
+        case let .httpStatus(code, message, errorCode):
             if let message, !message.isEmpty {
                 return message
+            }
+            if let errorCode, !errorCode.isEmpty {
+                return "请求失败：\(errorCode)"
             }
             return "请求失败，状态码 \(code)"
         case .decodingFailed:
@@ -454,7 +457,8 @@ final class APIClient {
                         }
                         if plainHTTP.statusCode != 401 {
                             let message = extractErrorMessage(from: plainData)
-                            throw APIError.httpStatus(plainHTTP.statusCode, message)
+                            let errorCode = extractErrorCode(from: plainData)
+                            throw APIError.httpStatus(plainHTTP.statusCode, message, errorCode)
                         }
                     }
                 }
@@ -465,7 +469,8 @@ final class APIClient {
 
             guard http.statusCode == 200 || http.statusCode == 206 else {
                 let message = extractErrorMessage(from: data)
-                throw APIError.httpStatus(http.statusCode, message)
+                let errorCode = extractErrorCode(from: data)
+                throw APIError.httpStatus(http.statusCode, message, errorCode)
             }
 
             if let responseEtag = http.value(forHTTPHeaderField: "ETag"),
@@ -700,7 +705,8 @@ final class APIClient {
             }
             let data = (try? Data(contentsOf: tempURL)) ?? Data()
             let message = extractErrorMessage(from: data)
-            throw APIError.httpStatus(http.statusCode, message)
+            let errorCode = extractErrorCode(from: data)
+            throw APIError.httpStatus(http.statusCode, message, errorCode)
         }
 
         let safeName = sanitizeFilename(filename ?? URL(fileURLWithPath: path).lastPathComponent)
@@ -1109,10 +1115,17 @@ final class APIClient {
         }
 
         let message = extractErrorMessage(from: data)
-        throw APIError.httpStatus(http.statusCode, message)
+        let errorCode = extractErrorCode(from: data)
+        throw APIError.httpStatus(http.statusCode, message, errorCode)
     }
 
     private func extractErrorMessage(from data: Data) -> String? {
+        if let dto = try? decoder.decode(ApiErrorDto.self, from: data),
+           let message = dto.message,
+           !message.isEmpty {
+            return message
+        }
+
         if let dto = try? decoder.decode(SimpleMessageResponse.self, from: data),
            let message = dto.message,
            !message.isEmpty {
@@ -1123,6 +1136,28 @@ final class APIClient {
            let message = object["message"] as? String,
            !message.isEmpty {
             return message
+        }
+
+        return nil
+    }
+
+    private func extractErrorCode(from data: Data) -> String? {
+        if let dto = try? decoder.decode(ApiErrorDto.self, from: data),
+           let code = dto.code,
+           !code.isEmpty {
+            return code
+        }
+
+        if let dto = try? decoder.decode(SimpleMessageResponse.self, from: data),
+           let code = dto.code,
+           !code.isEmpty {
+            return code
+        }
+
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let code = object["code"] as? String,
+           !code.isEmpty {
+            return code
         }
 
         return nil

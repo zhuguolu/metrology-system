@@ -206,7 +206,16 @@ struct RejectRequest: Codable {
 }
 
 struct SimpleMessageResponse: Codable {
+    let code: String?
     let message: String?
+}
+
+struct ApiErrorDto: Codable {
+    let timestamp: String?
+    let status: Int?
+    let code: String?
+    let message: String?
+    let path: String?
 }
 
 struct FileAccessDto: Codable {
