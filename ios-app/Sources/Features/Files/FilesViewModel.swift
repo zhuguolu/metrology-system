@@ -96,7 +96,7 @@ final class FilesViewModel: ObservableObject {
            Date().timeIntervalSince(cached.cachedAt) <= folderCacheTTL {
             items = cached.items
             applyAccess(cached.access)
-            hint = "共\(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+            hint = folderHint(for: items.count)
         }
 
         do {
@@ -105,7 +105,7 @@ final class FilesViewModel: ObservableObject {
 
             items = result.items ?? []
             applyAccess(result.access)
-            hint = "共\(items.count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+            hint = folderHint(for: items.count)
             folderCache[folderKey] = FolderSnapshot(
                 items: items,
                 access: result.access,
@@ -652,6 +652,10 @@ final class FilesViewModel: ObservableObject {
         let foldersDeleted = result.foldersDeleted ?? 0
         let filesDeleted = result.filesDeleted ?? 0
         return "扫描同步完成：新增目录\(foldersCreated)，新增文件\(filesCreated)，删除目录\(foldersDeleted)，删除文件\(filesDeleted)"
+    }
+
+    private func folderHint(for count: Int) -> String {
+        "共\(count) 项" + (readOnlyFolder ? "（只读目录）" : "")
     }
 
     private func resolveUploadMetadata(from url: URL) -> UploadPayload? {
