@@ -89,20 +89,24 @@ struct AuditView: View {
             subtitle: "集中处理待审批、我的申请与历史记录，审批详情保持只显示真实变更项。",
             accent: modeTone
         ) {
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .center, spacing: 8) {
                 Text("当前")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("\(viewModel.items.count)")
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(modeTone.tint)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text(viewModel.mode.title)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
-                    .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
+            .frame(maxHeight: .infinity, alignment: .center)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -117,23 +121,48 @@ struct AuditView: View {
 
     private var modePills: some View {
         HStack(spacing: 8) {
-            modePill(.pending, tone: .warning, compact: false)
-            modePill(.my, tone: .neutral, compact: false)
-            modePill(.history, tone: .muted, compact: false)
+            modePill(.pending, tone: .warning)
+            modePill(.my, tone: .neutral)
+            modePill(.history, tone: .muted)
         }
     }
 
-    private func modePill(_ mode: AuditListMode, tone: MetrologyPillTone, compact: Bool) -> some View {
-        MetrologyInteractivePill(
-            title: mode.title,
-            value: modeSubtitle(for: mode),
-            tone: tone,
-            isSelected: viewModel.mode == mode,
-            compact: compact
-        ) {
+    private func modePill(_ mode: AuditListMode, tone: MetrologyPillTone) -> some View {
+        let selected = viewModel.mode == mode
+
+        return Button {
             guard viewModel.mode != mode else { return }
             viewModel.mode = mode
+        } label: {
+            VStack(spacing: 3) {
+                Text(mode.title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(selected ? Color.white : tone.tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .allowsTightening(true)
+
+                Text(modeSubtitle(for: mode))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(selected ? Color.white : MetrologyPalette.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .allowsTightening(true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.horizontal, 8)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(selected ? tone.tint : Color.white)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(selected ? tone.tint.opacity(0.95) : tone.stroke, lineWidth: 1)
+            )
+            .shadow(color: selected ? tone.tint.opacity(0.08) : Color.clear, radius: 2, x: 0, y: 1)
+            .contentShape(Capsule(style: .continuous))
         }
+        .buttonStyle(.plain)
     }
 
     private func modeSubtitle(for mode: AuditListMode) -> String {
