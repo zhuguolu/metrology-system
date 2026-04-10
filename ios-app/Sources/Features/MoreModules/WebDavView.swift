@@ -31,10 +31,12 @@ struct WebDavView: View {
 
             if viewModel.deleteConfirmOpen {
                 MetrologyConfirmDialog(
-                    title: "\u{5220}\u{9664}\u{6302}\u{8f7d}\u{70b9}",
+                    title: "删除挂载点",
                     message: "确定删除挂载点“\(viewModel.selectedMountName)”？",
-                    cancelTitle: "\u{53d6}\u{6d88}",
-                    confirmTitle: "\u{5220}\u{9664}",
+                    eyebrow: "Delete",
+                    tone: .expired,
+                    cancelTitle: "取消",
+                    confirmTitle: "删除",
                     destructive: true,
                     onCancel: {
                         viewModel.deleteConfirmOpen = false
@@ -50,8 +52,10 @@ struct WebDavView: View {
 
             if let errorMessage = viewModel.errorMessage {
                 MetrologyNoticeDialog(
-                    title: "\u{63d0}\u{793a}",
-                    message: errorMessage
+                    title: "提示",
+                    message: errorMessage,
+                    eyebrow: "Notice",
+                    tone: .warning
                 ) {
                     viewModel.errorMessage = nil
                 }
@@ -84,11 +88,7 @@ struct WebDavView: View {
         .sheet(item: $viewModel.previewItem, onDismiss: {
             viewModel.handlePreviewDismiss()
         }) { item in
-            NavigationStack {
-                QuickLookPreview(url: item.url)
-                    .navigationTitle(item.title)
-                    .navigationBarTitleDisplayMode(.inline)
-            }
+            WebDavPreviewFullScreenView(item: item)
         }
         .sheet(item: $shareItem, onDismiss: {
             viewModel.cleanupSharedFiles()
@@ -110,16 +110,7 @@ struct WebDavView: View {
         }
         .overlay {
             if viewModel.isLoading {
-                ProgressView("加载中...")
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(MetrologyPalette.surface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                    )
+                MetrologyLoadingCard(title: "加载中...")
             }
         }
     }
@@ -127,7 +118,7 @@ struct WebDavView: View {
     private func fileActionDialog(item: WebDavFileDto) -> some View {
         let displayName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             ? item.name ?? ""
-            : "\u{6587}\u{4ef6}\u{64cd}\u{4f5c}"
+            : "文件操作"
 
         return ZStack {
             Color.black.opacity(0.24).ignoresSafeArea()
@@ -138,12 +129,12 @@ struct WebDavView: View {
                     .foregroundStyle(MetrologyPalette.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("\u{8bf7}\u{9009}\u{62e9}\u{6587}\u{4ef6}\u{64cd}\u{4f5c}")
+                Text("请选择文件操作")
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(MetrologyPalette.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Button("\u{4e0b}\u{8f7d}\u{5230}\u{672c}\u{5730}") {
+                Button("下载到本地") {
                     Task {
                         if let url = await viewModel.download(item: item, openAfterDownload: false) {
                             shareItem = ShareSheetItem(url: url)
@@ -154,7 +145,7 @@ struct WebDavView: View {
                 .frame(maxWidth: .infinity, minHeight: 42)
                 .buttonStyle(MetrologySecondaryButtonStyle())
 
-                Button("\u{4e0b}\u{8f7d}\u{5e76}\u{9884}\u{89c8}") {
+                Button("下载并预览") {
                     Task {
                         _ = await viewModel.download(item: item, openAfterDownload: true)
                         fileActionItem = nil
@@ -163,7 +154,7 @@ struct WebDavView: View {
                 .frame(maxWidth: .infinity, minHeight: 42)
                 .buttonStyle(MetrologyPrimaryButtonStyle())
 
-                Button("\u{53d6}\u{6d88}") {
+                Button("取消") {
                     fileActionItem = nil
                 }
                 .frame(maxWidth: .infinity, minHeight: 42)
@@ -207,7 +198,7 @@ struct WebDavView: View {
                     }
                 } label: {
                     MetrologySelectField(
-                        title: "\u{6302}\u{8f7d}\u{70b9}",
+                        title: "挂载点",
                         value: viewModel.selectedMountName
                     )
                 }
@@ -290,25 +281,18 @@ struct WebDavView: View {
     }
 
     private var hintLine: some View {
-        HStack(spacing: 8) {
-            Text(viewModel.hint)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(message: viewModel.hint, tone: .neutral, compact: true)
     }
 
     private var fileList: some View {
         VStack(spacing: 8) {
             if viewModel.files.isEmpty, !viewModel.isLoading {
-                Text("当前目录暂无文件")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-                    .metrologyCard()
+                MetrologyEmptyStateView(
+                    icon: "externaldrive",
+                    title: "当前目录暂无文件",
+                    message: "可以切换挂载点、返回上级目录，或上传文件到当前路径。"
+                )
+                .metrologyCard()
             } else {
                 ForEach(fileRows) { row in
                     WebDavFileRowCard(
@@ -485,57 +469,55 @@ private struct WebDavMountEditorSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 10) {
-                        VStack(spacing: 8) {
-                            TextField("挂载点名称", text: $editing.name)
-                                .metrologyInput()
-                            TextField("WebDAV 地址", text: $editing.url)
-                                .metrologyInput()
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            TextField("用户名（可空）", text: $editing.username)
-                                .metrologyInput()
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            SecureField("密码（可空）", text: $editing.password)
-                                .metrologyInput()
-                        }
-                        .padding(10)
-                        .metrologyCard()
-
-                        if let validationMessage, !validationMessage.isEmpty {
-                            Text(validationMessage)
-                                .font(.footnote)
-                                .foregroundStyle(MetrologyPalette.statusExpired)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 2)
-                        }
-
-                        Button("测试连接") {
-                            metrologyDismissKeyboard()
-                            guard validate() else { return }
-                            onTest(editing)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 22)
-                        .buttonStyle(MetrologySecondaryButtonStyle())
-
-                        MetrologySaveCancelRow(
-                            onCancel: onCancel,
-                            onSave: {
-                                guard validate() else { return }
-                                onSave(editing)
-                            }
-                        )
+            MetrologyFormSheetScaffold(
+                eyebrow: "WebDAV",
+                title: title,
+                subtitle: "统一维护网络挂载点地址、账号与密码，用于文件浏览、上传与预览。",
+                accent: .neutral,
+                bannerMessage: "保存前可以先执行连接测试，确认地址与认证信息可正常访问。",
+                bannerTone: .neutral
+            ) {
+                MetrologySectionPanel(
+                    title: "挂载点信息",
+                    subtitle: "地址为必填项，用户名与密码可按实际服务配置填写。"
+                ) {
+                    VStack(spacing: 8) {
+                        TextField("挂载点名称", text: $editing.name)
+                            .metrologyInput()
+                        TextField("WebDAV 地址", text: $editing.url)
+                            .metrologyInput()
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        TextField("用户名（可空）", text: $editing.username)
+                            .metrologyInput()
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        SecureField("密码（可空）", text: $editing.password)
+                            .metrologyInput()
                     }
-                    .padding(12)
-                    .padding(.bottom, 18)
                 }
-                .scrollIndicators(.hidden)
-                .scrollDismissesKeyboard(.interactively)
+
+                if let validationMessage, !validationMessage.isEmpty {
+                    MetrologyInlineValidationMessage(message: validationMessage)
+                }
+
+                Button("测试连接") {
+                    metrologyDismissKeyboard()
+                    guard validate() else { return }
+                    onTest(editing)
+                }
+                .frame(maxWidth: .infinity, minHeight: 22)
+                .buttonStyle(MetrologySecondaryButtonStyle())
+
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: "保存挂载点",
+                    onCancel: onCancel,
+                    onSave: {
+                        guard validate() else { return }
+                        onSave(editing)
+                    }
+                )
             }
             .navigationTitle(title)
         }
@@ -904,6 +886,139 @@ private struct UploadPayload {
     let name: String
     let mimeType: String?
     let fileURL: URL
+}
+
+private struct WebDavPreviewFullScreenView: View {
+    let item: PreviewItem
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var showShareSheet = false
+
+    var body: some View {
+        ZStack {
+            MetrologyPalette.background.ignoresSafeArea()
+
+            QuickLookPreview(url: item.url)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .lineLimit(1)
+
+                    Text("WebDAV 文件预览")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                }
+
+                Spacer(minLength: 10)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.94))
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.96), Color(hex: 0xF6FAFF, alpha: 0.95)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 8, x: 0, y: 3)
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+            .background(
+                LinearGradient(
+                    colors: [
+                        MetrologyPalette.background.opacity(0.96),
+                        MetrologyPalette.background.opacity(0.82),
+                        MetrologyPalette.background.opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: 12) {
+                Button {
+                    dismiss()
+                } label: {
+                    Label("关闭预览", systemImage: "xmark")
+                        .frame(maxWidth: .infinity, minHeight: 22)
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+
+                Button {
+                    showShareSheet = true
+                } label: {
+                    Label("分享文件", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity, minHeight: 22)
+                }
+                .buttonStyle(MetrologyPrimaryButtonStyle())
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.97), Color(hex: 0xF5F9FF, alpha: 0.96)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 8, x: 0, y: 3)
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+            .background(
+                LinearGradient(
+                    colors: [
+                        MetrologyPalette.background.opacity(0),
+                        MetrologyPalette.background.opacity(0.82),
+                        MetrologyPalette.background.opacity(0.96)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ActivitySheet(items: [item.url])
+        }
+    }
 }
 
 private struct ActivitySheet: UIViewControllerRepresentable {

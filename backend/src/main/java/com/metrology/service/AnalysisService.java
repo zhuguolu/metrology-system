@@ -71,51 +71,53 @@ public class AnalysisService {
             Map.entry(10, 0.3146)
     );
 
-        public AnalysisCapabilityResponse calculateCapability(AnalysisCapabilityRequest request) {
+    public AnalysisCapabilityResponse calculateCapability(AnalysisCapabilityRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("鐠囬攱鐪伴崣鍌涙殶娑撳秷鍏樻稉铏光敄");
+            throw new IllegalArgumentException("Request payload cannot be null");
         }
-        double lsl = requireFinite(request.getLsl(), "LSL 娑撳秷鍏樻稉铏光敄");
-        double usl = requireFinite(request.getUsl(), "USL 娑撳秷鍏樻稉铏光敄");
+        double lsl = requireFinite(request.getLsl(), "LSL");
+        double usl = requireFinite(request.getUsl(), "USL");
         if (usl <= lsl) {
-            throw new IllegalArgumentException("USL 韫囧懘銆忔径褌绨?LSL");
+            throw new IllegalArgumentException("USL must be greater than LSL");
         }
         double target = request.getTarget() != null && Double.isFinite(request.getTarget())
                 ? request.getTarget()
                 : (lsl + usl) / 2.0;
         List<Double> values = resolveValues(request.getGridValues(), request.getRawValues());
         if (values.size() < 2) {
-            throw new IllegalArgumentException("閺嶉攱婀伴弫浼村櫤閼峰啿鐨棁鈧憰?2 娑?);
+            throw new IllegalArgumentException("At least 2 valid sample values are required");
         }
         int subgroupSize = request.getSubgroupSize() == null ? 0 : request.getSubgroupSize();
         if (subgroupSize < 0) {
-            throw new IllegalArgumentException("鐎涙劗绮嶆径褍鐨稉宥堝厴鐏忓繋绨?0");
+            throw new IllegalArgumentException("Subgroup size cannot be less than 0");
         }
         if (subgroupSize == 1) {
-            throw new IllegalArgumentException("鐎涙劗绮嶆径褍鐨稉?1 閺冭埖妫ゅ▔鏇☆吀缁犳绮嶉崘鍛皾閸旑煉绱濈拠鐤翻閸?2~25 閹存牜鏆€缁?);
+            throw new IllegalArgumentException("When subgroup size is 1, please use moving range mode or set a subgroup size between 2 and 25");
         }
         if (subgroupSize > 25) {
-            throw new IllegalArgumentException("鐎涙劗绮嶆径褍鐨禒鍛暜閹?2~25");
+            throw new IllegalArgumentException("Subgroup size must be within 2 to 25");
         }
+
         double mean = mean(values);
         double min = values.stream().min(Double::compareTo).orElse(0.0);
         double max = values.stream().max(Double::compareTo).orElse(0.0);
         double sigmaOverall = sampleStdDev(values);
         if (sigmaOverall <= 0) {
-            throw new IllegalArgumentException("閺嶉攱婀板▔銏犲З娑?0閿涘本妫ゅ▔鏇☆吀缁犳鍏橀崝娑欏瘹閺?);
+            throw new IllegalArgumentException("Overall sigma must be greater than 0; please check whether the sample values are all identical");
         }
+
         String chartType = "MR";
         int groupCount = Math.max(values.size() - 1, 1);
         double sigmaWithin;
         if (subgroupSize > 1) {
             if (values.size() % subgroupSize != 0) {
-                throw new IllegalArgumentException("閺嶉攱婀伴弫浼村櫤韫囧懘銆忛懗鍊燁潶鐎涙劗绮嶆径褍鐨弫鎾珟");
+                throw new IllegalArgumentException("Sample count must be divisible by subgroup size");
             }
             List<List<Double>> groups = chunk(values, subgroupSize);
             if (groups.size() < 2) {
-                throw new IllegalArgumentException("閼峰啿鐨棁鈧憰?2 娑擃亜鐡欑紒?);
+                throw new IllegalArgumentException("At least 2 subgroups are required for subgroup analysis");
             }
-            double d2 = requireD2(subgroupSize, "鐎涙劗绮嶆径褍鐨?);
+            double d2 = requireD2(subgroupSize, "subgroup size");
             double avgRange = groups.stream().mapToDouble(this::range).average().orElse(0.0);
             sigmaWithin = avgRange / d2;
             groupCount = groups.size();
@@ -123,16 +125,17 @@ public class AnalysisService {
         } else {
             List<Double> movingRanges = movingRanges(values);
             if (movingRanges.isEmpty()) {
-                throw new IllegalArgumentException("閺嶉攱婀伴弫浼村櫤娑撳秷鍐婚敍灞炬￥濞夋洝顓哥粻妤冃╅崝銊︾€?);
+                throw new IllegalArgumentException("Moving range cannot be calculated; please provide at least 2 sequential valid values");
             }
-            double d2 = requireD2(2, "缁夎濮╅弸浣告▕");
+            double d2 = requireD2(2, "moving range");
             sigmaWithin = mean(movingRanges) / d2;
             subgroupSize = 2;
             groupCount = movingRanges.size();
         }
         if (sigmaWithin <= 0) {
-            throw new IllegalArgumentException("缂佸嫬鍞村▔銏犲З娑?0閿涘本妫ゅ▔鏇☆吀缁?Cpk");
+            throw new IllegalArgumentException("Within sigma must be greater than 0; capability indices cannot be calculated");
         }
+
         double specWidth = usl - lsl;
         double cp = specWidth / (6.0 * sigmaWithin);
         double cpl = (mean - lsl) / (3.0 * sigmaWithin);
@@ -157,7 +160,7 @@ public class AnalysisService {
         double overallPpmLower = normalTailPpmLower(lsl, mean, sigmaOverall);
         double overallPpmUpper = normalTailPpmUpper(usl, mean, sigmaOverall);
 
-                List<AnalysisHistogramBin> histogram = buildHistogram(values, request.getBins());
+        List<AnalysisHistogramBin> histogram = buildHistogram(values, request.getBins());
         List<AnalysisValidationItem> validationMessages = buildCapabilityValidationMessages(
                 values.size(),
                 subgroupSize,
@@ -272,7 +275,7 @@ public class AnalysisService {
         double svPartToPart = rp * k3;
         double svTotal = Math.sqrt(Math.pow(svGrr, 2) + Math.pow(svPartToPart, 2));
         if (!Double.isFinite(svTotal) || svTotal <= 0) {
-            throw new IllegalArgumentException("闁诡剝顕цぐ澶婎啅椤旀槒绀?0闁挎稑鏈Λ銈呪枖閺団槅鍚€缂?GRR");
+            throw new IllegalArgumentException("闂傚倸鍊搁崐鎼佸磹瀹勬噴褰掑炊椤掑鏅梺鍝勭▉閸樿偐绮堥崼鐔虹瘈闂傚牊渚楅崕娑㈡煛娴ｅ壊鍎戦柟鍙夋倐楠炲鏁冮埀顒侇攰闂備礁缍婇崑濠囧储閼测晜顐介柣鎰ゴ閺€浠嬫煟濡崵鍙€妞ゅ孩顨婇弻锟犲川椤栨銏°亜椤忓嫬鏆ｅ┑鈥崇埣瀹曞崬螣闁垮顏稿┑鐘殿暯閳ь剙鍟跨痪褔鎮介婊冧户闁?0闂傚倸鍊搁崐鎼佸磹閻戣姤鍊块柨鏃堟暜閸嬫挾绮☉妯诲櫧闁活厽鐟╅弻鐔告綇閸撗呮殸闁诲孩鑹鹃ˇ浼村Φ閸曨垰绠抽柛鈩冦仦婢规洟姊洪幑鎰惞闁稿鍊濆濠氬即閵忕娀鍞跺┑鐘绘涧濞层倕鈻嶅┑瀣拺闁告繂瀚烽崕鎰版煟濡ゅ啫鈻堢€殿喖顭烽弫鎾绘偐閼碱剙鈧偤姊洪幐搴ｇ畵婵☆偒鍘奸…鍥箣閿旇В鎷洪梺鍛婄☉閿曘倝鎮炶ぐ鎺撶厱閻庯綆鍋呯亸鐢电磼?GRR");
         }
 
         double sdRepeatability = svRepeatability / 6.0;
@@ -421,8 +424,7 @@ public class AnalysisService {
             setText(param2, 2, "Sigma Overall", styles.label()); setNumber(param2, 3, capability.getSigmaOverall(), styles.number6());
             setText(param2, 4, "Min", styles.label()); setNumber(param2, 5, capability.getMin(), styles.number4());
             setText(param2, 6, "Max", styles.label()); setNumber(param2, 7, capability.getMax(), styles.number4());
-
-            setText(row(summary, 8), 0, "闁煎疇妫勬慨蹇涘箰閸ャ劎鍨?, styles.section());
+            setText(row(summary, 8), 0, "Capability Indices", styles.section());
             summary.addMergedRegion(new CellRangeAddress(8, 8, 0, 7));
             HSSFRow idx1 = row(summary, 9);
             setText(idx1, 0, "CPK", styles.label()); setNumber(idx1, 1, capability.getCpk(), styles.number4());
@@ -488,10 +490,9 @@ public class AnalysisService {
             HSSFRow meta = row(summary, 2);
             setText(meta, 0, "Report Date", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
             setText(meta, 2, "Part Count", styles.label()); setNumber(meta, 3, rr.partCount(), styles.number0());
-            setText(meta, 4, "闂佹彃绉撮ˇ鎻掆枎閳╁啯娈?, styles.label()); setNumber(meta, 5, rr.trialCount(), styles.number0());
-            setText(meta, 6, "闁哄秹鏀卞﹢浼存倷鐟欏嫭娈?, styles.label()); setNumber(meta, 7, rr.sampleCount(), styles.number0());
-
-            setText(row(summary, 4), 0, "闁稿繑濞婇弫顓㈠箰閸ャ劎鍨?, styles.section());
+            setText(meta, 4, "Trial Count", styles.label()); setNumber(meta, 5, rr.trialCount(), styles.number0());
+            setText(meta, 6, "Sample Count", styles.label()); setNumber(meta, 7, rr.sampleCount(), styles.number0());
+            setText(row(summary, 4), 0, "Core Metrics", styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow k1 = row(summary, 5);
             setText(k1, 0, "Rbar", styles.label()); setNumber(k1, 1, rr.rbar(), styles.number6());
@@ -503,8 +504,7 @@ public class AnalysisService {
             setText(k2, 0, "R UCL/LCL", styles.label());
             setText(k2, 1, String.format(Locale.ROOT, "%.4f / %.4f", rr.rUcl(), rr.rLcl()), styles.text());
             setText(k2, 2, "Xbar UCL/LCL", styles.label());
-            setText(k2, 3, String.format(Locale.ROOT, "%.4f / %.4f", rr.xUcl(), rr.xLcl()), styles.text());
-            setText(k2, 4, "閻犲洤瀚悳?, styles.label());
+            setText(k2, 4, "Conclusion", styles.label());
             setText(k2, 5, rr.summary(), styles.text());
             summary.addMergedRegion(new CellRangeAddress(6, 6, 5, 7));
 
@@ -568,15 +568,13 @@ public class AnalysisService {
 
             HSSFRow meta = row(summary, 2);
             setText(meta, 0, "Report Date", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
-            setText(meta, 2, "闁瑰灝绉崇紞鏃堟嚀閸涱喗娈?, styles.label()); setNumber(meta, 3, grr.getAppraiserCount(), styles.number0());
+            setText(meta, 2, "Appraiser Count", styles.label()); setNumber(meta, 3, grr.getAppraiserCount(), styles.number0());
             setText(meta, 4, "Part Count", styles.label()); setNumber(meta, 5, grr.getPartCount(), styles.number0());
-            setText(meta, 6, "闂佹彃绉撮ˇ鎻掆枎閳╁啯娈?, styles.label()); setNumber(meta, 7, grr.getTrialCount(), styles.number0());
-
-            setText(row(summary, 4), 0, "闁稿繑濞婇弫顓㈠箰閸ャ劎鍨?, styles.section());
+            setText(meta, 6, "Trial Count", styles.label()); setNumber(meta, 7, grr.getTrialCount(), styles.number0());
+            setText(row(summary, 4), 0, "Core Metrics", styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow k1 = row(summary, 5);
-            setText(k1, 0, "AV (6sigma)", styles.label()); setNumber(k1, 1, grr.getSvReproducibility(), styles.number4());
-            setText(k1, 2, "EV (6閿?", styles.label()); setNumber(k1, 3, grr.getSvRepeatability(), styles.number4());
+            setText(k1, 2, "EV (6sigma)", styles.label()); setNumber(k1, 3, grr.getSvRepeatability(), styles.number4());
             setText(k1, 4, "%StudyVar AV", styles.label()); setNumber(k1, 5, grr.getPctStudyVarReproducibility(), styles.percent2());
             setText(k1, 6, "%Tolerance AV", styles.label()); setText(k1, 7, pctText(grr.getPctToleranceReproducibility()), styles.text());
 
@@ -628,12 +626,11 @@ public class AnalysisService {
             summary.addMergedRegion(new CellRangeAddress(0, 0, 0, 7));
 
             HSSFRow meta = row(summary, 2);
-            setText(meta, 0, "闁汇垻鍠愰崹姘跺籍閵夛附鍩?, styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
-            setText(meta, 2, "闁哄牆顦伴弲銉╂倷闁稓绉?, styles.label()); setNumber(meta, 3, linearity.sampleCount(), styles.number0());
+            setText(meta, 0, "Report Date", styles.label()); setText(meta, 1, LocalDate.now().toString(), styles.text());
+            setText(meta, 2, "Sample Count", styles.label()); setNumber(meta, 3, linearity.sampleCount(), styles.number0());
             setText(meta, 4, "Mean Bias", styles.label()); setNumber(meta, 5, linearity.meanBias(), styles.number6());
             setText(meta, 6, "Max Abs Bias", styles.label()); setNumber(meta, 7, linearity.maxAbsBias(), styles.number6());
-
-            setText(row(summary, 4), 0, "闁搞儳鍋涚紞濠勭磼閹惧浜?, styles.section());
+            setText(row(summary, 4), 0, "Regression Metrics", styles.section());
             summary.addMergedRegion(new CellRangeAddress(4, 4, 0, 7));
             HSSFRow reg = row(summary, 5);
             setText(reg, 0, "Slope", styles.label()); setNumber(reg, 1, linearity.slope(), styles.number6());
@@ -662,7 +659,7 @@ public class AnalysisService {
             for (int m = 0; m < maxMeasures; m++) {
                 setText(head, m + 2, "Trial " + (m + 1), styles.header());
             }
-            setText(head, maxMeasures + 2, "妤犵偛鍟垮搴∶圭€ｎ喖娅?, styles.header());
+            setText(head, maxMeasures + 2, "Mean Measure", styles.header());
             setText(head, maxMeasures + 3, "Bias", styles.header());
 
             for (int i = 0; i < linearity.points().size(); i++) {
@@ -724,7 +721,7 @@ public class AnalysisService {
         }
 
         double rbar = mean(arrayToList(partRanges));
-        double sigmaRepeatability = rbar / requireD2(trialCount, "闂佹彃绉撮ˇ鎻掆枎閳╁啯娈?);
+        double sigmaRepeatability = rbar / requireD2(trialCount, "trial count");
         double ev = sigmaRepeatability * 6.0;
         double xbarbar = mean(arrayToList(partMeans));
         double a2 = nearestConstant(A2_BY_TRIAL, trialCount, 1.023);
@@ -781,9 +778,8 @@ public class AnalysisService {
         }
 
         if (points.size() < 3) {
-            throw new IllegalArgumentException("缂佺偓瀵ч埀顑啫鐎婚柡瀣姌閸わ妇浜搁幋锔戒粯閻?濞戞搩浜濆﹢渚€寮崼銏犱化濞?);
+            throw new IllegalArgumentException("Linearity analysis requires at least 3 valid reference groups");
         }
-
         double xMean = mean(points.stream().map(LinearityPoint::reference).toList());
         double yMean = mean(points.stream().map(LinearityPoint::bias).toList());
         double sxx = 0.0;
@@ -1013,8 +1009,8 @@ public class AnalysisService {
         setText(refSub, meanCol + 2, "%R&R", styles.metaLabel());
         setText(refSub, meanCol + 3, "Ndc", styles.metaLabel());
         HSSFRow refVal = row(sheet, 7);
-        setFormula(refVal, meanCol + 2, "'闂佸憡甯掑Λ娆撴倵?!D12", styles.number3());
-        setFormula(refVal, meanCol + 3, "'闂佸憡甯掑Λ娆撴倵?!B18", styles.number3());
+        setFormula(refVal, meanCol + 2, "'闂傚倸鍊搁崐鎼佸磹閹间礁纾瑰瀣捣閻棗銆掑锝呬壕濡ょ姷鍋涢ˇ鐢稿极瀹ュ绀嬫い鎺嶇劍椤斿洭姊绘担鍛婅础闁稿簺鍊濆畷鐢告晝閳ь剟鍩ユ径濞㈢喖鏌ㄧ€ｎ兘鍋撴繝姘拺闁革富鍘兼禍鐐箾閸忚偐鎳囬柛鈹惧亾?!D12", styles.number3());
+        setFormula(refVal, meanCol + 3, "'闂傚倸鍊搁崐鎼佸磹閹间礁纾瑰瀣捣閻棗銆掑锝呬壕濡ょ姷鍋涢ˇ鐢稿极瀹ュ绀嬫い鎺嶇劍椤斿洭姊绘担鍛婅础闁稿簺鍊濆畷鐢告晝閳ь剟鍩ユ径濞㈢喖鏌ㄧ€ｎ兘鍋撴繝姘拺闁革富鍘兼禍鐐箾閸忚偐鎳囬柛鈹惧亾?!B18", styles.number3());
 
         sheet.createFreezePane(2, 5);
         return new GrrDataRefs(
@@ -1058,11 +1054,11 @@ public class AnalysisService {
 
         HSSFRow base = row(sheet, 5);
         setText(base, 0, "Rbar", styles.label());
-        setFormula(base, 1, "'闂佽桨鑳舵晶妤€鐣?!" + refs.rbarCell(), styles.number4());
+        setFormula(base, 1, "'闂傚倸鍊搁崐鎼佸磹閹间礁纾圭€瑰嫭鍣磋ぐ鎺戠倞鐟滄粌霉閺嶎厽鐓忓┑鐐靛亾濞呭棝鏌涢妶鍛伃闁哄被鍊楃划娆戞崉閵娿倗椹虫繝鐢靛仜閹虫劖鎱ㄩ崹顐も攳濠电姴娲ゅ洿闂佺鏈惌顔界珶閺囥垺鈷?!" + refs.rbarCell(), styles.number4());
         setText(base, 2, "XDIFF", styles.label());
-        setFormula(base, 3, "'闂佽桨鑳舵晶妤€鐣?!" + refs.xDiffCell(), styles.number4());
+        setFormula(base, 3, "'闂傚倸鍊搁崐鎼佸磹閹间礁纾圭€瑰嫭鍣磋ぐ鎺戠倞鐟滄粌霉閺嶎厽鐓忓┑鐐靛亾濞呭棝鏌涢妶鍛伃闁哄被鍊楃划娆戞崉閵娿倗椹虫繝鐢靛仜閹虫劖鎱ㄩ崹顐も攳濠电姴娲ゅ洿闂佺鏈惌顔界珶閺囥垺鈷?!" + refs.xDiffCell(), styles.number4());
         setText(base, 4, "RP", styles.label());
-        setFormula(base, 5, "'闂佽桨鑳舵晶妤€鐣?!" + refs.rpCell(), styles.number4());
+        setFormula(base, 5, "'闂傚倸鍊搁崐鎼佸磹閹间礁纾圭€瑰嫭鍣磋ぐ鎺戠倞鐟滄粌霉閺嶎厽鐓忓┑鐐靛亾濞呭棝鏌涢妶鍛伃闁哄被鍊楃划娆戞崉閵娿倗椹虫繝鐢靛仜閹虫劖鎱ㄩ崹顐も攳濠电姴娲ゅ洿闂佺鏈惌顔界珶閺囥垺鈷?!" + refs.rpCell(), styles.number4());
         setText(base, 6, "K1", styles.label());
         setNumber(base, 7, k1, styles.number4());
 
@@ -1112,19 +1108,18 @@ public class AnalysisService {
         // Reserved for future formula restoration if needed.
         //
         sheet.addMergedRegion(new CellRangeAddress(19, 21, 1, 7));
-
         HSSFRow section2 = row(sheet, 23);
-        setText(section2, 0, "闂佸搫鐗嗙粔瀛樻叏閻旂儤濯奸柨娑樺閺嗩剛绱撴担瑙勫鞍闁诲繐顦甸弫宥夊醇濠垫劕娈搁梺缁樻寙瀹ュ洨顦?, styles.section());
+        setText(section2, 0, "Professional Interpretation", styles.section());
         sheet.addMergedRegion(new CellRangeAddress(23, 23, 0, 7));
 
         HSSFRow s1 = row(sheet, 24);
-        setText(s1, 0, "GRR(6闁?", styles.label());
+        setText(s1, 0, "GRR(6闂?", styles.label());
         setNumber(s1, 1, result.getSvGrr(), styles.number4());
         setText(s1, 2, "%StudyVar GRR", styles.label());
         setNumber(s1, 3, result.getPctStudyVarGrr(), styles.percent2Emphasis());
 
         HSSFRow s2 = row(sheet, 25);
-        setText(s2, 0, "PV(6闁?", styles.label());
+        setText(s2, 0, "PV(6闂?", styles.label());
         setNumber(s2, 1, result.getSvPartToPart(), styles.number4());
         setText(s2, 2, "NDC", styles.label());
         setNumber(s2, 3, result.getNdc(), styles.number2Emphasis());
@@ -1354,7 +1349,7 @@ public class AnalysisService {
                 return "Linearity is excellent and slope is close to zero.";
             }
             if (pctTolerance <= 30) {
-                return "缂佺偓瀵ч埀顑啫璁查柟鎭掑劚瑜板牓鏁嶉崼婵堢处閻犱緡鍠楃€垫梻绱掗鐘崇＇闁硅矇宥囩";
+                return "Linearity is acceptable but should still be reviewed against tolerance and method stability.";
             }
             return "Linearity is high, please inspect reference standard and test method.";
         }
@@ -1583,7 +1578,7 @@ public class AnalysisService {
         private double requireD2(int n, String context) {
         Double d2 = D2_CONSTANTS.get(n);
         if (d2 == null) {
-            throw new IllegalArgumentException(context + " 閺嗗倷绗夐弨顖涘瘮 n=" + n + "閿涘矁顕担璺ㄦ暏 2~25");
+            throw new IllegalArgumentException(context + " 闂傚倸鍊搁崐椋庣矆娓氣偓楠炴牠顢曢埗鑺ョ☉铻栭柛娑卞幘閿涙瑦淇婇悙宸剰婵炴挳顥撶划濠氬棘濞嗗墽鍞甸梺鍏兼倐濞佳勬叏閸モ晝纾藉ù锝呭级濞呭棝鏌曢崶褍顏€殿喕绮欐俊姝岊槷婵℃彃鐗撳?n=" + n + "闂傚倸鍊搁崐鐑芥倿閿旈敮鍋撶粭娑樻噽閻瑩鏌熸潏楣冩闁稿孩顨呴妴鎺戭潩閿濆懍澹曟俊鐐€戦崹鍝勭暆閹间降鈧礁螖娴ｇ懓顎撻梺鑽ゅ枛閸嬪﹪鍩€椤掍焦宕岄柡宀嬬秮閹晠宕楅崨鏉跨劵闂備礁鎲￠弻銊х矓閻熼偊鍤?2~25");
         }
         return d2;
     }
@@ -1661,86 +1656,84 @@ public class AnalysisService {
         return numerator * 100.0 / denominator;
     }
 
-        private String capabilitySummary(double cpk, double ppk) {
+    private String capabilitySummary(double cpk, double ppk) {
         if (cpk >= 1.67 && ppk >= 1.67) {
-            return "閼宠棄濮忔导妯碱潊";
+            return "Excellent";
         }
         if (cpk >= 1.33 && ppk >= 1.33) {
-            return "閼宠棄濮忛懝顖氥偨";
+            return "Acceptable";
         }
-        if (cpk >= 1.00 && ppk >= 1.00) {
-            return "閼宠棄濮忔稉鈧懜?;
-        }
-        return "閼宠棄濮忛崑蹇庣秵";
+        return "Needs Improvement";
     }
+
     private String capabilityAssessmentLevel(double cpk, double ppk) {
         if (cpk >= 1.67 && ppk >= 1.67) {
-            return "娴兼顫?;
+            return "Excellent";
         }
         if (cpk >= 1.33 && ppk >= 1.33) {
-            return "閼诡垰銈?;
+            return "Good";
         }
         if (cpk >= 1.00 && ppk >= 1.00) {
-            return "閸欘垱甯撮崣?;
+            return "Watch";
         }
-        return "闂団偓閺佸瓨鏁?;
+        return "Risk";
     }
     private String capabilityConclusion(String assessmentLevel, double cpk, double ppk, double cpl, double cpu) {
         return switch (assessmentLevel) {
-            case "娴兼顫? -> "鏉╁洨鈻奸懗钘夊閸忓懓鍐婚敍宀€绮嶉崘鍛瑢閺佺繝缍嬬悰銊у箛闁€熺窛缁嬪啿鐣鹃敍灞藉讲娴ｆ粈璐熸导妯哄帥閸欏倽鈧啰绮ㄩ弸婧库偓?;
-            case "閼诡垰銈? -> "鏉╁洨鈻奸懗钘夊鏉堟儳鍩岀敮姝岊潐閹貉冨煑鐟曚焦鐪伴敍灞界紦鐠侇喚鎴风紒顓濈箽閹镐椒鑵戣箛鍐ㄢ偓闂寸瑢濞夈垹濮╅幒褍鍩楅妴?;
-            case "閸欘垱甯撮崣? -> "鏉╁洨鈻奸懗钘夊婢跺嫪绨稉瀵告櫕閸欘垱甯撮崣妤€灏梻杈剧礉瀵ら缚顔呮径宥嗙壋娑擃厼绺鹃崑蹇曅╅獮鑸靛瘮缂侇叀顫囩€电喆鈧?;
+            case "Excellent" -> "Process capability is strong and centered well within the specification window. Current control strategy can be maintained with routine monitoring.";
+            case "Good" -> "Process capability meets common release expectations, but continued monitoring is recommended to prevent drift and preserve margin.";
+            case "Watch" -> "Process capability is close to the lower acceptable boundary. Review centering, variation sources, and recent shifts before formal release.";
             default -> (cpl < cpu
-                    ? "鏉╁洨鈻奸懗钘夊娑撳秷鍐婚敍灞煎瘜鐟曚線顥撻梽鈺呮肠娑擃厼婀棃鐘虹箮娑撳顫夐弽濂告娑撯偓娓氀佲偓?
-                    : "鏉╁洨鈻奸懗钘夊娑撳秷鍐婚敍灞煎瘜鐟曚線顥撻梽鈺呮肠娑擃厼婀棃鐘虹箮娑撳﹨顫夐弽濂告娑撯偓娓氀佲偓?)
-                    + " 瀵ら缚顔呴崗鍫滅喘閸栨牞绻冪粙瀣倵閸愬秴褰傜敮鍐╊劀瀵繒绮ㄧ拋鎭掆偓?;
+                    ? "Process capability is below target and is leaning toward the lower specification side."
+                    : "Process capability is below target and is leaning toward the upper specification side.")
+                    + " Corrective action is recommended before using this result as a release basis.";
         };
     }
     private String capabilityRecommendedAction(String assessmentLevel, List<AnalysisValidationItem> items) {
         boolean hasShift = items.stream().anyMatch(item -> "CAP_SHIFT".equals(item.getCode()) || "CAP_CENTER_OFF".equals(item.getCode()));
         return switch (assessmentLevel) {
-            case "娴兼顫? -> "瀵ら缚顔呴幐澶婄秼閸撳秴寮弫鎵埛缂侇厾娲冮幒褝绱濋獮璺虹殺閺堫剚顐肩紒鎾寸亯娴ｆ粈璐熼崺铏瑰殠閻楀牊婀版穱婵嗙摠閵?;
-            case "閼诡垰銈? -> hasShift
-                    ? "瀵ら缚顔呮导妯哄帥濡偓閺屻儴绻冪粙瀣╄厬韫囧啫浜哥粔浼欑礉閸愬秵瀵旂紒顓＄闊亝澹掗梻瀛樺皾閸斻劊鈧?
-                    : "瀵ら缚顔呮穱婵囧瘮瑜版挸澧犲銉ㄥ閸欏倹鏆熼敍灞借嫙閹稿顓搁崚鎺戞噯閺堢喎顦插ù瀣ㄢ偓?;
-            case "閸欘垱甯撮崣? -> "瀵ら缚顔呯悰銉ュ帠閺嶉攱婀伴獮璺侯槻閺嶆瓕绻冪粙瀣╄厬韫囧喛绱濊箛鍛邦洣閺冨爼鍣搁弬鎷岊啎鐎规碍甯堕崚鍓佹櫕闂勬劑鈧?;
-            default -> "瀵ら缚顔呴弳鍌氫粻閻╁瓨甯村鏇犳暏閺堫剛绮ㄩ弸婊冧粵濮濓絽绱￠弨鎹愵攽閿涘苯鍘涙禒搴ゎ啎婢跺洢鈧礁浼愰懝鍝勬嫲閸欐牗鐗遍弬瑙勭《娑撳鏌熼棃銏℃殻閺€骞库偓?;
+            case "Excellent" -> "Keep the current process window, continue routine SPC monitoring, and retain the current report as the baseline version.";
+            case "Good" -> hasShift
+                    ? "Capability is acceptable but a center shift was detected. Re-center the process and confirm the next production lot before release."
+                    : "Capability is acceptable. Continue routine monitoring and re-check after material, tooling, or setup changes.";
+            case "Watch" -> "Run a focused review on centering and major variation sources, then collect a fresh sample before final release.";
+            default -> "Do not rely on the current result for final release. Investigate the process, correct the main issue, and perform a new capability study.";
         };
     }
-        private String grrSummary(double pctStudyVarGrr, double ndc) {
+    private String grrSummary(double pctStudyVarGrr, double ndc) {
         if (pctStudyVarGrr <= 10 && ndc >= 5) {
-            return "GRR 娴兼顫呴敍灞藉讲閻╁瓨甯撮悽銊ょ艾鏉╁洨鈻奸幒褍鍩?;
+            return "GRR is excellent and the measurement system is suitable for process control and release decisions.";
         }
         if (pctStudyVarGrr <= 30) {
-            return "GRR 閸欘垱甯撮崣妤嬬礉瀵ら缚顔呯紒鎾虫値娑撴艾濮熸搴ㄦ珦鐠囧嫪鍙婇崥搴濆▏閻?;
+            return "GRR is conditionally acceptable. The system may be used with caution while improvement opportunities are reviewed.";
         }
-        return "GRR 閸嬪繘鐝敍灞界紦鐠侇喕绱崗鍫滅喘閸栨牠鍣洪崗鏋偓浣规煙濞夋洘鍨ㄩ幙宥勭稊閸涙ü绔撮懛瀛樷偓?;
+        return "GRR is not acceptable. The measurement system should be improved before being used for capability or release decisions.";
     }
     private String grrAssessmentLevel(double pctStudyVarGrr, double ndc) {
         if (pctStudyVarGrr <= 10 && ndc >= 5) {
-            return "娴兼顫?;
+            return "Excellent";
         }
         if (pctStudyVarGrr <= 30 && ndc >= 3) {
-            return "閸欘垱甯撮崣?;
+            return "Watch";
         }
-        return "闂団偓閺佸瓨鏁?;
+        return "Risk";
     }
     private String grrConclusion(String assessmentLevel, double pctStudyVarGrr, double ndc) {
         return switch (assessmentLevel) {
-            case "娴兼顫? -> "濞村鍣虹化鑽ょ埠闁插秴顦查幀褌绗岄崘宥囧箛閹嗐€冮悳鎷屽婵傛枻绱濋崣顖滄纯閹恒儲鏁幘鎴ｇ箖缁嬪甯堕崚韬测偓?;
-            case "閸欘垱甯撮崣? -> "濞村鍣虹化鑽ょ埠閸╃儤婀伴崣顖滄暏閿涘奔绲炬禒宥呯紦鐠侇喚绮ㄩ崥鍫滅瑹閸旓繝顥撻梽鈺佹嫲閸忔娊鏁悧瑙勨偓褌濞囬悽銊ｂ偓?;
-            default -> "濞村鍣虹化鑽ょ埠濞夈垹濮╅崑蹇涚彯閹存牕灏崚鍡氬厴閸旀稐绗夌搾绛圭礉瑜版挸澧犳稉宥呯紦鐠侇喚娲块幒銉ょ稊娑撶儤娓剁紒鍫濆灲鐎规矮绶烽幑顔衡偓?;
-        } + " 瑜版挸澧?%Study Var=" + String.format(Locale.ROOT, "%.2f", pctStudyVarGrr)
-                + "%閿涘DC=" + String.format(Locale.ROOT, "%.2f", ndc) + "閵?;
+            case "Excellent" -> "Measurement variation is low and part discrimination is sufficient. The system is fit for routine use.";
+            case "Watch" -> "Measurement variation is marginal. Use the system with caution and improve discrimination or reduce measurement noise.";
+            default -> "Measurement variation is too high for reliable release decisions. Improve the measurement system before continuing.";
+        } + " (%Study Var=" + String.format(Locale.ROOT, "%.2f", pctStudyVarGrr)
+                + "%, ndc=" + String.format(Locale.ROOT, "%.2f", ndc) + ")";
     }
     private String grrRecommendedAction(String assessmentLevel, List<AnalysisValidationItem> items) {
         boolean lowNdc = items.stream().anyMatch(item -> "GRR_NDC_LOW".equals(item.getCode()));
         return switch (assessmentLevel) {
-            case "娴兼顫? -> "瀵ら缚顔呯紒瀛樺瘮瑜版挸澧犻柌蹇撳徔娑撳孩鎼锋担婊嗩潐閼煎喛绱濋獮鏈电稊娑撴椽鍣哄ù瀣兇缂佺喎鐔€缁惧じ绻氱€涙ǜ鈧?;
-            case "閸欘垱甯撮崣? -> lowNdc
-                    ? "瀵ら缚顔呮导妯哄帥婢х偛濮為梿鏈垫瀹割喖绱撻弽閿嬫拱閿涘苯鍟€婢跺秵鐗抽幙宥勭稊閸涙顔勭紒鍐х閼峰瓨鈧佲偓?
-                    : "瀵ら缚顔呯紒鎾虫値娴溠冩惂妞嬪酣娅撶紒褏鐢绘担璺ㄦ暏閿涘苯鑻熺€瑰甯撻崥搴ｇ敾婢跺秵绁寸涵顔款吇閵?;
-            default -> "瀵ら缚顔呮导妯哄帥閹烘帗鐓￠柌蹇撳徔閻樿埖鈧降鈧礁銇欏▽璇插徔閵嗕焦鎼锋担婊勬煙濞夋洖鎷伴幙宥勭稊閸涙顔勭紒鍐跨礉閸愬秹鍣搁弬鐗堝⒔鐞?GRR閵?;
+            case "Excellent" -> "Keep the current measurement system in service, maintain routine verification, and use the present result as the baseline record.";
+            case "Watch" -> lowNdc
+                    ? "Measurement variation is marginal and ndc is low. Improve part discrimination or increase resolution before relying on this GRR result."
+                    : "Measurement variation is marginal. Tighten operator method control and reduce noise before the next formal study.";
+            default -> "Do not use the current measurement system for release decisions yet. Improve repeatability and reproducibility, then run a new GRR study.";
         };
     }
     private List<AnalysisValidationItem> buildCapabilityValidationMessages(
@@ -1756,29 +1749,30 @@ public class AnalysisService {
     ) {
         List<AnalysisValidationItem> items = new ArrayList<>();
         if (sampleCount < 30) {
-            items.add(validation("CAP_SAMPLE_LOW", "WARNING", "閺嶉攱婀伴柌蹇撶毌娴?30閿涘苯缂撶拋顔藉⒖閸忓懏鐗遍張顒€鎮楅崘宥呭絺鐢啯顒滃蹇曠波鐠佹亽鈧?));
+            items.add(validation("CAP_SAMPLE_LOW", "WARNING", "Sample size is below 30. Statistical confidence is limited and a larger study is recommended."));
         } else {
-            items.add(validation("CAP_SAMPLE_OK", "INFO", "閺嶉攱婀伴柌蹇斿姬鐡掑啿鐖剁憴鍕厴閸旀稑鍨庨弸鎰畱閸╄櫣顢呯憰浣圭湴閵?));
+            items.add(validation("CAP_SAMPLE_OK", "INFO", "Sample size is adequate for a routine capability review."));
         }
         if (subgroupSize > 1 && groupCount < 20) {
-            items.add(validation("CAP_GROUP_LOW", "WARNING", "鐎涙劗绮嶉弫浼村櫤閸嬪繐鐨敍宀€绮嶉崘鍛皾閸斻劋鍙婄拋锛勄旂€规碍鈧傜閼割兙鈧?));
+            items.add(validation("CAP_GROUP_LOW", "WARNING", "Subgroup count is low. Control chart stability and within-group estimates may not be robust."));
         }
         if (Math.abs(cpk - ppk) >= 0.20) {
-            items.add(validation("CAP_SHIFT", "WARNING", "CPK 娑?PPK 瀹割喖绱撴潏鍐ㄣ亣閿涘矁绻冪粙瀣讲閼宠棄鐡ㄩ崷銊︾磽缁夌粯鍨ㄩ幍褰掓？濞夈垹濮╅妴?));
+            items.add(validation("CAP_SHIFT", "WARNING", "CPK and PPK differ noticeably. A recent process shift or instability may be present."));
         }
         if (Math.abs(cpl - cpu) >= 0.20) {
-            items.add(validation("CAP_CENTER_OFF", "WARNING", "鏉╁洨鈻奸崸鍥р偓鐓庝焊閸氭垼顫夐弽闂寸娓氀嶇礉瀵ら缚顔呭Λ鈧弻銉よ厬韫囧啫鈧壈顔曠€规哎鈧?));
+            items.add(validation("CAP_CENTER_OFF", "WARNING", "Capability is not centered. The process mean appears to be closer to one specification limit."));
         }
         if (cpk < 1.00 || ppk < 1.00) {
-            items.add(validation("CAP_NOT_CAPABLE", "RISK", "瑜版挸澧犳潻鍥┾柤閼宠棄濮忔稉宥堝喕閿涘苯缂撶拋顔芥畯閸嬫粌鐨㈤張顒傜波閺嬫粈缍旀稉鐑橆劀瀵繑鏂佺悰灞肩贩閹诡喓鈧?));
+            items.add(validation("CAP_NOT_CAPABLE", "RISK", "Capability is below the common acceptance threshold. Improvement is required before release use."));
         } else if (cpk >= 1.33 && ppk >= 1.33) {
-            items.add(validation("CAP_GOOD", "INFO", "鏉╁洨鈻奸懗钘夊鏉堟儳鍩岀敮姝岊潐闁插繋楠囩憰浣圭湴閵?));
+            items.add(validation("CAP_GOOD", "INFO", "Capability meets a commonly used release threshold."));
         }
         if (observedPpmTotal > 1000 || predictedPpmTotalOverall > 1000) {
-            items.add(validation("CAP_PPM_HIGH", "WARNING", "娑撳秷澹?ppm 閸嬪繘鐝敍灞界紦鐠侇喚绮ㄩ崥鍫濈磽鐢摜鍋ｆ稉搴ゎ啎婢跺洨濮搁幀浣界箻娑撯偓濮濄儱顦查弽鎼炩偓?));
+            items.add(validation("CAP_PPM_HIGH", "WARNING", "Observed or predicted nonconformance is high. Review process stability before relying on this study."));
         }
         return items;
     }
+
     private List<AnalysisValidationItem> buildGrrValidationMessages(
             double pctStudyVarGrr,
             double ndc,
@@ -1789,25 +1783,25 @@ public class AnalysisService {
     ) {
         List<AnalysisValidationItem> items = new ArrayList<>();
         if (pctStudyVarGrr > 30) {
-            items.add(validation("GRR_HIGH", "RISK", "GRR 閸楃姵鐦搾鍛扮箖 30%閿涘本绁撮柌蹇曢兇缂佺喐娈忔稉宥呯紦鐠侇喚娲块幒銉ф暏娴滃孩顒滃蹇撳灲鐎规哎鈧?));
+            items.add(validation("GRR_HIGH", "RISK", "GRR exceeds 30% of study variation. The measurement system is not acceptable for release decisions."));
         } else if (pctStudyVarGrr > 10) {
-            items.add(validation("GRR_MEDIUM", "WARNING", "GRR 婢跺嫪绨?10%~30%閿涘苯缂撶拋顔剧波閸氬牅绗熼崝锟狀棑闂勨晞鐦庢导鏉挎倵娴ｈ法鏁ら妴?));
+            items.add(validation("GRR_MEDIUM", "WARNING", "GRR is between 10% and 30% of study variation. The system may be usable with caution."));
         } else {
-            items.add(validation("GRR_OK", "INFO", "GRR 閸楃姵鐦潏鍐х秵閿涘本绁撮柌蹇曢兇缂佺喕銆冮悳鎷屽婵傚鈧?));
+            items.add(validation("GRR_OK", "INFO", "GRR is within 10% of study variation. The measurement system is performing well."));
         }
         if (ndc < 5) {
-            items.add(validation("GRR_NDC_LOW", "WARNING", "NDC 鐏忓繋绨?5閿涘苯灏崚鍡曠瑝閸氬矂娴傛禒鍓佹畱閼宠棄濮忛崑蹇撴€ラ妴?));
+            items.add(validation("GRR_NDC_LOW", "WARNING", "ndc is below 5, which suggests weak part discrimination."));
         } else {
-            items.add(validation("GRR_NDC_OK", "INFO", "NDC 濠娐ゅ喕閸栧搫鍨庨懗钘夊鐟曚焦鐪伴妴?));
+            items.add(validation("GRR_NDC_OK", "INFO", "ndc is acceptable for routine discrimination between parts."));
         }
         if (tolerance == null || !Double.isFinite(tolerance) || tolerance <= 0) {
-            items.add(validation("GRR_NO_TOL", "INFO", "閺堫亝褰佹笟娑樺彆瀹割噯绱濊ぐ鎾冲缂佹捁顔戦張顏勫瘶閸氼偄鍙曞顔煎窗濮ｆ柨鍨介弬顓溾偓?));
+            items.add(validation("GRR_NO_TOL", "INFO", "No valid tolerance was provided. Tolerance-based judgement was skipped."));
         }
         if (appraiserCount < 3) {
-            items.add(validation("GRR_APPRAISER_LOW", "INFO", "閹垮秳缍旈崨妯绘殶闁插繗绶濈亸鎴礉瀵ら缚顔呴崥搴ｇ敾閹碘晛鍘栭幙宥勭稊閸涙ɑ鐗遍張顒€顦查弽鎼炩偓?));
+            items.add(validation("GRR_APPRAISER_LOW", "INFO", "Fewer than 3 appraisers were included. Appraiser reproducibility evidence is limited."));
         }
         if (partCount < 10 || trialCount < 3) {
-            items.add(validation("GRR_DESIGN_LIGHT", "WARNING", "闂嗘湹娆㈤弫鐗堝灗闁插秴顦插▎鈩冩殶閸嬪繐鐨敍灞界紦鐠侇喛藟閸忓懎鎮楅崘宥呬粵閺堚偓缂佸牆缍婂锝冣偓?));
+            items.add(validation("GRR_DESIGN_LIGHT", "WARNING", "Study design is light. Consider at least 10 parts and 3 trials for a more stable GRR study."));
         }
         return items;
     }

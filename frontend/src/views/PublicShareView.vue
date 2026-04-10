@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="share-page">
     <div class="share-shell">
       <section class="share-hero">
@@ -28,8 +28,7 @@
               class="hero-action"
               @click="enterFolder(activeItem)"
             >
-              进入文件夹
-            </button>
+              进入文件夹            </button>
             <button
               v-else-if="activeItem && canDownload(activeItem)"
               type="button"
@@ -328,7 +327,7 @@
                       <strong>{{ canDownload(activeItem) ? '允许下载' : (isFolder(activeItem) ? '可进入浏览' : '允许预览') }}</strong>
                     </div>
                   </div>
-                  <div v-else class="share-info-empty">左侧选中文件或文件夹后查看详情。</div>
+                  <div v-else class="share-info-empty">在左侧选中文件或文件夹后查看详情。</div>
                 </div>
 
                 <div class="share-info-card">
@@ -355,8 +354,7 @@
                       下载当前文件
                     </button>
                     <div v-else class="share-action-note">
-                      当前分享未开放下载时，仍可浏览目录，并预览支持的文件格式。
-                    </div>
+                      当前分享未开放下载时，仍可浏览目录，并预览支持的文件格式。                    </div>
                   </div>
                 </div>
               </div>
@@ -1147,6 +1145,33 @@ onBeforeUnmount(() => {
   color: #c62828;
 }
 
+.share-state-card.error,
+.share-stage-placeholder.error,
+.share-preview-empty.error {
+  border-color: rgba(252, 165, 165, 0.92);
+  background: linear-gradient(180deg, rgba(255,245,245,0.96), rgba(254,242,242,0.94));
+  color: #b91c1c;
+}
+
+.share-password-card,
+.share-state-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.share-password-card::after,
+.share-state-card::after {
+  content: '';
+  position: absolute;
+  top: -44px;
+  right: -44px;
+  width: 144px;
+  height: 144px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(219,234,254,0.72), transparent 68%);
+  pointer-events: none;
+}
+
 .share-explorer {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -1840,5 +1865,64 @@ onBeforeUnmount(() => {
   .share-preview-text {
     padding: 14px;
   }
+}
+
+.share-hero-copy {
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.08);
+}
+.share-hero-panel,
+.share-sidebar,
+.share-stage {
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.08);
+}
+.share-item-card {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(15,23,42,0.05);
+}
+.share-preview-card,
+.share-info-card {
+  box-shadow: 0 18px 36px rgba(15,23,42,0.06);
+}
+.share-status-strip {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:18px;
+}
+.share-status-card {
+  display:inline-flex;
+  align-items:center;
+  min-height:36px;
+  padding:0 14px;
+  border-radius:999px;
+  border:1px solid rgba(219,234,254,.82);
+  background:rgba(255,255,255,.72);
+  color:#475569;
+  font-size:12px;
+  font-weight:700;
+  box-shadow:0 12px 24px rgba(15,23,42,.05);
+}
+.hero-action,
+.share-inline-btn,
+.share-mobile-close {
+  box-shadow:0 14px 28px rgba(15,23,42,.08);
+}
+.share-state-card,
+.share-stage-placeholder,
+.share-preview-empty {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 16px 34px rgba(15,23,42,.05);
+}
+.share-stage-header {
+  position: relative;
+  overflow: hidden;
+}
+.share-stage-header::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(191,219,254,.9), transparent);
+}
+@media (max-width: 768px) {
+  .share-status-strip { margin-top: 14px; }
 }
 </style>

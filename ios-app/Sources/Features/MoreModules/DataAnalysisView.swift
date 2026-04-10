@@ -9,7 +9,11 @@ struct DataAnalysisView: View {
             MetrologyPalette.background.ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 10) {
+                VStack(spacing: 14) {
+                    heroSection
+                    reportSummarySection
+                    exportPreparationSection
+                    explanationHierarchySection
                     capabilityCard
                     capabilityResultCard
                     grrCard
@@ -17,6 +21,7 @@ struct DataAnalysisView: View {
                     hintLine
                 }
                 .padding(.horizontal, 12)
+                .padding(.top, 10)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)
@@ -34,178 +39,350 @@ struct DataAnalysisView: View {
         .navigationTitle("数据分析")
     }
 
-    private var capabilityCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("过程能力指数")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(MetrologyPalette.textPrimary)
+    private var heroSection: some View {
+        MetrologyPageHeroCard(
+            eyebrow: "Analysis",
+            title: "数据分析",
+            subtitle: "把过程能力与量具 GRR 收到同一页，适合快速计算、结果查看与专业判断。",
+            accent: .neutral
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("当前模块")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
 
-            Text("输入样本与规格上下限，计算 Cp/Cpk/Pp/Ppk")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
+                Text(viewModel.capabilityResult == nil && viewModel.grrResult == nil ? "待计算" : "已产出")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(MetrologyPalette.navActive)
 
-            HStack(spacing: 8) {
-                TextField("规格下限（LSL）", text: $viewModel.capabilityLSLText)
-                    .keyboardType(.decimalPad)
-                    .metrologyInput()
-
-                TextField("规格上限（USL）", text: $viewModel.capabilityUSLText)
-                    .keyboardType(.decimalPad)
-                    .metrologyInput()
+                Text("能力 / GRR")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
             }
-
-            TextField("子组大小（可选）", text: $viewModel.capabilitySubgroupText)
-                .keyboardType(.numberPad)
-                .metrologyInput()
-
-            AnalysisTextEditor(
-                placeholder: "样本数据（支持换行/逗号/空格）\n示例：10.02, 10.05, 9.98, 10.11",
-                text: $viewModel.capabilityDataText,
-                minHeight: 108
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.82))
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(hex: 0xC5D8F7), lineWidth: 1)
+            )
+        }
+    }
 
-            HStack(spacing: 10) {
-                Button("计算能力指数") {
-                    metrologyDismissKeyboard()
-                    viewModel.calculateCapability()
-                }
-                .buttonStyle(MetrologyPrimaryButtonStyle())
-                .frame(maxWidth: .infinity)
+    @ViewBuilder
+    private var reportSummarySection: some View {
+        if viewModel.capabilityResult != nil || viewModel.grrResult != nil {
+            MetrologySectionPanel(
+                title: "报告摘要",
+                subtitle: "把当前已生成的分析结果汇总成一页，便于后续截图、复核与报告整理。"
+            ) {
+                VStack(spacing: 10) {
+                    if let result = viewModel.capabilityResult {
+                        AnalysisNarrativeCard(
+                            title: "过程能力 · \(result.summary)",
+                            message: "Cpk \(result.cpk.formatted(3)) / Ppk \(result.ppk.formatted(3))，\(result.riskLevelDescription)",
+                            tone: result.riskTone
+                        )
+                    }
 
-                Button("清空") {
-                    metrologyDismissKeyboard()
-                    viewModel.clearCapabilityInputs()
+                    if let result = viewModel.grrResult {
+                        AnalysisNarrativeCard(
+                            title: "量具 GRR · \(result.summary)",
+                            message: "%GRR \(result.percentGRR.formatted(2))%，ndc \(result.ndc.map(String.init) ?? "-")，\(result.riskLevelDescription)",
+                            tone: result.riskTone
+                        )
+                    }
                 }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-                .frame(maxWidth: .infinity)
             }
         }
-        .padding(12)
-        .metrologyCard()
+    }
+
+    @ViewBuilder
+    private var exportPreparationSection: some View {
+        if viewModel.capabilityResult != nil || viewModel.grrResult != nil {
+            MetrologySectionPanel(
+                title: "导出前摘要",
+                subtitle: "导出、截图或整理报告前，先确认本次结果、风险等级与建议动作。"
+            ) {
+                VStack(spacing: 10) {
+                    if let result = viewModel.capabilityResult {
+                        AnalysisExportSummaryCard(
+                            title: "过程能力结果",
+                            summary: "Cpk \(result.cpk.formatted(3)) / Ppk \(result.ppk.formatted(3)) · \(result.summary)",
+                            badge: result.riskLevelTitle,
+                            notes: result.exportNotes,
+                            tone: result.riskTone
+                        )
+                    }
+
+                    if let result = viewModel.grrResult {
+                        AnalysisExportSummaryCard(
+                            title: "量具 GRR 结果",
+                            summary: "%GRR \(result.percentGRR.formatted(2))% / ndc \(result.ndc.map(String.init) ?? "-") · \(result.summary)",
+                            badge: result.riskLevelTitle,
+                            notes: result.exportNotes,
+                            tone: result.riskTone
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var explanationHierarchySection: some View {
+        if viewModel.capabilityResult != nil || viewModel.grrResult != nil {
+            MetrologySectionPanel(
+                title: "结果说明层级",
+                subtitle: "建议按“核心结论 → 风险等级 → 建议动作”的顺序阅读和复核。"
+            ) {
+                VStack(spacing: 10) {
+                    if let result = viewModel.capabilityResult {
+                        AnalysisHierarchyCard(
+                            title: "过程能力",
+                            tone: result.heroTone,
+                            stages: [
+                                AnalysisHierarchyStage(step: "01", title: "核心结论", message: result.summary),
+                                AnalysisHierarchyStage(step: "02", title: "风险等级", message: result.riskLevelDescription),
+                                AnalysisHierarchyStage(step: "03", title: "建议动作", message: result.recommendedActions.first ?? "继续保持当前过程监控。")
+                            ]
+                        )
+                    }
+
+                    if let result = viewModel.grrResult {
+                        AnalysisHierarchyCard(
+                            title: "量具 GRR",
+                            tone: result.heroTone,
+                            stages: [
+                                AnalysisHierarchyStage(step: "01", title: "核心结论", message: result.summary),
+                                AnalysisHierarchyStage(step: "02", title: "风险等级", message: result.riskLevelDescription),
+                                AnalysisHierarchyStage(step: "03", title: "建议动作", message: result.recommendedActions.first ?? "继续按周期复核量具系统。")
+                            ]
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var capabilityCard: some View {
+        MetrologySectionPanel(title: "过程能力指数", subtitle: "输入样本与规格上下限，计算 Cp / Cpk / Pp / Ppk。") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    TextField("规格下限（LSL）", text: $viewModel.capabilityLSLText)
+                        .keyboardType(.decimalPad)
+                        .metrologyInput()
+
+                    TextField("规格上限（USL）", text: $viewModel.capabilityUSLText)
+                        .keyboardType(.decimalPad)
+                        .metrologyInput()
+                }
+
+                TextField("子组大小（可选）", text: $viewModel.capabilitySubgroupText)
+                    .keyboardType(.numberPad)
+                    .metrologyInput()
+
+                AnalysisTextEditor(
+                    placeholder: "样本数据（支持换行、逗号、空格）\n示例：10.02, 10.05, 9.98, 10.11",
+                    text: $viewModel.capabilityDataText,
+                    minHeight: 108
+                )
+
+                HStack(spacing: 10) {
+                    Button("示例") {
+                        metrologyDismissKeyboard()
+                        viewModel.fillCapabilityExample()
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
+
+                    Button("计算能力指数") {
+                        metrologyDismissKeyboard()
+                        viewModel.calculateCapability()
+                    }
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
+
+                    Button("清空") {
+                        metrologyDismissKeyboard()
+                        viewModel.clearCapabilityInputs()
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
     }
 
     @ViewBuilder
     private var capabilityResultCard: some View {
         if let result = viewModel.capabilityResult {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Text("能力结果")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(MetrologyPalette.textPrimary)
-                    Spacer(minLength: 0)
-                    Text(result.summary)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(result.summaryColor)
+            VStack(spacing: 10) {
+                AnalysisResultHeroCard(
+                    eyebrow: "CPK / PPK",
+                    title: result.summary,
+                    subtitle: result.capabilityAdvice,
+                    tone: result.heroTone,
+                    highlights: [
+                        AnalysisHighlight(title: "Cpk", value: result.cpk.formatted(3)),
+                        AnalysisHighlight(title: "Ppk", value: result.ppk.formatted(3)),
+                        AnalysisHighlight(title: "样本", value: "\(result.sampleCount)")
+                    ]
+                )
+
+                MetrologySectionPanel(title: "能力结果", subtitle: "核心指标已按能力等级着色，便于快速判断。") {
+                    AnalysisMetricGrid(items: [
+                        AnalysisMetric(title: "样本数", value: "\(result.sampleCount)", tone: .neutral),
+                        AnalysisMetric(title: "子组数", value: "\(result.groupCount)", tone: .neutral),
+                        AnalysisMetric(title: "平均值", value: result.mean.formatted(4), tone: .normal),
+                        AnalysisMetric(title: "组内标准差", value: result.sigmaWithin.formatted(6), tone: .normal),
+                        AnalysisMetric(title: "整体标准差", value: result.sigmaOverall.formatted(6), tone: .normal),
+                        AnalysisMetric(title: "Cp", value: result.cp.formatted(4), tone: result.capabilityTone),
+                        AnalysisMetric(title: "Cpk", value: result.cpk.formatted(4), tone: result.capabilityTone),
+                        AnalysisMetric(title: "Pp", value: result.pp.formatted(4), tone: result.performanceTone),
+                        AnalysisMetric(title: "Ppk", value: result.ppk.formatted(4), tone: result.performanceTone)
+                    ])
                 }
 
-                AnalysisMetricGrid(items: [
-                    AnalysisMetric(title: "样本数", value: "\(result.sampleCount)", tone: .neutral),
-                    AnalysisMetric(title: "子组数", value: "\(result.groupCount)", tone: .neutral),
-                    AnalysisMetric(title: "平均值", value: result.mean.formatted(4), tone: .normal),
-                    AnalysisMetric(title: "组内标准差", value: result.sigmaWithin.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "整体标准差", value: result.sigmaOverall.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "Cp", value: result.cp.formatted(4), tone: result.capabilityTone),
-                    AnalysisMetric(title: "Cpk", value: result.cpk.formatted(4), tone: result.capabilityTone),
-                    AnalysisMetric(title: "Pp", value: result.pp.formatted(4), tone: result.performanceTone),
-                    AnalysisMetric(title: "Ppk", value: result.ppk.formatted(4), tone: result.performanceTone)
-                ])
+                MetrologySectionPanel(title: "专业判断", subtitle: "结合 Cpk / Ppk 给出当前过程能力建议。") {
+                    AnalysisNarrativeCard(
+                        title: result.summary,
+                        message: result.capabilityAdvice,
+                        tone: result.heroTone
+                    )
+                }
+
+                MetrologySectionPanel(title: "风险等级", subtitle: "按当前能力指数给出风险分级，便于现场快速判断。") {
+                    AnalysisNarrativeCard(
+                        title: result.riskLevelTitle,
+                        message: result.riskLevelDescription,
+                        tone: result.riskTone
+                    )
+                }
+
+                MetrologySectionPanel(title: "建议动作", subtitle: "根据当前结果给出优先处理动作。") {
+                    AnalysisActionChecklist(actions: result.recommendedActions, tone: result.heroTone)
+                }
+
+                MetrologySectionPanel(title: "说明卡", subtitle: "帮助理解 Cpk / Ppk 与当前样本结构。") {
+                    AnalysisExplanationCard(lines: result.explanationNotes, tone: .neutral)
+                }
             }
-            .padding(10)
-            .metrologyCard()
         }
     }
 
     private var grrCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("量具 GRR（交叉型）")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(MetrologyPalette.textPrimary)
+        MetrologySectionPanel(title: "量具 GRR（交叉型）", subtitle: "每行格式：零件、检验员、重复次数、测量值。") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    TextField("零件数", text: $viewModel.grrPartsText)
+                        .keyboardType(.numberPad)
+                        .metrologyInput()
 
-            Text("行格式：零件,检验员,重复,测量值")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
+                    TextField("检验员数", text: $viewModel.grrOperatorsText)
+                        .keyboardType(.numberPad)
+                        .metrologyInput()
 
-            HStack(spacing: 8) {
-                TextField("零件数", text: $viewModel.grrPartsText)
-                    .keyboardType(.numberPad)
-                    .metrologyInput()
-
-                TextField("检验员数", text: $viewModel.grrOperatorsText)
-                    .keyboardType(.numberPad)
-                    .metrologyInput()
-
-                TextField("重复次数", text: $viewModel.grrRepeatsText)
-                    .keyboardType(.numberPad)
-                    .metrologyInput()
-            }
-
-            AnalysisTextEditor(
-                placeholder: "示例行：P1,O1,1,10.01",
-                text: $viewModel.grrDataText,
-                minHeight: 138
-            )
-
-            HStack(spacing: 10) {
-                Button("计算 GRR") {
-                    metrologyDismissKeyboard()
-                    viewModel.calculateGRR()
+                    TextField("重复次数", text: $viewModel.grrRepeatsText)
+                        .keyboardType(.numberPad)
+                        .metrologyInput()
                 }
-                .buttonStyle(MetrologyPrimaryButtonStyle())
-                .frame(maxWidth: .infinity)
 
-                Button("清空") {
-                    metrologyDismissKeyboard()
-                    viewModel.clearGRRInputs()
+                AnalysisTextEditor(
+                    placeholder: "示例行：P1, O1, 1, 10.01",
+                    text: $viewModel.grrDataText,
+                    minHeight: 138
+                )
+
+                HStack(spacing: 10) {
+                    Button("示例") {
+                        metrologyDismissKeyboard()
+                        viewModel.fillGRRExample()
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
+
+                    Button("计算 GRR") {
+                        metrologyDismissKeyboard()
+                        viewModel.calculateGRR()
+                    }
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
+
+                    Button("清空") {
+                        metrologyDismissKeyboard()
+                        viewModel.clearGRRInputs()
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(MetrologySecondaryButtonStyle())
-                .frame(maxWidth: .infinity)
             }
         }
-        .padding(12)
-        .metrologyCard()
     }
 
     @ViewBuilder
     private var grrResultCard: some View {
         if let result = viewModel.grrResult {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Text("GRR 结果")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(MetrologyPalette.textPrimary)
-                    Spacer(minLength: 0)
-                    Text(result.summary)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(result.summaryColor)
+            VStack(spacing: 10) {
+                AnalysisResultHeroCard(
+                    eyebrow: "GRR",
+                    title: result.summary,
+                    subtitle: result.analysisAdvice,
+                    tone: result.heroTone,
+                    highlights: [
+                        AnalysisHighlight(title: "%GRR", value: result.percentGRR.formatted(2) + "%"),
+                        AnalysisHighlight(title: "ndc", value: result.ndc.map(String.init) ?? "-"),
+                        AnalysisHighlight(title: "零件", value: "\(result.partCount)")
+                    ]
+                )
+
+                MetrologySectionPanel(title: "GRR 结果", subtitle: "量具重复性、再现性和总变差统一展示。") {
+                    AnalysisMetricGrid(items: [
+                        AnalysisMetric(title: "零件数", value: "\(result.partCount)", tone: .neutral),
+                        AnalysisMetric(title: "检验员数", value: "\(result.operatorCount)", tone: .neutral),
+                        AnalysisMetric(title: "重复次数", value: "\(result.repeatCount)", tone: .neutral),
+                        AnalysisMetric(title: "EV", value: result.ev.formatted(6), tone: .normal),
+                        AnalysisMetric(title: "AV", value: result.av.formatted(6), tone: .normal),
+                        AnalysisMetric(title: "PV", value: result.pv.formatted(6), tone: .normal),
+                        AnalysisMetric(title: "GRR", value: result.grr.formatted(6), tone: result.grrTone),
+                        AnalysisMetric(title: "TV", value: result.tv.formatted(6), tone: .normal),
+                        AnalysisMetric(title: "%GRR", value: result.percentGRR.formatted(2) + "%", tone: result.grrTone),
+                        AnalysisMetric(title: "ndc", value: result.ndc.map(String.init) ?? "-", tone: .neutral)
+                    ])
                 }
 
-                AnalysisMetricGrid(items: [
-                    AnalysisMetric(title: "零件数", value: "\(result.partCount)", tone: .neutral),
-                    AnalysisMetric(title: "检验员数", value: "\(result.operatorCount)", tone: .neutral),
-                    AnalysisMetric(title: "重复次数", value: "\(result.repeatCount)", tone: .neutral),
-                    AnalysisMetric(title: "EV", value: result.ev.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "AV", value: result.av.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "PV", value: result.pv.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "GRR", value: result.grr.formatted(6), tone: result.grrTone),
-                    AnalysisMetric(title: "TV", value: result.tv.formatted(6), tone: .normal),
-                    AnalysisMetric(title: "%GRR", value: result.percentGRR.formatted(2) + "%", tone: result.grrTone),
-                    AnalysisMetric(title: "ndc", value: result.ndc.map(String.init) ?? "-", tone: .neutral)
-                ])
+                MetrologySectionPanel(title: "专业判断", subtitle: "按量具系统优劣给出当前 GRR 结论与建议。") {
+                    AnalysisNarrativeCard(
+                        title: result.summary,
+                        message: result.analysisAdvice,
+                        tone: result.heroTone
+                    )
+                }
+
+                MetrologySectionPanel(title: "风险等级", subtitle: "综合 %GRR 与 ndc 判断当前量具系统风险。") {
+                    AnalysisNarrativeCard(
+                        title: result.riskLevelTitle,
+                        message: result.riskLevelDescription,
+                        tone: result.riskTone
+                    )
+                }
+
+                MetrologySectionPanel(title: "建议动作", subtitle: "根据 GRR 结果列出优先处置动作。") {
+                    AnalysisActionChecklist(actions: result.recommendedActions, tone: result.heroTone)
+                }
+
+                MetrologySectionPanel(title: "说明卡", subtitle: "帮助理解 EV / AV / PV / ndc 的业务含义。") {
+                    AnalysisExplanationCard(lines: result.explanationNotes, tone: .neutral)
+                }
             }
-            .padding(10)
-            .metrologyCard()
         }
     }
 
     private var hintLine: some View {
-        HStack(spacing: 8) {
-            Text(viewModel.hint)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(message: viewModel.hint, tone: .neutral)
     }
 }
 
@@ -277,6 +454,277 @@ private struct AnalysisMetricGrid: View {
                 )
             }
         }
+    }
+}
+
+private struct AnalysisHighlight: Identifiable {
+    let id = UUID()
+    let title: String
+    let value: String
+}
+
+private struct AnalysisResultHeroCard: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let tone: MetrologyPillTone
+    let highlights: [AnalysisHighlight]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            MetrologyPageHeroCard(
+                eyebrow: eyebrow,
+                title: title,
+                subtitle: subtitle,
+                accent: tone
+            ) {
+                VStack(alignment: .trailing, spacing: 8) {
+                    ForEach(highlights) { item in
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(item.title)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(MetrologyPalette.textSecondary)
+                            Text(item.value)
+                                .font(.system(size: 20, weight: .black, design: .rounded))
+                                .foregroundStyle(tone.tint)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct AnalysisNarrativeCard: View {
+    let title: String
+    let message: String
+    let tone: MetrologyPillTone
+
+    var bodyView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(tone.tint)
+                    .frame(width: 8, height: 8)
+                Text(title)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(tone.tint)
+            }
+
+            Text(message)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(MetrologyPalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tone.background)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tone.stroke, lineWidth: 1)
+        )
+    }
+
+    var body: some View { bodyView }
+}
+
+private struct AnalysisActionChecklist: View {
+    let actions: [String]
+    let tone: MetrologyPillTone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
+                HStack(alignment: .top, spacing: 8) {
+                    Circle()
+                        .fill(tone.tint)
+                        .frame(width: 7, height: 7)
+                        .padding(.top, 5)
+
+                    Text(action)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if index < actions.count - 1 {
+                    Divider().overlay(tone.stroke)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tone.background)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tone.stroke, lineWidth: 1)
+        )
+    }
+}
+
+private struct AnalysisExportSummaryCard: View {
+    let title: String
+    let summary: String
+    let badge: String
+    let notes: [String]
+    let tone: MetrologyPillTone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+
+                    Text(summary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(badge)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(tone.tint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(tone.strongBackground)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
+                    HStack(alignment: .top, spacing: 8) {
+                        Circle()
+                            .fill(tone.tint)
+                            .frame(width: 6, height: 6)
+                            .padding(.top, 6)
+
+                        Text(note)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(tone.background)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(tone.stroke, lineWidth: 1)
+        )
+    }
+}
+
+private struct AnalysisHierarchyStage: Identifiable {
+    let id = UUID()
+    let step: String
+    let title: String
+    let message: String
+}
+
+private struct AnalysisHierarchyCard: View {
+    let title: String
+    let tone: MetrologyPillTone
+    let stages: [AnalysisHierarchyStage]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+
+            VStack(spacing: 8) {
+                ForEach(stages) { stage in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(stage.step)
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(tone.tint)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(tone.strongBackground)
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(stage.title)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(MetrologyPalette.textPrimary)
+
+                            Text(stage.message)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(MetrologyPalette.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    if stage.id != stages.last?.id {
+                        Divider()
+                            .overlay(MetrologyPalette.stroke)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
+    }
+}
+
+private struct AnalysisExplanationCard: View {
+    let lines: [String]
+    let tone: MetrologyPillTone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(tone.tint)
+                        .padding(.top, 1)
+                    Text(line)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tone.background)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tone.stroke, lineWidth: 1)
+        )
     }
 }
 
@@ -484,6 +932,87 @@ struct CapabilityResult {
         if ppk >= 1.00 { return .warning }
         return .danger
     }
+
+    var heroTone: MetrologyPillTone {
+        if cpk >= 1.33 && ppk >= 1.33 { return .valid }
+        if cpk >= 1.00 && ppk >= 1.00 { return .warning }
+        return .expired
+    }
+
+    var capabilityAdvice: String {
+        if cpk >= 1.67 && ppk >= 1.67 {
+            return "当前过程能力充足，短期与长期表现都稳定，适合直接纳入正式结果查看与报告输出。"
+        }
+        if cpk >= 1.33 && ppk >= 1.33 {
+            return "当前过程能力良好，建议继续保持过程控制，并定期复核波动来源。"
+        }
+        if cpk >= 1.00 && ppk >= 1.00 {
+            return "当前过程能力处于临界可用区，建议重点关注均值偏移与整体波动。"
+        }
+        return "当前过程能力偏低，建议先排查设备、工艺或测量系统波动，再重新取样复测。"
+    }
+
+    var riskTone: MetrologyPillTone {
+        if cpk >= 1.67 && ppk >= 1.67 { return .valid }
+        if cpk >= 1.33 && ppk >= 1.33 { return .neutral }
+        if cpk >= 1.00 && ppk >= 1.00 { return .warning }
+        return .expired
+    }
+
+    var riskLevelTitle: String {
+        if cpk >= 1.67 && ppk >= 1.67 { return "低风险" }
+        if cpk >= 1.33 && ppk >= 1.33 { return "可控风险" }
+        if cpk >= 1.00 && ppk >= 1.00 { return "中风险" }
+        return "高风险"
+    }
+
+    var riskLevelDescription: String {
+        if cpk >= 1.67 && ppk >= 1.67 { return "当前短期与长期能力都较充足，过程输出稳定，风险较低。" }
+        if cpk >= 1.33 && ppk >= 1.33 { return "过程整体处于可控范围，建议保持监控并定期复核。" }
+        if cpk >= 1.00 && ppk >= 1.00 { return "过程已接近能力下限，需要重点关注均值偏移与波动扩大。" }
+        return "过程能力不足，继续放行会带来较高质量风险，建议优先整改。"
+    }
+
+    var recommendedActions: [String] {
+        if cpk >= 1.67 && ppk >= 1.67 {
+            return [
+                "维持当前控制计划，按既定频率复核过程能力。",
+                "保留本次样本与参数，作为后续能力趋势对比基线。"
+            ]
+        }
+        if cpk >= 1.33 && ppk >= 1.33 {
+            return [
+                "继续监控关键工艺参数，避免均值漂移。",
+                "定期复核特殊原因波动，保持长期能力稳定。"
+            ]
+        }
+        if cpk >= 1.00 && ppk >= 1.00 {
+            return [
+                "优先排查均值偏移来源，必要时重新中心化工艺。",
+                "增加抽样或缩短复测周期，防止能力继续下滑。"
+            ]
+        }
+        return [
+            "暂停直接用于正式判断，先排查设备、工艺或测量系统问题。",
+            "整改后重新取样，并对比前后能力变化再决定是否放行。"
+        ]
+    }
+
+    var explanationNotes: [String] {
+        [
+            "Cpk 反映过程中心与规格边界的短期能力，越高说明当前过程越稳。",
+            "Ppk 反映长期整体能力，若明显低于 Cpk，通常意味着长期波动偏大。",
+            groupCount > 1 ? "本次结果包含子组结构信息，可同时观察短期与长期波动。" : "本次结果基于连续单值样本，适合快速判断当前能力水平。"
+        ]
+    }
+
+    var exportNotes: [String] {
+        [
+            "建议在导出中保留 Cpk / Ppk、样本数与风险等级，便于后续复核。",
+            "当前判断：\(summary)，\(riskLevelDescription)",
+            recommendedActions.first ?? "继续保持当前过程监控。"
+        ]
+    }
 }
 
 struct GrrResult {
@@ -514,6 +1043,75 @@ struct GrrResult {
         if percentGRR <= 10 { return .good }
         if percentGRR <= 30 { return .warning }
         return .danger
+    }
+
+    var heroTone: MetrologyPillTone {
+        if percentGRR <= 10 { return .valid }
+        if percentGRR <= 30 { return .warning }
+        return .expired
+    }
+
+    var analysisAdvice: String {
+        if percentGRR <= 10 {
+            return "量具系统优秀，重复性与再现性对总变差影响较小，适合直接用于过程判断。"
+        }
+        if percentGRR <= 30 {
+            return "量具系统可接受，建议结合 ndc 和实际业务风险判断是否继续优化。"
+        }
+        return "量具系统需改进，建议优先排查检验员差异、量具重复性和量具分辨率。"
+    }
+
+    var riskTone: MetrologyPillTone {
+        if percentGRR <= 10 { return .valid }
+        if percentGRR <= 30 { return .warning }
+        return .expired
+    }
+
+    var riskLevelTitle: String {
+        if percentGRR <= 10 { return "低风险" }
+        if percentGRR <= 30 { return "中风险" }
+        return "高风险"
+    }
+
+    var riskLevelDescription: String {
+        if percentGRR <= 10 { return "量具系统对总变差影响较小，可直接支撑日常过程判断。" }
+        if percentGRR <= 30 { return "量具系统处于可接受区，建议结合 ndc 和现场风险再决定是否继续使用。" }
+        return "量具系统对总变差影响偏大，继续使用会放大判断误差，建议优先整改。"
+    }
+
+    var recommendedActions: [String] {
+        if percentGRR <= 10 {
+            return [
+                "保持当前量具与作业方法，按周期复核 GRR。",
+                "把本次结果作为量具系统稳定基线，后续持续跟踪。"
+            ]
+        }
+        if percentGRR <= 30 {
+            return [
+                "结合 ndc 与业务风险评估是否需要进一步优化量具系统。",
+                "优先检查检验员差异和重复测量一致性。"
+            ]
+        }
+        return [
+            "优先排查检验员差异、量具分辨率和量具自身重复性。",
+            "整改后重新做交叉型 GRR，确认 %GRR 和 ndc 是否回到可接受区。"
+        ]
+    }
+
+    var explanationNotes: [String] {
+        [
+            "EV 反映设备重复性，AV 反映检验员之间的再现性差异。",
+            "%GRR 越低越好，通常 10% 以内较优，30% 以上需要重点关注。",
+            "ndc 用于衡量量具区分不同零件差异的能力，越高越适合过程分析。"
+        ]
+    }
+
+    var exportNotes: [String] {
+        [
+            "建议在导出中保留 %GRR、ndc 与风险等级，方便后续审核量具系统状态。",
+            "当前判断：\(summary)，\(riskLevelDescription)",
+            recommendedActions.first ?? "继续按周期复核量具系统。"
+        ]
     }
 }
 

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="login-page">
     <div class="login-stage">
       <section class="login-hero">
@@ -418,6 +418,11 @@ async function submit() {
 
 .field-wrap {
   position: relative;
+  transition: transform 0.18s ease;
+}
+
+.field-wrap:focus-within {
+  transform: translateY(-1px);
 }
 
 .field-icon {
@@ -483,6 +488,10 @@ async function submit() {
   background: #fff1f2;
   color: #b91c1c;
   font-size: 13px;
+}
+
+.error-msg svg {
+  flex: 0 0 auto;
 }
 
 .submit-btn {
@@ -700,5 +709,49 @@ async function submit() {
     height: 52px;
     border-radius: 16px;
   }
+}
+.login-panel-shell {
+  position: relative;
+}
+.login-panel-shell::after {
+  content: '';
+  position: absolute;
+  inset: auto 24px 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(148,163,184,.38), transparent);
+}
+.login-signals {
+  display:grid;
+  gap:10px;
+  margin-top:18px;
+}
+.login-signal-card {
+  display:grid;
+  grid-template-columns:auto auto 1fr;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(219,234,254,.72);
+  background:linear-gradient(135deg, rgba(248,250,252,.96), rgba(255,255,255,.9));
+  box-shadow:0 12px 28px rgba(15,23,42,.05);
+  color:#64748b;
+  font-size:13px;
+}
+.login-signal-card b { color:#0f172a; font-size:13px; }
+.login-signal-dot { width:9px; height:9px; border-radius:999px; box-shadow:0 0 0 6px rgba(59,130,246,.08); }
+.login-signal-dot.blue { background:#3b82f6; }
+.login-signal-dot.green { background:#10b981; box-shadow:0 0 0 6px rgba(16,185,129,.08); }
+.login-signal-dot.amber { background:#f59e0b; box-shadow:0 0 0 6px rgba(245,158,11,.1); }
+.submit-btn {
+  box-shadow: 0 20px 46px rgba(37,99,235,.28);
+}
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+@media (max-width: 768px) {
+  .login-signals { margin-top: 14px; }
+  .login-signal-card { grid-template-columns: auto 1fr; }
+  .login-signal-card span:last-child { grid-column: 2; }
 }
 </style>

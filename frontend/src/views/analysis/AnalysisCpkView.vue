@@ -1,5 +1,18 @@
 ﻿<template>
   <div class="analysis-shell">
+    <section class="analysis-hero-card">
+      <div>
+        <div class="analysis-hero-eyebrow">Capability Report</div>
+        <h1 class="analysis-hero-title">CPK / PPK 过程能力结果</h1>
+        <p class="analysis-hero-desc">把样本覆盖、能力等级、风险提示与建议动作集中到首屏，适合做正式结果查看与报告输出。</p>
+      </div>
+      <div class="analysis-hero-badges">
+        <span class="analysis-hero-badge strong">样本 {{ sampleCount }}</span>
+        <span class="analysis-hero-badge" :class="isResultStale ? 'warn' : 'success'">{{ isResultStale ? '结果待刷新' : '结果已同步' }}</span>
+        <span class="analysis-hero-badge primary">{{ result?.assessmentLevel || result?.summary || '等待计算' }}</span>
+      </div>
+    </section>
+
     <div class="analysis-card">
       <div class="analysis-card-title">CPK/PPK 参数</div>
       <div class="analysis-form-grid">
@@ -157,7 +170,7 @@
         <div class="analysis-card">
           <div class="analysis-sheet-toolbar">
             <span class="analysis-sheet-title">样本录入表</span>
-            <span class="analysis-sheet-meta">已识别 {{ sampleCount }} 个数值</span>
+            <span class="analysis-sheet-meta">已识别 {{ sampleCount }} 个数值，可直接从 Excel 整块粘贴</span>
           </div>
           <div class="analysis-sheet-wrap">
             <table class="analysis-sheet-table">
@@ -1210,4 +1223,118 @@ onUnmounted(() => {
     width: 52px;
   }
 }
+
+.analysis-hero-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 26px;
+  border-radius: 28px;
+  border: 1px solid rgba(191, 219, 254, 0.82);
+  background: radial-gradient(circle at top right, rgba(219, 234, 254, 0.82), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+.analysis-hero-eyebrow { display:inline-flex; align-items:center; min-height:28px; padding:0 12px; border-radius:999px; background:rgba(37,99,235,0.1); color:#2563eb; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.analysis-hero-title { margin:14px 0 8px; font-size:30px; line-height:1.12; color:#0f172a; }
+.analysis-hero-desc { margin:0; max-width:760px; color:#64748b; line-height:1.7; }
+.analysis-hero-badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; min-width:220px; }
+.analysis-hero-badge { display:inline-flex; align-items:center; min-height:38px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; border:1px solid rgba(226,232,240,0.94); background:rgba(241,245,249,0.96); color:#475569; }
+.analysis-hero-badge.strong { color:#2563eb; background:rgba(219,234,254,0.78); border-color:rgba(147,197,253,0.9); }
+.analysis-hero-badge.success { color:#047857; background:rgba(209,250,229,0.92); border-color:rgba(110,231,183,0.9); }
+.analysis-hero-badge.warn { color:#b45309; background:rgba(254,243,199,0.95); border-color:rgba(252,211,77,0.9); }
+.analysis-hero-badge.primary { color:#4f46e5; background:rgba(224,231,255,0.92); border-color:rgba(165,180,252,0.9); }
+.analysis-card { border-radius: 22px; border-color: rgba(226,232,240,0.94); box-shadow: 0 16px 34px rgba(15,23,42,0.06); }
+.analysis-result-guidance { box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 24px rgba(15,23,42,0.04); }
+.analysis-chart-panel { border-radius: 18px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.72); }
+@media (max-width: 768px) { .analysis-hero-card { flex-direction:column; padding:18px; border-radius:22px; } .analysis-hero-title { font-size:24px; } .analysis-hero-badges { justify-content:flex-start; min-width:0; } }
+
+.analysis-parameter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.analysis-parameter-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(219, 234, 254, 0.86);
+  background: rgba(239, 246, 255, 0.86);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analysis-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 10px;
+}
+
+.analysis-kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 14px 28px rgba(15,23,42,0.05);
+}
+
+.analysis-kpi-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.analysis-kpi-card b {
+  font-size: 30px;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.analysis-kpi-card small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.analysis-card:first-of-type {
+  position: relative;
+  overflow: hidden;
+}
+
+.analysis-card:first-of-type::after {
+  content: '';
+  position: absolute;
+  top: -32px;
+  right: -32px;
+  width: 168px;
+  height: 168px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(219,234,254,0.82), transparent 68%);
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .analysis-parameter-strip {
+    gap: 8px;
+  }
+
+  .analysis-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-kpi-card b {
+    font-size: 26px;
+  }
+}
 </style>
+

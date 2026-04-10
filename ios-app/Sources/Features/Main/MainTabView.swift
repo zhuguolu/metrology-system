@@ -606,6 +606,8 @@ private struct MoreHubView: View {
                     MetrologyConfirmDialog(
                         title: "退出登录",
                         message: "确认退出当前账号？",
+                        eyebrow: "Account",
+                        tone: .expired,
                         cancelTitle: "取消",
                         confirmTitle: "退出",
                         destructive: true,

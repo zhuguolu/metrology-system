@@ -60,11 +60,31 @@
 
     <div class="page-results-bar equipment-results-bar">
       <div class="page-results-meta">
-        <span class="page-results-chip page-results-chip-strong">共 {{ totalElements }} 台</span>
-        <span class="page-results-chip page-results-chip-use-normal">正常 {{ useStatusSummary.normal }}</span>
-        <span class="page-results-chip page-results-chip-use-fault">故障 {{ useStatusSummary.fault }}</span>
-        <span class="page-results-chip page-results-chip-use-scrap">报废 {{ useStatusSummary.scrap }}</span>
-        <span class="page-results-chip page-results-chip-use-other">其他 {{ useStatusSummary.other }}</span>
+        <span
+          class="page-results-chip page-results-chip-strong is-clickable"
+          :class="{ 'is-active': !filterUseStatus }"
+          @click="applyEquipmentUseStatusFilter('')"
+        >共 {{ totalElements }} 台</span>
+        <span
+          class="page-results-chip page-results-chip-use-normal is-clickable"
+          :class="{ 'is-active': isEquipmentUseStatusActive('正常') }"
+          @click="applyEquipmentUseStatusFilter('正常')"
+        >正常 {{ useStatusSummary.normal }}</span>
+        <span
+          class="page-results-chip page-results-chip-use-fault is-clickable"
+          :class="{ 'is-active': isEquipmentUseStatusActive('故障') }"
+          @click="applyEquipmentUseStatusFilter('故障')"
+        >故障 {{ useStatusSummary.fault }}</span>
+        <span
+          class="page-results-chip page-results-chip-use-scrap is-clickable"
+          :class="{ 'is-active': isEquipmentUseStatusActive('报废') }"
+          @click="applyEquipmentUseStatusFilter('报废')"
+        >报废 {{ useStatusSummary.scrap }}</span>
+        <span
+          class="page-results-chip page-results-chip-use-other is-clickable"
+          :class="{ 'is-active': isEquipmentUseStatusActive(OTHER_USE_STATUS_TOKEN) }"
+          @click="applyEquipmentUseStatusFilter(OTHER_USE_STATUS_TOKEN)"
+        >其他 {{ useStatusSummary.other }}</span>
         <span class="page-results-chip">当前第 {{ currentPage }} / {{ Math.max(totalPages || 1, 1) }} 页</span>
       </div>
     </div>
@@ -114,8 +134,8 @@
               <td :style="{ color: d.validity==='失效' ? 'var(--danger)' : d.validity==='即将过期' ? 'var(--warning)' : 'inherit', fontWeight: d.validity!=='有效'?600:'normal' }">
                 {{ d.nextDate || '-' }}
               </td>
-              <td><span :class="['tag', validityTag(d.validity)]">{{ d.validity || '-' }}</span></td>
-              <td><span :class="['tag', useStatusTag(d.useStatus)]">{{ d.useStatus || '正常' }}</span></td>
+              <td><span :class="['tag', validityTag(d.validity), 'tag-clickable', { 'is-active': isEquipmentValidityActive(d.validity) }]" @click.stop="applyEquipmentValidityFilter(d.validity)">{{ d.validity || '-' }}</span></td>
+              <td><span :class="['tag', useStatusTag(d.useStatus), 'tag-clickable', { 'is-active': isEquipmentUseStatusActive(d.useStatus || '正常') }]" @click.stop="applyEquipmentUseStatusFilter(d.useStatus || '正常')">{{ d.useStatus || '正常' }}</span></td>
               <td>
                 <img v-if="getPrimaryImage(d)" :src="getPrimaryImage(d)" class="table-img" @click="openImg(getPrimaryImage(d))" />
                 <span v-else class="text-muted text-sm">-</span>
@@ -178,7 +198,7 @@
         </div>
         <div class="m-card-footer equipment-mobile-card-footer">
           <div class="mobile-card-kpi equipment-mobile-card-kpi">
-            <span :class="['tag', useStatusTag(d.useStatus), 'equipment-mobile-status']">{{ d.useStatus || '正常' }}</span>
+            <span :class="['tag', useStatusTag(d.useStatus), 'equipment-mobile-status', 'tag-clickable', { 'is-active': isEquipmentUseStatusActive(d.useStatus || '正常') }]" @click.stop="applyEquipmentUseStatusFilter(d.useStatus || '正常')">{{ d.useStatus || '正常' }}</span>
             <a v-if="d.certPath" :href="d.certPath" :download="d.certName||'cert'" class="table-link equipment-mobile-mini-link">证书</a>
             <img v-if="getPrimaryImage(d)" :src="getPrimaryImage(d)" class="equipment-mobile-thumb" @click="openImg(getPrimaryImage(d))" />
           </div>
@@ -724,6 +744,7 @@ useScrollMemory('equipment-view')
 const loading = ref(false)
 const devices = ref([])
 const deviceStatuses = ref([])
+const OTHER_USE_STATUS_TOKEN = '__OTHER__'
 const search = ref('')
 const filterDept = ref(''), filterValidity = ref(''), filterUseStatus = ref('')
 const showModal = ref(false), editingId = ref(null), saving = ref(false)
@@ -951,30 +972,61 @@ function goNextFormTab() {
   if (isLastFormTab.value) return
   formTab.value = formTabItems[currentFormTabIndex.value + 1].name
 }
+function isEquipmentUseStatusActive(status) {
+  return (filterUseStatus.value || '') === (status || '')
+}
+function isEquipmentValidityActive(validity) {
+  return !!validity && filterValidity.value === validity
+}
+function applyEquipmentValidityFilter(validity) {
+  const nextValue = filterValidity.value === validity ? '' : (validity || '')
+  if (filterValidity.value === nextValue) return
+  filterValidity.value = nextValue
+  onFilter()
+}
+function applyEquipmentUseStatusFilter(status) {
+  const nextValue = filterUseStatus.value === status ? '' : (status || '')
+  if (filterUseStatus.value === nextValue) return
+  filterUseStatus.value = nextValue
+  onFilter()
+}
 
 async function loadDevices() {
   loading.value = true
   try {
+    const isOtherUseStatusFilter = filterUseStatus.value === OTHER_USE_STATUS_TOKEN
     const listParams = {
       search: search.value||undefined,
       dept: filterDept.value||undefined,
       validity: filterValidity.value||undefined,
-      useStatus: filterUseStatus.value||undefined
+      useStatus: isOtherUseStatusFilter ? undefined : (filterUseStatus.value||undefined)
     }
-    const res = await deviceApi.listPaged({
-      ...listParams,
-      page: currentPage.value, size: pageSize.value
-    })
-    devices.value = res.data.content
-    totalPages.value = res.data.totalPages
-    totalElements.value = res.data.totalElements
-    currentPage.value = res.data.page
-    try {
+    if (isOtherUseStatusFilter) {
       const summaryRes = await deviceApi.list(listParams)
-      useStatusSummary.value = buildUseStatusSummary(summaryRes.data)
-    } catch (summaryError) {
-      console.error(summaryError)
-      useStatusSummary.value = buildUseStatusSummary(devices.value)
+      const allMatched = Array.isArray(summaryRes.data) ? summaryRes.data : []
+      const otherMatched = allMatched.filter(device => normalizeUseStatusKey(device?.useStatus) === 'other')
+      totalElements.value = otherMatched.length
+      totalPages.value = Math.max(1, Math.ceil(otherMatched.length / pageSize.value))
+      if (currentPage.value > totalPages.value) currentPage.value = 1
+      const start = Math.max(0, (currentPage.value - 1) * pageSize.value)
+      devices.value = otherMatched.slice(start, start + pageSize.value)
+      useStatusSummary.value = buildUseStatusSummary(allMatched)
+    } else {
+      const res = await deviceApi.listPaged({
+        ...listParams,
+        page: currentPage.value, size: pageSize.value
+      })
+      devices.value = res.data.content
+      totalPages.value = res.data.totalPages
+      totalElements.value = res.data.totalElements
+      currentPage.value = res.data.page
+      try {
+        const summaryRes = await deviceApi.list(listParams)
+        useStatusSummary.value = buildUseStatusSummary(summaryRes.data)
+      } catch (summaryError) {
+        console.error(summaryError)
+        useStatusSummary.value = buildUseStatusSummary(devices.value)
+      }
     }
     selectedIds.value = selectedIds.value.filter(id => devices.value.some(d => d.id === id))
     saveEquipmentCache()
@@ -2023,6 +2075,127 @@ onUnmounted(() => {
     font-size: 13px;
   }
 }
-</style>
 
+.equipment-filter-bar {
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.88);
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.72), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+}
+
+.equipment-results-bar {
+  padding-block: 14px;
+}
+
+.batch-bar {
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+}
+
+.batch-info b {
+  color: #0f172a;
+}
+
+.equipment-mobile-card {
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background:
+    radial-gradient(circle at top right, rgba(239, 246, 255, 0.62), transparent 24%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.equipment-mobile-card .m-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.equipment-mobile-meta-item {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.equipment-mobile-actions .action-btn {
+  min-height: 32px;
+  border-radius: 12px;
+}
+
+.quick-edit-modal {
+  border-radius: 24px;
+}
+
+.quick-edit-body .form-group {
+  gap: 6px;
+}
+
+@media (max-width: 768px) {
+  .equipment-filter-bar {
+    border-radius: 18px;
+  }
+}
+
+.equipment-results-bar .page-results-chip {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 18px rgba(15, 23, 42, 0.04);
+}
+
+.equipment-results-bar .page-results-chip-strong {
+  background: linear-gradient(135deg, rgba(37,99,235,0.16), rgba(219,234,254,0.92));
+}
+
+.table-wrap .table-scroll table tbody tr:hover {
+  background: rgba(239, 246, 255, 0.62);
+}
+
+.action-group .action-btn,
+.equipment-mobile-actions .action-btn {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.page-pagination {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+}
+
+.modal-box.modal-lg {
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
+}
+
+
+.module-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(191, 219, 254, 0.82);
+  background: radial-gradient(circle at top right, rgba(219, 234, 254, 0.82), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+.module-hero-eyebrow { display:inline-flex; align-items:center; min-height:28px; padding:0 12px; border-radius:999px; background:rgba(37,99,235,0.1); color:#2563eb; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.module-hero-title { margin:14px 0 8px; font-size:30px; line-height:1.12; color:#0f172a; }
+.module-hero-desc { margin:0; max-width:760px; color:#64748b; line-height:1.7; }
+.module-hero-pills { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; min-width:240px; }
+.module-hero-pill { display:inline-flex; align-items:center; min-height:38px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; border:1px solid transparent; }
+.module-hero-pill.strong { color:#2563eb; background:rgba(219,234,254,0.78); border-color:rgba(147,197,253,0.9); }
+.module-hero-pill.success { color:#047857; background:rgba(209,250,229,0.92); border-color:rgba(110,231,183,0.9); }
+.module-hero-pill.warning { color:#b45309; background:rgba(254,243,199,0.95); border-color:rgba(252,211,77,0.9); }
+.module-hero-pill.danger { color:#b91c1c; background:rgba(254,226,226,0.95); border-color:rgba(252,165,165,0.9); }
+.module-hero-pill.neutral { color:#475569; background:rgba(241,245,249,0.96); border-color:rgba(226,232,240,0.96); }
+@media (max-width: 768px) {
+  .module-hero { flex-direction:column; padding:18px; border-radius:22px; }
+  .module-hero-title { font-size:24px; }
+  .module-hero-pills { justify-content:flex-start; min-width:0; }
+}
+</style>
 

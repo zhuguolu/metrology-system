@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
@@ -14,33 +14,34 @@ struct DashboardView: View {
             MetrologyPalette.background.ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 10) {
+                VStack(spacing: 14) {
+                    heroSection
                     headerRow
 
                     LazyVGrid(columns: metricColumns, spacing: 10) {
                         DashboardMetricCard(
-                            title: "\u{8BBE}\u{5907}\u{603B}\u{6570}",
+                            title: "设备总数",
                             value: viewModel.total,
                             accent: MetrologyPalette.navActive,
                             icon: "books.vertical.fill",
                             background: Color(hex: 0xEEF4FF)
                         )
                         DashboardMetricCard(
-                            title: "\u{672C}\u{6708}\u{5230}\u{671F}",
+                            title: "本月到期",
                             value: viewModel.dueThisMonth,
                             accent: MetrologyPalette.statusWarning,
                             icon: "calendar",
                             background: Color(hex: 0xFFF7E8)
                         )
                         DashboardMetricCard(
-                            title: "\u{6709}\u{6548}\u{8BBE}\u{5907}",
+                            title: "有效设备",
                             value: viewModel.valid,
                             accent: MetrologyPalette.statusValid,
                             icon: "checkmark.seal.fill",
                             background: Color(hex: 0xECFDF5)
                         )
                         DashboardMetricCard(
-                            title: "\u{5931}\u{6548}/\u{9884}\u{8B66}",
+                            title: "失效/预警",
                             value: viewModel.risk,
                             accent: MetrologyPalette.statusExpired,
                             icon: "exclamationmark.triangle.fill",
@@ -53,49 +54,77 @@ struct DashboardView: View {
                     departmentSection
                 }
                 .padding(.horizontal, 14)
+                .padding(.top, 10)
                 .padding(.bottom, 14)
             }
         }
-        .navigationTitle("\u{603B}\u{89C8}\u{770B}\u{677F}")
+        .navigationTitle("总览看板")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load()
         }
-        .alert(item: $distributionDetail) { detail in
-            Alert(
-                title: Text("\u{8BBE}\u{5907}\u{6709}\u{6548}\u{6027}\u{5206}\u{5E03} - \(detail.title)"),
-                message: Text(
-                    "\u{6570}\u{91CF}\u{FF1A}\(formatCount(detail.value)) \u{53F0}\n" +
-                    "\u{5360}\u{6BD4}\u{FF1A}\(ratioText(detail.value, detail.total))\n" +
-                    "\u{603B}\u{6570}\u{FF1A}\(formatCount(detail.total)) \u{53F0}"
-                ),
-                dismissButton: .default(Text("\u{5173}\u{95ED}"))
-            )
-        }
         .overlay {
-            if viewModel.isLoading {
-                ProgressView("\u{52A0}\u{8F7D}\u{4E2D}...")
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(MetrologyPalette.surface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                    )
+            ZStack {
+                if viewModel.isLoading {
+                    MetrologyLoadingCard(title: "加载中...")
+                }
+
+                if let distributionDetail {
+                    DashboardDistributionDetailDialog(
+                        detail: distributionDetail,
+                        ratioText: ratioText(distributionDetail.value, distributionDetail.total),
+                        formattedValue: formatCount(distributionDetail.value),
+                        formattedTotal: formatCount(distributionDetail.total)
+                    ) {
+                        self.distributionDetail = nil
+                    }
+                }
             }
+        }
+    }
+
+    private var heroSection: some View {
+        MetrologyPageHeroCard(
+            eyebrow: "Dashboard",
+            title: "总览看板",
+            subtitle: "把设备规模、校准趋势、有效性分布和部门统计收拢到同一页，适合日常巡检与汇总查看。",
+            accent: .neutral
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("有效占比")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+
+                Text(ratioText(viewModel.valid, max(viewModel.total, 0)))
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(MetrologyPalette.statusValid)
+
+                Text("总设备 \(formatCount(viewModel.total)) 台")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.82))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(hex: 0xA7F3D0), lineWidth: 1)
+            )
         }
     }
 
     private var headerRow: some View {
         HStack(spacing: 10) {
-            Text(viewModel.errorMessage ?? viewModel.hintText)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(viewModel.errorMessage == nil ? MetrologyPalette.textMuted : MetrologyPalette.statusExpired)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                MetrologyStatusBanner(message: errorMessage, tone: .expired, compact: true)
+            } else {
+                MetrologyStatusBanner(message: viewModel.hintText, tone: .neutral, compact: true)
+            }
 
-            Button("\u{5237}\u{65B0}") {
+            Button("刷新") {
                 Task { await viewModel.load() }
             }
             .font(.system(size: 11, weight: .bold))
@@ -107,13 +136,10 @@ struct DashboardView: View {
     }
 
     private var trendSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        MetrologySectionPanel(title: "校准趋势", subtitle: "近 6 个月的月度变化。") {
             HStack {
-                Text("\u{6821}\u{51C6}\u{8D8B}\u{52BF}")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
                 Spacer(minLength: 8)
-                Text("\u{8FD1}6\u{4E2A}\u{6708}")
+                Text("近 6 个月")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(MetrologyPalette.navActive)
                     .padding(.horizontal, 12)
@@ -122,26 +148,20 @@ struct DashboardView: View {
             }
 
             if viewModel.trend.isEmpty {
-                Text("\u{6682}\u{65E0}\u{8D8B}\u{52BF}\u{6570}\u{636E}")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textMuted)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .frame(height: 200)
+                MetrologyEmptyStateView(
+                    icon: "chart.bar",
+                    title: "暂无趋势数据",
+                    message: "当前没有可展示的趋势结果，请稍后再试。"
+                )
             } else {
                 DashboardTrendChartView(points: viewModel.trend)
                     .frame(height: 260)
             }
         }
-        .padding(14)
-        .metrologyCard()
     }
 
     private var distributionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\u{8BBE}\u{5907}\u{6709}\u{6548}\u{6027}\u{5206}\u{5E03}")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(MetrologyPalette.textPrimary)
-
+        MetrologySectionPanel(title: "设备有效性分布", subtitle: "点击圆环或右侧标签可查看占比。") {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 24) {
                     distributionChart
@@ -153,8 +173,6 @@ struct DashboardView: View {
                 }
             }
         }
-        .padding(14)
-        .metrologyCard()
     }
 
     private var distributionChart: some View {
@@ -208,11 +226,8 @@ struct DashboardView: View {
     }
 
     private var departmentSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        MetrologySectionPanel(title: "\u{90E8}\u{95E8}\u{8BBE}\u{5907}\u{7EDF}\u{8BA1}", subtitle: "\u{6309}\u{90E8}\u{95E8}\u{67E5}\u{770B}\u{6709}\u{6548}\u{3001}\u{9884}\u{8B66}\u{4E0E}\u{5931}\u{6548}\u{5206}\u{5E03}\u{3002}") {
             HStack {
-                Text("\u{90E8}\u{95E8}\u{8BBE}\u{5907}\u{7EDF}\u{8BA1}")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
                 Spacer(minLength: 8)
                 Text("\u{6309}\u{90E8}\u{95E8}")
                     .font(.system(size: 11, weight: .bold))
@@ -223,19 +238,17 @@ struct DashboardView: View {
             }
 
             if viewModel.deptStats.isEmpty {
-                Text("\u{6682}\u{65E0}\u{90E8}\u{95E8}\u{7EDF}\u{8BA1}\u{6570}\u{636E}")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textMuted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 6)
+                MetrologyEmptyStateView(
+                    icon: "building.2",
+                    title: "暂无部门统计数据",
+                    message: "当前还没有可展示的部门分布结果，请稍后再试。"
+                )
             } else {
                 ForEach(viewModel.deptStats) { item in
                     DashboardDeptStatCard(item: item)
                 }
             }
         }
-        .padding(14)
-        .metrologyCard()
     }
 
     private func legendRow(
@@ -285,6 +298,81 @@ private struct DistributionDetail: Identifiable {
     let title: String
     let value: Int64
     let total: Int64
+}
+
+private struct DashboardDistributionDetailDialog: View {
+    let detail: DistributionDetail
+    let ratioText: String
+    let formattedValue: String
+    let formattedTotal: String
+    let onClose: () -> Void
+
+    private var tone: MetrologyPillTone {
+        switch detail.title {
+        case "有效":
+            return .valid
+        case "即将过期":
+            return .warning
+        case "失效":
+            return .expired
+        default:
+            return .neutral
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.24).ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("DISTRIBUTION")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .tracking(0.7)
+                    .foregroundStyle(tone.tint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(tone.strongBackground)
+                    )
+
+                Text("设备有效性分布 · \(detail.title)")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+
+                VStack(spacing: 10) {
+                    MetrologyStatusBanner(message: "数量：\(formattedValue) 台", tone: tone)
+                    MetrologyStatusBanner(message: "占比：\(ratioText)", tone: .neutral)
+                    MetrologyStatusBanner(message: "总数：\(formattedTotal) 台", tone: .neutral)
+                }
+
+                Button("关闭", action: onClose)
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .buttonStyle(MetrologyPrimaryButtonStyle())
+            }
+            .padding(14)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x456B96, alpha: 0.22), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 20)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .zIndex(1000)
+        .preferredColorScheme(.light)
+    }
 }
 
 private struct DashboardMetricCard: View {

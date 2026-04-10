@@ -1,9 +1,9 @@
-<template>
+﻿<template>
   <router-view />
   <div class="toast-wrap">
     <transition-group name="toast">
       <div v-for="t in toasts" :key="t.id" :class="['toast', `toast-${t.type}`]">
-        <span>{{ t.type === 'success' ? '✓' : t.type === 'error' ? '✕' : 'ℹ' }}</span>
+        <span class="toast-symbol" aria-hidden="true">{{ t.type === 'success' ? '✓' : t.type === 'error' ? '!' : 'i' }}</span>
         {{ t.message }}
       </div>
     </transition-group>
@@ -57,6 +57,19 @@ onBeforeUnmount(() => {
 
 body.public-share-body {
   overscroll-behavior-y: auto;
+}
+
+.toast-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .toast-enter-active, .toast-leave-active { transition: all 0.25s ease; }

@@ -22,10 +22,12 @@ struct DeviceStatusView: View {
 
             if let deletingItem {
                 MetrologyConfirmDialog(
-                    title: "\u{5220}\u{9664}\u{72b6}\u{6001}",
+                    title: "删除状态",
                     message: "确定删除“\(deletingName(deletingItem))”？",
-                    cancelTitle: "\u{53d6}\u{6d88}",
-                    confirmTitle: "\u{5220}\u{9664}",
+                    eyebrow: "Delete",
+                    tone: .expired,
+                    cancelTitle: "取消",
+                    confirmTitle: "删除",
                     destructive: true,
                     onCancel: {
                         self.deletingItem = nil
@@ -45,11 +47,18 @@ struct DeviceStatusView: View {
 
             if let errorMessage = viewModel.errorMessage {
                 MetrologyNoticeDialog(
-                    title: "\u{63d0}\u{793a}",
-                    message: errorMessage
+                    title: "提示",
+                    message: errorMessage,
+                    eyebrow: "Notice",
+                    tone: .warning
                 ) {
                     viewModel.errorMessage = nil
                 }
+            }
+        }
+        .overlay {
+            if viewModel.isLoading {
+                MetrologyLoadingCard(title: "加载中...")
             }
         }
         .navigationTitle("使用状态")
@@ -92,29 +101,18 @@ struct DeviceStatusView: View {
     }
 
     private var hintLine: some View {
-        HStack(spacing: 8) {
-            if viewModel.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
-            Text(viewModel.hint)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(message: viewModel.hint, tone: .neutral, compact: true)
     }
 
     private var statusList: some View {
         VStack(spacing: 8) {
             if statusRows.isEmpty, !viewModel.isLoading {
-                Text("暂无状态数据")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-                    .metrologyCard()
+                MetrologyEmptyStateView(
+                    icon: "tag",
+                    title: "暂无状态数据",
+                    message: "可以直接新增状态，或稍后刷新再试。"
+                )
+                .metrologyCard()
             } else {
                 ForEach(statusRows) { row in
                     DeviceStatusRow(

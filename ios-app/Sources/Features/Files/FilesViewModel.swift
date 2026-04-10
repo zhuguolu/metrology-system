@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import Combine
 import UniformTypeIdentifiers
 
@@ -136,7 +136,7 @@ final class FilesViewModel: ObservableObject {
         if item.isFolder {
             cancelActivePreviewDownload(resetLoading: false)
             guard let folderId = item.id else {
-                errorMessage = "目录ID无效"
+                errorMessage = "目录标识无效，请刷新后重试。"
                 return
             }
             pushFolder(id: folderId, name: item.displayName)
@@ -146,7 +146,7 @@ final class FilesViewModel: ObservableObject {
 
         guard let id = item.id else {
             previewLoadingFileId = nil
-            errorMessage = "文件ID无效"
+            errorMessage = "文件标识无效，请刷新后重试。"
             return
         }
 
@@ -199,11 +199,11 @@ final class FilesViewModel: ObservableObject {
     func createFolder(name: String) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            errorMessage = "文件夹名称不能为空"
+            errorMessage = "文件夹名称不能为空。"
             return false
         }
         guard canWrite else {
-            errorMessage = "当前目录为只读，不能新建文件夹"
+            errorMessage = "当前目录为只读，无法新建文件夹。"
             return false
         }
 
@@ -213,7 +213,7 @@ final class FilesViewModel: ObservableObject {
 
         do {
             _ = try await APIClient.shared.createFolder(name: trimmed, parentId: currentFolderId)
-            scanSyncMessage = "文件夹创建成功"
+            scanSyncMessage = "文件夹创建成功。"
             invalidateFolderCache()
             await load()
             return true
@@ -229,7 +229,7 @@ final class FilesViewModel: ObservableObject {
     func uploadFiles(urls: [URL]) async {
         guard !urls.isEmpty else { return }
         guard canWrite else {
-            errorMessage = "当前目录为只读，不能上传文件"
+            errorMessage = "当前目录为只读，无法上传文件。"
             return
         }
 
@@ -292,14 +292,14 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "上传完成：成功\(successCount)，失败\(failCount)"
+        scanSyncMessage = "上传完成：成功 \(successCount) 项，失败 \(failCount) 项。"
         invalidateFolderCache()
         await load()
     }
 
     func scanSync() async {
         guard canWrite else {
-            errorMessage = "当前目录为只读，不能扫描同步"
+            errorMessage = "当前目录为只读，无法执行同步。"
             return
         }
 
@@ -317,7 +317,7 @@ final class FilesViewModel: ObservableObject {
                 return
             }
             errorMessage = localizedMessage(from: error)
-            scanSyncMessage = "扫描同步失败，可继续浏览当前目录并稍后重试"
+            scanSyncMessage = "同步失败了，你可以继续浏览当前目录，稍后再试。"
         }
     }
 
@@ -391,7 +391,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "移动完成：成功\(successCount)，失败\(failCount)"
+        scanSyncMessage = "移动完成：成功 \(successCount) 项，失败 \(failCount) 项。"
         invalidateFolderCache()
         await load()
     }
@@ -432,7 +432,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "删除完成：成功\(successCount)，失败\(failCount)"
+        scanSyncMessage = "删除完成：成功 \(successCount) 项，失败 \(failCount) 项。"
         invalidateFolderCache()
         await load()
     }
@@ -440,7 +440,7 @@ final class FilesViewModel: ObservableObject {
     func renameItem(id: Int64, newName: String) async -> Bool {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            errorMessage = "名称不能为空"
+            errorMessage = "名称不能为空。"
             return false
         }
 
@@ -450,7 +450,7 @@ final class FilesViewModel: ObservableObject {
 
         do {
             _ = try await APIClient.shared.renameFile(id: id, name: trimmed)
-            scanSyncMessage = "重命名成功"
+            scanSyncMessage = "重命名成功。"
             invalidateFolderCache()
             await load()
             return true
@@ -467,7 +467,7 @@ final class FilesViewModel: ObservableObject {
         guard !items.isEmpty else { return [] }
         isLoading = true
         errorMessage = nil
-        beginBatchProgress(title: "下载准备", total: items.count)
+        beginBatchProgress(title: "准备下载", total: items.count)
         defer {
             clearBatchProgress()
             isLoading = false
@@ -515,16 +515,14 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        if skippedFolders > 0 || failed > 0 {
-            scanSyncMessage = "下载准备完成：成功\(urls.count)，文件夹跳过 \(skippedFolders)，失败\(failed)"
-        }
+        scanSyncMessage = "下载准备完成：成功 \(urls.count) 项，跳过文件夹 \(skippedFolders) 项，失败 \(failed) 项。"
         return urls
     }
 
     func copyItemsToCurrentFolder(_ items: [UserFileItemDto]) async {
         guard !items.isEmpty else { return }
         guard canWrite else {
-            errorMessage = "当前目录为只读，不能复制"
+            errorMessage = "当前目录为只读，无法复制文件。"
             return
         }
 
@@ -597,7 +595,7 @@ final class FilesViewModel: ObservableObject {
             }
         )
 
-        scanSyncMessage = "复制完成：成功\(successCount)，文件夹跳过 \(skippedFolders)，失败\(failedCount)"
+        scanSyncMessage = "复制完成：成功 \(successCount) 项，跳过文件夹 \(skippedFolders) 项，失败 \(failedCount) 项。"
         invalidateFolderCache()
         await load()
     }
@@ -651,11 +649,11 @@ final class FilesViewModel: ObservableObject {
         let filesCreated = result.filesCreated ?? 0
         let foldersDeleted = result.foldersDeleted ?? 0
         let filesDeleted = result.filesDeleted ?? 0
-        return "扫描同步完成：新增目录\(foldersCreated)，新增文件\(filesCreated)，删除目录\(foldersDeleted)，删除文件\(filesDeleted)"
+        return "同步完成：新增文件夹 \(foldersCreated) 个，新增文件 \(filesCreated) 个，删除文件夹 \(foldersDeleted) 个，删除文件 \(filesDeleted) 个。"
     }
 
     private func folderHint(for count: Int) -> String {
-        "共\(count) 项" + (readOnlyFolder ? "（只读目录）" : "")
+        "共 \(count) 项" + (readOnlyFolder ? "（只读目录）" : "")
     }
 
     private func resolveUploadMetadata(from url: URL) -> UploadPayload? {
@@ -744,15 +742,31 @@ final class FilesViewModel: ObservableObject {
     private func localizedMessage(from error: Error) -> String {
         if let apiError = error as? APIError {
             switch apiError {
-            case .forbidden:
-                return "当前账号没有文件模块访问权限"
+            case .invalidURL:
+                return "文件服务地址无效，请检查当前接口配置。"
+            case .unauthorized:
+                return "登录状态已失效，请重新登录后再访问文件。"
+            case .forbidden(_):
+                return "当前账号没有文件模块访问权限。"
+            case let .serverMessage(message):
+                let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? "文件服务暂时不可用，请稍后重试。" : trimmed
+            case let .httpStatus(code, message, errorCode):
+                if let message, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return message
+                }
+                if let errorCode, !errorCode.isEmpty {
+                    return "文件服务返回异常：\(errorCode)。"
+                }
+                return "文件服务请求失败（\(code)），请稍后重试。"
             case .decodingFailed:
-                return "文件模块数据解析失败，请检查后端接口返回格式"
+                return "文件模块数据解析失败，请检查后端接口返回格式。"
             default:
-                return apiError.localizedDescription
+                return apiError.localizedDescription ?? "文件服务暂时不可用，请稍后重试。"
             }
         }
-        return error.localizedDescription
+        let fallback = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        return fallback.isEmpty ? "文件服务暂时不可用，请稍后重试。" : fallback
     }
 
     private func resetToRoot() {
@@ -867,3 +881,4 @@ private struct UploadPayload: Sendable {
     let mimeType: String?
     let fileURL: URL
 }
+

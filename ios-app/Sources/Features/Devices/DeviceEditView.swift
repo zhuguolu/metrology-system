@@ -1,4 +1,5 @@
-import SwiftUI
+﻿import SwiftUI
+import UIKit
 
 struct DeviceEditView: View {
     let device: DeviceDto
@@ -42,7 +43,7 @@ struct DeviceEditView: View {
 
     init(
         device: DeviceDto,
-        title: String = "编辑台账",
+        title: String = "编辑设备",
         onSave: @escaping (DeviceUpdatePayload) -> Void
     ) {
         self.device = device
@@ -73,64 +74,60 @@ struct DeviceEditView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 10) {
-                        if let validationMessage {
-                            Text(validationMessage)
-                                .font(.footnote)
-                                .foregroundStyle(MetrologyPalette.statusExpired)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 2)
-                        }
-
-                        sectionCard(title: "必填信息") {
-                            field("设备名称", text: $name)
-                            field("计量编号", text: $metricNo)
-                        }
-
-                        sectionCard(title: "台账信息") {
-                            field("资产编号", text: $assetNo)
-                            field("出厂编号", text: $serialNo)
-                            selectField("ABC分类", text: $abcClass, options: ["A", "B", "C"])
-                            editableSelectField("部门", text: $dept, options: departmentOptions)
-                            field("设备位置", text: $location)
-                            field("责任人", text: $responsiblePerson)
-                            editableSelectField("使用状态", text: $useStatus, options: useStatusOptions)
-                        }
-
-                        sectionCard(title: "校准信息") {
-                            selectField("检定周期", text: $cycleText, options: ["半年", "一年", "两年", "24"])
-                            dateField("上次校准日期", value: calDate) {
-                                activeDatePicker = .calDate
-                            }
-                            selectField("校准结果", text: $calibrationResult, options: ["合格", "不合格"])
-                            remarkEditor(minHeight: 90)
-                        }
-
-                        sectionCard(title: "扩展信息") {
-                            field("制造厂", text: $manufacturer)
-                            field("设备型号", text: $model)
-                            dateField("采购日期", value: purchaseDate) {
-                                activeDatePicker = .purchaseDate
-                            }
-                            field("采购价格", text: $purchasePriceText, keyboard: .decimalPad)
-                            field("分度值", text: $graduationValue)
-                            field("测试范围", text: $testRange)
-                            field("允许误差", text: $allowableError)
-                        }
-
-                        MetrologySaveCancelRow(
-                            onCancel: { dismiss() },
-                            onSave: { handleSave() }
-                        )
-                    }
-                    .padding(12)
-                    .padding(.bottom, 18)
+            MetrologyFormSheetScaffold(
+                eyebrow: device.id == nil ? "Create" : "Edit",
+                title: screenTitle,
+                subtitle: "统一维护设备台账、校准与扩展属性，保存后会同步刷新当前列表。",
+                accent: .neutral,
+                bannerMessage: "必填项为设备名称与计量编号，日期字段统一使用日历选择。",
+                bannerTone: .neutral
+            ) {
+                if let validationMessage, !validationMessage.isEmpty {
+                    MetrologyInlineValidationMessage(message: validationMessage)
                 }
-                .scrollDismissesKeyboard(.interactively)
+
+                sectionCard(title: "必填信息", subtitle: "基础标识会用于列表、搜索和审批。") {
+                    field("设备名称", text: $name)
+                    field("计量编号", text: $metricNo)
+                }
+
+                sectionCard(title: "台账信息", subtitle: "资产、部门、责任人与使用状态统一在这里维护。") {
+                    field("资产编号", text: $assetNo)
+                    field("出厂编号", text: $serialNo)
+                    selectField("ABC分类", text: $abcClass, options: ["A", "B", "C"])
+                    editableSelectField("使用部门", text: $dept, options: departmentOptions)
+                    field("设备位置", text: $location)
+                    field("责任人", text: $responsiblePerson)
+                    editableSelectField("使用状态", text: $useStatus, options: useStatusOptions)
+                }
+
+                sectionCard(title: "校准信息", subtitle: "校准周期、上次校准时间和结果会影响有效性判断。") {
+                    selectField("检定周期", text: $cycleText, options: ["半年", "一年", "两年", "24"])
+                    dateField("上次校准日期", value: calDate) {
+                        activeDatePicker = .calDate
+                    }
+                    selectField("校准结果", text: $calibrationResult, options: ["合格", "不合格"])
+                    remarkEditor(minHeight: 90)
+                }
+
+                sectionCard(title: "扩展信息", subtitle: "用于记录采购、制造与技术参数。") {
+                    field("制造厂", text: $manufacturer)
+                    field("设备型号", text: $model)
+                    dateField("采购日期", value: purchaseDate) {
+                        activeDatePicker = .purchaseDate
+                    }
+                    field("采购价格", text: $purchasePriceText, keyboard: .decimalPad)
+                    field("分度值", text: $graduationValue)
+                    field("测试范围", text: $testRange)
+                    field("允许误差", text: $allowableError)
+                }
+
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: "保存修改",
+                    onCancel: { dismiss() },
+                    onSave: { handleSave() }
+                )
             }
             .navigationTitle(screenTitle)
         }
@@ -151,15 +148,12 @@ struct DeviceEditView: View {
         }
     }
 
-    private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(MetrologyPalette.textPrimary)
-            content()
+    private func sectionCard<Content: View>(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) -> some View {
+        MetrologySectionPanel(title: title, subtitle: subtitle) {
+            VStack(alignment: .leading, spacing: 8) {
+                content()
+            }
         }
-        .padding(10)
-        .metrologyCard()
     }
 
     private func field(_ title: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
@@ -435,7 +429,6 @@ struct DeviceEditView: View {
             departmentLookupOptions = normalizedOptions(departmentNames + [dept])
             useStatusLookupOptions = normalizedOptions(statusNames + [useStatus])
         } catch {
-            // Keep current values and fallback options when remote lookup fails.
             departmentLookupOptions = normalizedOptions(departmentLookupOptions + [dept])
             useStatusLookupOptions = normalizedOptions(useStatusLookupOptions + [useStatus])
         }
@@ -494,10 +487,19 @@ private struct DeviceEditDatePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 14) {
+            MetrologyFormSheetScaffold(
+                eyebrow: "Date",
+                title: title,
+                subtitle: "统一使用日历选择日期，避免手写格式不一致。",
+                accent: .neutral,
+                bannerMessage: "选择后会自动写回 yyyy-MM-dd 格式。",
+                bannerTone: .neutral
+            ) {
                 DatePicker("", selection: $selectedDate, displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .labelsHidden()
+                    .padding(10)
+                    .metrologyCard()
 
                 HStack(spacing: 10) {
                     Button("清空") {
@@ -505,15 +507,16 @@ private struct DeviceEditDatePickerSheet: View {
                         dismiss()
                     }
                     .buttonStyle(MetrologySecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
 
                     Button("确定") {
                         onSelect(selectedDate)
                         dismiss()
                     }
                     .buttonStyle(MetrologyPrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding(14)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -521,3 +524,4 @@ private struct DeviceEditDatePickerSheet: View {
         .presentationDragIndicator(.visible)
     }
 }
+

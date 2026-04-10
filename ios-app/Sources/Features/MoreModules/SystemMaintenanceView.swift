@@ -9,6 +9,17 @@ struct SystemMaintenanceView: View {
 
             ScrollView {
                 VStack(spacing: 10) {
+                    if let errorMessage = viewModel.errorMessage, cmsContentIsEmpty {
+                        MetrologyErrorStateView(
+                            title: "系统维护配置加载失败",
+                            message: errorMessage,
+                            actionTitle: "重新加载",
+                            action: {
+                                Task { await viewModel.reload() }
+                            }
+                        )
+                    }
+
                     thresholdCard
                     automationCard
                     statusLine
@@ -22,11 +33,18 @@ struct SystemMaintenanceView: View {
 
             if let errorMessage = viewModel.errorMessage {
                 MetrologyNoticeDialog(
-                    title: "\u{63d0}\u{793a}",
-                    message: errorMessage
+                    title: "提示",
+                    message: errorMessage,
+                    eyebrow: "Notice",
+                    tone: .warning
                 ) {
                     viewModel.errorMessage = nil
                 }
+            }
+        }
+        .overlay {
+            if viewModel.isLoading {
+                MetrologyLoadingCard(title: "加载中...")
             }
         }
         .navigationTitle("系统维护")
@@ -104,18 +122,11 @@ struct SystemMaintenanceView: View {
     }
 
     private var statusLine: some View {
-        HStack(spacing: 8) {
-            if viewModel.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
-            Text(viewModel.statusMessage)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(
+            message: viewModel.statusMessage.isEmpty ? "可在这里调整预警阈值、自动导出与备份策略。" : viewModel.statusMessage,
+            tone: viewModel.errorMessage == nil ? .neutral : .expired,
+            compact: true
+        )
     }
 
     private var actionBar: some View {
@@ -161,6 +172,10 @@ final class SystemMaintenanceViewModel: ObservableObject {
     func initialLoad() async {
         guard !loaded else { return }
         loaded = true
+        await load()
+    }
+
+    func reload() async {
         await load()
     }
 
@@ -231,6 +246,14 @@ final class SystemMaintenanceViewModel: ObservableObject {
         cmsRootPath = settings.cmsRootPath ?? ""
         ledgerExportPath = (settings.ledgerExportPath?.isEmpty == false) ? settings.ledgerExportPath! : "-"
         databaseBackupPath = (settings.databaseBackupPath?.isEmpty == false) ? settings.databaseBackupPath! : "-"
+    }
+}
+
+private extension SystemMaintenanceView {
+    var cmsContentIsEmpty: Bool {
+        viewModel.cmsRootPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && viewModel.ledgerExportPath == "-"
+            && viewModel.databaseBackupPath == "-"
     }
 }
 

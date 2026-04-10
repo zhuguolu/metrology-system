@@ -60,10 +60,10 @@
 
     <div class="page-results-bar calibration-summary-bar">
       <div class="page-results-meta">
-        <span class="page-results-chip page-results-chip-strong">共 {{ totalItems }} 条</span>
-        <span class="page-results-chip" :style="{ background:'#ecfdf3', color:'#059669', borderColor:'#a7f3d0' }">有效 {{ countBy('有效') }}</span>
-        <span class="page-results-chip" :style="{ background:'#fffbeb', color:'#b45309', borderColor:'#fcd34d' }">即将过期 {{ countBy('即将过期') }}</span>
-        <span class="page-results-chip" :style="{ background:'#fef2f2', color:'#dc2626', borderColor:'#fca5a5' }">失效 {{ countBy('失效') }}</span>
+        <span class="page-results-chip page-results-chip-strong is-clickable" :class="{ 'is-active': !filterValidity }" @click="applyCalibrationValidityFilter('')">共 {{ totalItems }} 条</span>
+        <span class="page-results-chip page-results-chip-valid is-clickable" :class="{ 'is-active': isCalibrationValidityActive('有效') }" @click="applyCalibrationValidityFilter('有效')">有效 {{ countBy('有效') }}</span>
+        <span class="page-results-chip page-results-chip-warning is-clickable" :class="{ 'is-active': isCalibrationValidityActive('即将过期') }" @click="applyCalibrationValidityFilter('即将过期')">即将过期 {{ countBy('即将过期') }}</span>
+        <span class="page-results-chip page-results-chip-danger is-clickable" :class="{ 'is-active': isCalibrationValidityActive('失效') }" @click="applyCalibrationValidityFilter('失效')">失效 {{ countBy('失效') }}</span>
       </div>
     </div>
 
@@ -105,7 +105,7 @@
               <td :style="{ color: d.validity==='失效' ? 'var(--danger)' : d.validity==='即将过期' ? 'var(--warning)' : 'inherit', fontWeight: d.validity!=='有效'?600:'normal' }">
                 {{ d.nextDate || '-' }}
               </td>
-              <td><span :class="['tag', vTag(d.validity)]">{{ d.validity || '-' }}</span></td>
+              <td><span :class="['tag', vTag(d.validity), 'tag-clickable', { 'is-active': isCalibrationValidityActive(d.validity) }]" @click.stop="applyCalibrationValidityFilter(d.validity)">{{ d.validity || '-' }}</span></td>
               <td><span :class="['tag', usTag(d.useStatus)]">{{ d.useStatus || '正常' }}</span></td>
               <td>
                 <el-button v-if="authStore.canRecordCalibration" size="small" type="primary" plain @click="openCalib(d)">记录校准</el-button>
@@ -441,6 +441,13 @@ function resetFilter() {
 function vTag(v) { return v==='有效'?'tag-valid':v==='即将过期'?'tag-warning':'tag-expired' }
 function usTag(s) { const m={'正常':'tag-green','故障':'tag-red','维修':'tag-yellow','报废':'tag-gray'}; return m[s]||'tag-blue' }
 function countBy(v) { return Number(summaryCounts.value?.[v] || 0) }
+function isCalibrationValidityActive(validity) { return (filterValidity.value || '') === (validity || '') }
+function applyCalibrationValidityFilter(validity) {
+  const nextValue = filterValidity.value === validity ? '' : (validity || '')
+  if (filterValidity.value === nextValue) return
+  filterValidity.value = nextValue
+  onFilter()
+}
 function isSelected(id) { return selectedIds.value.includes(id) }
 function toggleSelection(id) {
   selectedIds.value = isSelected(id)
@@ -1023,4 +1030,121 @@ onUnmounted(() => {
     font-size: 11.5px;
   }
 }
+
+.calibration-filter-bar {
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.88);
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.72), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+}
+
+.calibration-summary-bar {
+  padding-block: 14px;
+}
+
+.batch-bar {
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+}
+
+.calibration-mobile-card {
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background:
+    radial-gradient(circle at top right, rgba(236, 253, 245, 0.68), transparent 26%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.calibration-mobile-card .m-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.calibration-mobile-meta-item {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.calibration-mobile-actions .action-btn {
+  min-height: 32px;
+  border-radius: 12px;
+}
+
+.quick-edit-modal {
+  border-radius: 24px;
+}
+
+.quick-edit-intro,
+.batch-hint {
+  border: 1px solid rgba(191, 219, 254, 0.86);
+  background: linear-gradient(135deg, rgba(239,246,255,0.9), rgba(248,250,252,0.96));
+}
+
+@media (max-width: 768px) {
+  .calibration-filter-bar {
+    border-radius: 18px;
+  }
+}
+
+.calibration-summary-bar .page-results-chip {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 18px rgba(15, 23, 42, 0.04);
+}
+.calibration-summary-bar .page-results-chip-valid { background:#ecfdf3; color:#059669; border-color:#a7f3d0; }
+.calibration-summary-bar .page-results-chip-warning { background:#fffbeb; color:#b45309; border-color:#fcd34d; }
+.calibration-summary-bar .page-results-chip-danger { background:#fef2f2; color:#dc2626; border-color:#fca5a5; }
+
+.calibration-mobile-card,
+.quick-edit-modal,
+.modal-box.modal-sm {
+  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.08);
+}
+
+.calibration-mobile-card-footer,
+.batch-actions {
+  border-top: 1px solid rgba(226, 232, 240, 0.72);
+}
+
+.page-pagination {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+}
+
+
+.module-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(187, 247, 208, 0.82);
+  background: radial-gradient(circle at top right, rgba(220,252,231,0.8), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+.module-hero-eyebrow { display:inline-flex; align-items:center; min-height:28px; padding:0 12px; border-radius:999px; background:rgba(16,185,129,0.1); color:#059669; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.module-hero-title { margin:14px 0 8px; font-size:30px; line-height:1.12; color:#0f172a; }
+.module-hero-desc { margin:0; max-width:760px; color:#64748b; line-height:1.7; }
+.module-hero-pills { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; min-width:240px; }
+.module-hero-pill { display:inline-flex; align-items:center; min-height:38px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; border:1px solid transparent; }
+.module-hero-pill.strong { color:#2563eb; background:rgba(219,234,254,0.78); border-color:rgba(147,197,253,0.9); }
+.module-hero-pill.success { color:#047857; background:rgba(209,250,229,0.92); border-color:rgba(110,231,183,0.9); }
+.module-hero-pill.warning { color:#b45309; background:rgba(254,243,199,0.95); border-color:rgba(252,211,77,0.9); }
+.module-hero-pill.danger { color:#b91c1c; background:rgba(254,226,226,0.95); border-color:rgba(252,165,165,0.9); }
+@media (max-width: 768px) {
+  .module-hero { flex-direction:column; padding:18px; border-radius:22px; }
+  .module-hero-title { font-size:24px; }
+  .module-hero-pills { justify-content:flex-start; min-width:0; }
+}
 </style>
+

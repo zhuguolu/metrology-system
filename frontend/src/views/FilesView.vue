@@ -570,7 +570,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
-import { fileApi } from '../api/index.js'
+import { extractApiError, fileApi } from '../api/index.js'
 import { usePinchZoom } from '../composables/usePinchZoom.js'
 import { useResumeRefresh } from '../composables/useResumeRefresh.js'
 import { useScrollMemory } from '../composables/useScrollMemory.js'
@@ -1185,7 +1185,7 @@ async function handleScanSync() {
     }
     await loadBreadcrumb(currentFolderId.value)
   } catch (e) {
-    showToast(e.response?.data?.message || '扫描同步失败', 'error')
+    showToast(extractApiError(e, '扫描同步失败').message, 'error')
   } finally {
     scanSyncLoading.value = false
   }
@@ -1617,7 +1617,7 @@ async function openShareDialogForItem(item) {
     shareExpiresAt.value = data.expiresAt || ''
     sharePasswordProtected.value = !!data.hasPassword
   } catch (e) {
-    showToast(e.response?.data?.message || '加载分享配置失败', 'error')
+    showToast(extractApiError(e, '加载分享配置失败').message, 'error')
   } finally {
     shareLoading.value = false
   }
@@ -1644,7 +1644,7 @@ async function saveShareAction() {
     sharePasswordValue.value = ''
     showToast('分享链接已保存')
   } catch (e) {
-    showToast(e.response?.data?.message || '保存分享失败', 'error')
+    showToast(extractApiError(e, '保存分享失败').message, 'error')
   } finally {
     shareSaving.value = false
   }
@@ -1664,7 +1664,7 @@ async function disableShareAction() {
     sharePasswordValue.value = ''
     showToast('分享已关闭')
   } catch (e) {
-    showToast(e.response?.data?.message || '关闭分享失败', 'error')
+    showToast(extractApiError(e, '关闭分享失败').message, 'error')
   } finally {
     shareDisabling.value = false
   }
@@ -1709,7 +1709,7 @@ async function createFolder() {
     invalidateFilesPageCache()
     loadFiles(currentFolderId.value)
   } catch (e) {
-    showToast(e.response?.data?.message || '创建失败', 'error')
+    showToast(extractApiError(e, '创建失败').message, 'error')
   } finally {
     createFolderLoading.value = false
   }
@@ -2250,7 +2250,7 @@ async function previewFile(item, options = {}) {
     }
   } catch (error) {
     if (isPreviewRequestCanceled(error)) return
-    previewError.value = error?.response?.data?.message || '文件预览失败，请稍后重试。'
+    previewError.value = extractApiError(error, '文件预览失败，请稍后重试。').message
   } finally {
     if (requestToken === previewRequestToken) {
       previewAbortController = null
@@ -2273,7 +2273,7 @@ async function deleteItem(item) {
     }
     return true
   } catch (e) {
-    showToast(e.response?.data?.message || '删除失败', 'error')
+    showToast(extractApiError(e, '删除失败').message, 'error')
     return false
   }
 }
@@ -2367,7 +2367,7 @@ async function doRename() {
       if (idx !== -1) searchResults.value[idx] = { ...searchResults.value[idx], name }
     }
   } catch (e) {
-    showToast(e.response?.data?.message || '重命名失败', 'error')
+    showToast(extractApiError(e, '重命名失败').message, 'error')
   } finally {
     renameLoading.value = false
   }
@@ -3979,3 +3979,116 @@ onBeforeUnmount(() => {
   }
 }
 </style>
+
+
+.file-toolbar,
+.file-nav-actions,
+.file-toolbar-right {
+  align-items: center;
+}
+
+.file-toolbar {
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.86);
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.7), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.07);
+}
+
+.file-search :deep(.el-input__wrapper) {
+  min-height: 42px;
+}
+
+.file-nav-btn,
+.file-toolbar :deep(.el-button) {
+  border-radius: 14px;
+}
+
+.view-switch {
+  min-width: 156px;
+  height: 42px;
+  padding: 0 14px;
+  border-color: rgba(191, 219, 254, 0.92);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,246,255,0.92));
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+}
+
+.view-switch-current {
+  font-weight: 800;
+  color: #1d4ed8;
+}
+
+.files-grid.list-mode,
+.files-grid.grid-mode {
+  gap: 14px;
+}
+
+.files-list-head {
+  margin-bottom: 10px;
+  padding: 0 18px;
+  color: #7b8aa2;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.file-item {
+  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background:
+    radial-gradient(circle at top right, rgba(239, 246, 255, 0.58), transparent 26%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.file-item:hover {
+  border-color: rgba(147, 197, 253, 0.96);
+  box-shadow: 0 20px 40px rgba(37, 99, 235, 0.12);
+}
+
+.file-thumb {
+  border-radius: 18px;
+}
+
+.file-thumb-fallback {
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+}
+
+.file-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.file-meta,
+.file-list-meta {
+  color: #6b7b93;
+}
+
+.file-context-menu {
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.86);
+  background: rgba(255,255,255,0.98);
+  box-shadow: 0 24px 44px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.file-context-item {
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .file-toolbar {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .view-switch {
+    min-width: 132px;
+    height: 38px;
+  }
+}

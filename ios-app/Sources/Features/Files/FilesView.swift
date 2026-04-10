@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 import UniformTypeIdentifiers
 
 struct FilesView: View {
@@ -27,27 +27,13 @@ struct FilesView: View {
             MetrologyPalette.background.ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
+                    heroSection
                     headerPanel
-
-                    if fileRows.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 30))
-                                .foregroundStyle(MetrologyPalette.textMuted)
-                            Text("当前目录暂无文件")
-                                .foregroundStyle(MetrologyPalette.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 26)
-                        .metrologyCard()
-                    } else {
-                        ForEach(fileRows) { row in
-                            fileRow(item: row.item)
-                        }
-                    }
+                    contentPanel
                 }
                 .padding(.horizontal, 14)
+                .padding(.top, 10)
                 .padding(.bottom, hasSelection ? 86 : 14)
             }
             .scrollIndicators(.hidden)
@@ -90,24 +76,13 @@ struct FilesView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .alert("新建文件夹", isPresented: $createFolderDialogOpen) {
-                TextField("请输入文件夹名称", text: $createFolderName)
-                Button("取消", role: .cancel) {
-                    createFolderName = ""
-                }
-                Button("创建") {
-                    let pendingName = createFolderName
-                    createFolderName = ""
-                    Task {
-                        _ = await viewModel.createFolder(name: pendingName)
-                    }
-                }
-            } message: {
-                Text("将在当前目录创建子文件夹")
-            }
             .overlay {
-                if viewModel.isLoading {
-                    loadingOverlay
+                ZStack {
+                    if viewModel.isLoading {
+                        loadingOverlay
+                    }
+
+                    dialogsOverlay
                 }
             }
             .fullScreenCover(item: $viewModel.previewItem, onDismiss: {
@@ -130,73 +105,269 @@ struct FilesView: View {
             .sheet(isPresented: $showActivitySheet) {
                 FilesActivitySheet(items: activityItems)
             }
-            .confirmationDialog("更多操作", isPresented: $showMoreActions, titleVisibility: .visible) {
-                if canRenameSelected {
-                    Button("重命名") {
-                        prepareRename()
+    }
+
+    @ViewBuilder
+    private var dialogsOverlay: some View {
+        if createFolderDialogOpen {
+            FilesTextEntryDialog(
+                eyebrow: "Create",
+                title: "新建文件夹",
+                subtitle: "将在当前目录创建新的子文件夹。",
+                placeholder: "请输入文件夹名称",
+                text: $createFolderName,
+                tone: .valid,
+                confirmTitle: "创建",
+                onCancel: {
+                    createFolderName = ""
+                    createFolderDialogOpen = false
+                },
+                onConfirm: {
+                    let pendingName = createFolderName
+                    createFolderName = ""
+                    createFolderDialogOpen = false
+                    Task {
+                        _ = await viewModel.createFolder(name: pendingName)
                     }
                 }
-                Button("删除", role: .destructive) {
+            )
+        }
+
+        if showMoreActions {
+            FilesActionMenuDialog(
+                canRename: canRenameSelected,
+                onRename: {
+                    showMoreActions = false
+                    prepareRename()
+                },
+                onDelete: {
+                    showMoreActions = false
                     showDeleteConfirm = true
+                },
+                onCancel: {
+                    showMoreActions = false
                 }
-                Button("取消", role: .cancel) {}
-            }
-            .alert("重命名", isPresented: $showRenameDialog) {
-                TextField("请输入新名称", text: $renameText)
-                Button("取消", role: .cancel) {
+            )
+        }
+
+        if showRenameDialog {
+            FilesTextEntryDialog(
+                eyebrow: "Rename",
+                title: "重命名",
+                subtitle: "仅支持单个文件或文件夹重命名。",
+                placeholder: "请输入新名称",
+                text: $renameText,
+                tone: .neutral,
+                confirmTitle: "保存",
+                onCancel: {
                     renameText = ""
-                }
-                Button("保存") {
+                    showRenameDialog = false
+                },
+                onConfirm: {
+                    showRenameDialog = false
                     Task { await renameSelectedItem() }
                 }
-            } message: {
-                Text("仅支持单个文件或文件夹重命名")
-            }
-            .alert("确认删除", isPresented: $showDeleteConfirm) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            )
+        }
+
+        if showDeleteConfirm {
+            MetrologyConfirmDialog(
+                title: "确认删除",
+                message: "已选择 \(selectedItems.count) 项，删除后无法恢复。",
+                eyebrow: "Delete",
+                tone: .expired,
+                confirmTitle: "删除",
+                destructive: true,
+                onCancel: {
+                    showDeleteConfirm = false
+                },
+                onConfirm: {
+                    showDeleteConfirm = false
                     Task { await deleteSelectedItems() }
                 }
-            } message: {
-                Text("已选择 \(selectedItems.count) 项，删除后无法恢复")
+            )
+        }
+    }
+
+    private var heroSection: some View {
+        MetrologyPageHeroCard(
+            eyebrow: "Files",
+            title: "我的文件",
+            subtitle: "统一管理文件夹、资料与预览动作，支持根目录、返回上级、同步与批量处理。",
+            accent: .neutral
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("当前")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+
+                Text("\(fileRows.count)")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(MetrologyPalette.navActive)
+
+                Text(isSearching ? "筛选结果" : "可见项目")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.82))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(hex: 0xC5D8F7), lineWidth: 1)
+            )
+        }
+    }
+
+    private var headerPanel: some View {
+        MetrologySectionPanel(
+            title: "目录工具",
+            subtitle: "支持搜索、返回上级、刷新、上传、新建文件夹与同步。"
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                searchField
+
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("路径")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
+
+                        Text(viewModel.currentPath)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    HStack(spacing: 6) {
+                        headerIconActionButton(
+                            title: "根目录",
+                            systemImage: "house.fill",
+                            style: .primary
+                        ) {
+                            Task { await viewModel.goRoot() }
+                        }
+
+                        headerIconActionButton(
+                            title: "上级",
+                            systemImage: "arrow.up.left",
+                            style: .secondary
+                        ) {
+                            Task { await viewModel.goBack() }
+                        }
+                        .disabled(viewModel.currentFolderId == nil)
+                        .opacity(viewModel.currentFolderId == nil ? 0.45 : 1)
+
+                        headerIconActionButton(
+                            title: "刷新",
+                            systemImage: "arrow.clockwise",
+                            style: .secondary
+                        ) {
+                            Task { await viewModel.load() }
+                        }
+                    }
+                }
+
+                if isSearching || !viewModel.hint.isEmpty {
+                    noticeLine(searchHint, tone: .neutral)
+                }
+
+                if let scanSyncMessage = viewModel.scanSyncMessage, !scanSyncMessage.isEmpty {
+                    noticeLine(scanSyncMessage, tone: .neutral)
+                }
+
+                if viewModel.readOnlyFolder {
+                    noticeLine("当前目录为只读，已禁用上传、新建与同步。", tone: .warning)
+                }
+
+                if let message = viewModel.errorMessage {
+                    noticeLine(message, tone: .expired)
+                }
+
+                HStack(spacing: 8) {
+                    headerPrimaryActionButton(
+                        title: "上传",
+                        systemImage: "arrow.up.circle.fill",
+                        style: .primary
+                    ) {
+                        fileImporterOpen = true
+                    }
+                    .disabled(!viewModel.canWrite)
+                    .opacity(viewModel.canWrite ? 1 : 0.45)
+
+                    headerPrimaryActionButton(
+                        title: "新建文件夹",
+                        systemImage: "folder.badge.plus",
+                        style: .secondary
+                    ) {
+                        createFolderName = ""
+                        createFolderDialogOpen = true
+                    }
+                    .disabled(!viewModel.canWrite)
+                    .opacity(viewModel.canWrite ? 1 : 0.45)
+
+                    headerPrimaryActionButton(
+                        title: "同步",
+                        systemImage: "arrow.triangle.2.circlepath",
+                        style: .secondary
+                    ) {
+                        Task { await viewModel.scanSync() }
+                    }
+                    .disabled(!viewModel.canWrite)
+                    .opacity(viewModel.canWrite ? 1 : 0.45)
+                }
+            }
+        }
+    }
+    private var contentPanel: some View {
+        MetrologySectionPanel(
+            title: "文件列表",
+            subtitle: isSearching ? "正在显示筛选结果。" : "点击文件可预览，点击文件夹可进入目录。"
+        ) {
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    fileCountPill(title: "总数", value: "\(fileRows.count)", tone: .neutral)
+                    fileCountPill(title: "文件夹", value: "\(visibleFolderCount)", tone: .valid)
+                    fileCountPill(title: "文件", value: "\(visibleFileCount)", tone: .warning)
+                }
+
+                if let errorMessage = viewModel.errorMessage, fileRows.isEmpty {
+                    MetrologyErrorStateView(
+                        title: "文件加载失败",
+                        message: errorMessage,
+                        actionTitle: "重新加载",
+                        action: {
+                            Task { await viewModel.load() }
+                        }
+                    )
+                } else if fileRows.isEmpty {
+                    emptyStateView
+                } else {
+                    LazyVStack(spacing: 10) {
+                        ForEach(fileRows) { row in
+                            fileRow(item: row.item)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func noticeLine(_ message: String, tone: MetrologyPillTone) -> some View {
+        MetrologyStatusBanner(message: message, tone: tone)
     }
 
     private var loadingOverlay: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(loadingOverlayTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                Spacer()
-                if canCancelPreviewLoading {
-                    Button("取消") {
-                        viewModel.cancelPreviewLoading()
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(MetrologyPalette.navActive)
-                    .buttonStyle(.plain)
-                }
-            }
-
-            if let fraction = viewModel.batchProgressFraction {
-                ProgressView(value: fraction)
-                    .controlSize(.small)
-                    .tint(MetrologyPalette.navActive)
-            } else {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(MetrologyPalette.navActive)
-            }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(MetrologyPalette.surface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        MetrologyLoadingCard(
+            title: loadingOverlayTitle,
+            fraction: viewModel.batchProgressFraction,
+            actionTitle: canCancelPreviewLoading ? "取消" : nil,
+            action: canCancelPreviewLoading ? { viewModel.cancelPreviewLoading() } : nil
         )
     }
 
@@ -218,15 +389,25 @@ struct FilesView: View {
                 showMoreActions = true
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(MetrologyPalette.surface)
-        .overlay(
-            Rectangle()
-                .fill(MetrologyPalette.stroke)
-                .frame(height: 1),
-            alignment: .top
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.97), Color(hex: 0xF5F9FF, alpha: 0.95)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
+        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 8, x: 0, y: 2)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
     }
 
     private func selectionActionButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -241,6 +422,14 @@ struct FilesView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.88))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
         .buttonStyle(.plain)
     }
 
@@ -282,114 +471,6 @@ struct FilesView: View {
                 }
             }
         }
-    }
-
-    private var headerPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            searchField
-
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("路径")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(MetrologyPalette.textSecondary)
-                    Text(viewModel.currentPath)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(MetrologyPalette.textPrimary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                HStack(spacing: 6) {
-                    headerIconActionButton(
-                        title: "根目录",
-                        systemImage: "house.fill",
-                        style: .primary
-                    ) {
-                        Task { await viewModel.goRoot() }
-                    }
-
-                    headerIconActionButton(
-                        title: "上级",
-                        systemImage: "arrow.up.left",
-                        style: .secondary
-                    ) {
-                        Task { await viewModel.goBack() }
-                    }
-                    .disabled(viewModel.currentFolderId == nil)
-                    .opacity(viewModel.currentFolderId == nil ? 0.45 : 1)
-
-                    headerIconActionButton(
-                        title: "刷新",
-                        systemImage: "arrow.clockwise",
-                        style: .secondary
-                    ) {
-                        Task { await viewModel.load() }
-                    }
-                }
-            }
-
-            if isSearching || !viewModel.hint.isEmpty {
-                Text(searchHint)
-                    .font(.footnote)
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-            }
-
-            if let scanSyncMessage = viewModel.scanSyncMessage, !scanSyncMessage.isEmpty {
-                Text(scanSyncMessage)
-                    .font(.footnote)
-                    .foregroundStyle(MetrologyPalette.navActive)
-            }
-
-            if viewModel.readOnlyFolder {
-                Text("当前目录为只读，已禁用上传/新建/扫描同步")
-                    .font(.footnote)
-                    .foregroundStyle(MetrologyPalette.statusWarning)
-            }
-
-            if let message = viewModel.errorMessage {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(MetrologyPalette.statusExpired)
-            }
-
-            HStack(spacing: 8) {
-                headerPrimaryActionButton(
-                    title: "上传",
-                    systemImage: "arrow.up.circle.fill",
-                    style: .primary
-                ) {
-                    fileImporterOpen = true
-                }
-                .disabled(!viewModel.canWrite)
-                .opacity(viewModel.canWrite ? 1 : 0.45)
-
-                headerPrimaryActionButton(
-                    title: "新建文件夹",
-                    systemImage: "folder.badge.plus",
-                    style: .secondary
-                ) {
-                    createFolderName = ""
-                    createFolderDialogOpen = true
-                }
-                .disabled(!viewModel.canWrite)
-                .opacity(viewModel.canWrite ? 1 : 0.45)
-
-                headerPrimaryActionButton(
-                    title: "同步",
-                    systemImage: "arrow.triangle.2.circlepath",
-                    style: .secondary
-                ) {
-                    Task { await viewModel.scanSync() }
-                }
-                .disabled(!viewModel.canWrite)
-                .opacity(viewModel.canWrite ? 1 : 0.45)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .metrologyCard()
     }
 
     private var searchField: some View {
@@ -458,7 +539,6 @@ struct FilesView: View {
         .accessibilityLabel(title)
         .buttonStyle(.plain)
     }
-
     private func headerPrimaryActionButton(
         title: String,
         systemImage: String,
@@ -522,19 +602,37 @@ struct FilesView: View {
                     Image(systemName: iconStyle.symbolName)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(iconStyle.tint)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 34, height: 34)
                         .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(MetrologyPalette.surface)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.white)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(MetrologyPalette.stroke, lineWidth: 1)
                         )
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(item.isFolder ? "文件夹" : "文件")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(item.isFolder ? MetrologyPalette.statusValid : MetrologyPalette.navActive)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(
+                                        (item.isFolder ? MetrologyPalette.statusValid : MetrologyPalette.navActive)
+                                            .opacity(0.12)
+                                    )
+                            )
+
                         Text(item.displayName)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(MetrologyPalette.textPrimary)
                             .multilineTextAlignment(.leading)
                             .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
+
                         Text(fileMetaText(for: item))
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(MetrologyPalette.textSecondary)
@@ -544,6 +642,7 @@ struct FilesView: View {
                 }
             }
             .buttonStyle(.plain)
+
             selectionCircle(item: item)
         }
         .padding(12)
@@ -586,6 +685,14 @@ struct FilesView: View {
         !selectedItemIDs.isEmpty
     }
 
+    private var visibleFolderCount: Int {
+        filteredItems.filter(\.isFolder).count
+    }
+
+    private var visibleFileCount: Int {
+        filteredItems.filter { !$0.isFolder }.count
+    }
+
     private var selectedItems: [UserFileItemDto] {
         viewModel.items.filter { item in
             guard let id = item.id else { return false }
@@ -622,7 +729,6 @@ struct FilesView: View {
                 .foregroundStyle(MetrologyPalette.textMuted.opacity(0.35))
         }
     }
-
     private func toggleSelection(for item: UserFileItemDto) {
         guard let id = item.id else { return }
         if selectedItemIDs.contains(id) {
@@ -689,6 +795,7 @@ struct FilesView: View {
     private func renameSelectedItem() async {
         guard let item = selectedItems.first, let id = item.id else { return }
         let success = await viewModel.renameItem(id: id, newName: renameText)
+        renameText = ""
         if success {
             selectedItemIDs.removeAll()
         }
@@ -708,6 +815,36 @@ struct FilesView: View {
             return sizeText
         }
         return "\(dateText) · \(sizeText)"
+    }
+
+    private func fileCountPill(title: String, value: String, tone: MetrologyPillTone) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tone.tint)
+            Text(value)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(tone.background)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(tone.stroke, lineWidth: 1)
+        )
+    }
+
+    private var emptyStateView: some View {
+        MetrologyEmptyStateView(
+            icon: isSearching ? "magnifyingglass.circle" : "tray",
+            title: isSearching ? "没有匹配到相关文件" : "当前目录暂无文件",
+            message: isSearching ? "可以尝试更换关键词，或先清空搜索条件。" : "你可以上传文件、新建文件夹，或点击同步拉取最新内容。"
+        )
     }
 
     private func displayDateOnly(_ raw: String?) -> String {
@@ -809,7 +946,6 @@ struct FilesView: View {
 
         return FileIconStyle(symbolName: "doc.fill", tint: MetrologyPalette.textMuted)
     }
-
     private func fileExtension(of item: UserFileItemDto) -> String {
         let rawName = (item.name ?? item.displayName).trimmingCharacters(in: .whitespacesAndNewlines)
         guard let dotIndex = rawName.lastIndex(of: "."), dotIndex < rawName.index(before: rawName.endIndex) else {
@@ -837,6 +973,161 @@ private struct FileIconStyle {
     let tint: Color
 }
 
+private struct FilesTextEntryDialog: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let placeholder: String
+    @Binding var text: String
+    var tone: MetrologyPillTone = .neutral
+    var confirmTitle: String = "保存"
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    private var trimmedText: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.24).ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(eyebrow.uppercased())
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .tracking(0.7)
+                    .foregroundStyle(tone.tint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(tone.strongBackground)
+                    )
+
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+
+                MetrologyStatusBanner(message: subtitle, tone: tone)
+
+                TextField(placeholder, text: $text)
+                    .metrologyInput()
+
+                if trimmedText.isEmpty {
+                    MetrologyInlineValidationMessage(message: "名称不能为空，请先填写后再继续。")
+                }
+
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: confirmTitle,
+                    saveDisabled: trimmedText.isEmpty,
+                    onCancel: onCancel,
+                    onSave: onConfirm
+                )
+            }
+            .padding(14)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x456B96, alpha: 0.22), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 20)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .zIndex(1000)
+        .preferredColorScheme(.light)
+    }
+}
+
+private struct FilesActionMenuDialog: View {
+    let canRename: Bool
+    let onRename: () -> Void
+    let onDelete: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.24).ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("ACTIONS")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .tracking(0.7)
+                    .foregroundStyle(MetrologyPalette.navActive)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color(hex: 0xE7F0FF))
+                    )
+
+                Text("更多操作")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+
+                MetrologyStatusBanner(
+                    message: canRename ? "可继续执行重命名或删除操作。" : "当前已选择多项，仅保留删除操作。",
+                    tone: canRename ? .neutral : .warning
+                )
+
+                VStack(spacing: 8) {
+                    if canRename {
+                        Button(action: onRename) {
+                            Label("重命名", systemImage: "pencil")
+                                .frame(maxWidth: .infinity, minHeight: 22)
+                        }
+                        .buttonStyle(MetrologySecondaryButtonStyle())
+                    }
+
+                    Button(action: onDelete) {
+                        Label("删除", systemImage: "trash")
+                            .frame(maxWidth: .infinity, minHeight: 22)
+                    }
+                    .buttonStyle(MetrologyDangerButtonStyle())
+
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .frame(maxWidth: .infinity, minHeight: 22)
+                    }
+                    .buttonStyle(MetrologySecondaryButtonStyle())
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: 0x456B96, alpha: 0.22), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 20)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .zIndex(1000)
+        .preferredColorScheme(.light)
+    }
+}
+
 private struct FilePreviewFullScreenView: View {
     let item: PreviewItem
 
@@ -844,43 +1135,184 @@ private struct FilePreviewFullScreenView: View {
     @State private var showExternalSheet = false
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+            MetrologyPalette.background.ignoresSafeArea()
+
             QuickLookPreview(url: item.url)
-                .navigationTitle(item.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("关闭") {
-                            dismiss()
-                        }
-                    }
-                }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            previewHeader
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 10)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            MetrologyPalette.background.opacity(0.96),
+                            MetrologyPalette.background.opacity(0.82),
+                            MetrologyPalette.background.opacity(0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(MetrologyPalette.stroke)
-                    .frame(height: 1)
-                Button {
-                    showExternalSheet = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.up.forward.app")
-                        Text("外部打开")
-                    }
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(MetrologyPalette.navActive)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 14)
-                }
-                .buttonStyle(.plain)
-            }
-            .background(MetrologyPalette.surface)
+            previewBottomBar
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            MetrologyPalette.background.opacity(0),
+                            MetrologyPalette.background.opacity(0.82),
+                            MetrologyPalette.background.opacity(0.96)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         }
         .sheet(isPresented: $showExternalSheet) {
             FilesActivitySheet(items: [item.url])
         }
+    }
+
+    private var previewHeader: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.94))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: previewIconName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(previewAccent)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(compactTitle)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .lineLimit(1)
+
+                    Text(previewSubtitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetrologyPalette.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 10)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(0.94))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.96), Color(hex: 0xF6FAFF, alpha: 0.95)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
+        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 8, x: 0, y: 3)
+    }
+
+    private var previewBottomBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                dismiss()
+            } label: {
+                Label("关闭预览", systemImage: "xmark")
+                    .frame(maxWidth: .infinity, minHeight: 22)
+            }
+            .buttonStyle(MetrologySecondaryButtonStyle())
+
+            Button {
+                showExternalSheet = true
+            } label: {
+                Label("外部打开或分享", systemImage: "arrow.up.forward.app")
+                    .frame(maxWidth: .infinity, minHeight: 22)
+            }
+            .buttonStyle(MetrologyPrimaryButtonStyle())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.97), Color(hex: 0xF5F9FF, alpha: 0.96)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+        )
+        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 8, x: 0, y: 3)
+    }
+
+    private var compactTitle: String {
+        if item.title.count > 28 {
+            return String(item.title.prefix(26)) + "..."
+        }
+        return item.title
+    }
+
+    private var previewSubtitle: String {
+        let ext = item.url.pathExtension.uppercased()
+        if ext.isEmpty {
+            return "文件预览"
+        }
+        return "\(ext) 文件预览"
+    }
+
+    private var previewIconName: String {
+        let ext = item.url.pathExtension.lowercased()
+        if ["pdf"].contains(ext) { return "doc.richtext.fill" }
+        if ["xls", "xlsx", "csv", "numbers"].contains(ext) { return "tablecells.fill" }
+        if ["doc", "docx", "pages", "rtf"].contains(ext) { return "doc.text.fill" }
+        if ["ppt", "pptx", "key"].contains(ext) { return "rectangle.on.rectangle.angled.fill" }
+        if ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "tif", "tiff"].contains(ext) { return "photo.fill" }
+        if ["mp4", "mov", "m4v", "avi", "mkv"].contains(ext) { return "film.fill" }
+        return "doc.fill"
+    }
+
+    private var previewAccent: Color {
+        let ext = item.url.pathExtension.lowercased()
+        if ["pdf"].contains(ext) { return MetrologyPalette.statusExpired }
+        if ["xls", "xlsx", "csv", "numbers"].contains(ext) { return MetrologyPalette.statusValid }
+        if ["ppt", "pptx", "key"].contains(ext) { return MetrologyPalette.statusWarning }
+        if ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "tif", "tiff"].contains(ext) { return MetrologyPalette.statusValid }
+        return MetrologyPalette.navActive
     }
 }
 

@@ -1,16 +1,16 @@
 package com.metrology.controller;
 
+import com.metrology.dto.ApiErrorResponse;
 import com.metrology.dto.FileMetadataDto;
 import com.metrology.entity.UserFile;
 import com.metrology.service.PermissionService;
 import com.metrology.service.UserFileService;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,23 +31,36 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
+@Slf4j
 public class UserFileController {
 
     private final UserFileService service;
     private final PermissionService permissionService;
 
-    private ResponseEntity<?> checkFileAccess(String username) {
+    private ResponseEntity<ApiErrorResponse> checkFileAccess(String username) {
         if (!permissionService.hasFileModuleAccess(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "当前账号没有文件模块访问权限"));
+            return error(HttpStatus.FORBIDDEN, "FILE_MODULE_FORBIDDEN", "当前账号没有文件模块访问权限", "/api/files");
         }
         return null;
     }
 
-    private ResponseEntity<?> checkFileWriteAccess(String username) {
+    private ResponseEntity<ApiErrorResponse> checkFileWriteAccess(String username) {
         if (!permissionService.hasPermission(username, PermissionService.FILE_ACCESS)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "当前账号仅有文件只读权限"));
+            return error(HttpStatus.FORBIDDEN, "FILE_WRITE_FORBIDDEN", "当前账号只有文件只读权限", "/api/files");
         }
         return null;
+    }
+
+    private ResponseEntity<ApiErrorResponse> error(HttpStatus status, String code, String message, String path) {
+        return ResponseEntity.status(status)
+                .body(ApiErrorResponse.of(status.value(), code, message, path));
+    }
+
+    private ResponseEntity<ApiErrorResponse> badRequest(String code, Exception ex, String path) {
+        String message = ex.getMessage() == null || ex.getMessage().isBlank()
+                ? "请求参数无效"
+                : ex.getMessage();
+        return error(HttpStatus.BAD_REQUEST, code, message, path);
     }
 
     @GetMapping
@@ -59,7 +72,7 @@ public class UserFileController {
         try {
             return ResponseEntity.ok(service.list(u.getUsername(), parentId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -81,7 +94,7 @@ public class UserFileController {
         try {
             return ResponseEntity.ok(service.getBreadcrumb(u.getUsername(), folderId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -99,7 +112,7 @@ public class UserFileController {
                     ? ((Number) body.get("parentId")).longValue() : null;
             return ResponseEntity.ok(service.createFolder(u.getUsername(), parentId, name));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -129,7 +142,7 @@ public class UserFileController {
                     : null;
             return ResponseEntity.ok(service.scanSync(u.getUsername(), parentId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -140,7 +153,7 @@ public class UserFileController {
         try {
             return ResponseEntity.ok(service.listGrantableFolders(u.getUsername()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -159,7 +172,7 @@ public class UserFileController {
                     .lastModified(target.lastModified())
                     .body(buildMetadata(file, target));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -170,13 +183,12 @@ public class UserFileController {
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) throws IOException {
         if (!permissionService.hasFileModuleAccess(u.getUsername())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return error(HttpStatus.FORBIDDEN, "FILE_MODULE_FORBIDDEN", "当前账号没有文件模块访问权限", "/api/files/" + id + "/download");
         }
         UserFile f = service.getFile(u.getUsername(), id);
         File target = service.resolveDownloadTarget(f);
         String encoded = URLEncoder.encode(f.getName(), StandardCharsets.UTF_8).replace("+", "%20");
-        MediaType mediaType = MediaType.parseMediaType(
-                f.getMimeType() != null ? f.getMimeType() : "application/octet-stream");
+        MediaType mediaType = resolveResponseMediaType(f);
         String etag = buildWeakEtag(target);
 
         if (matchesIfNoneMatch(ifNoneMatch, etag)) {
@@ -188,36 +200,9 @@ public class UserFileController {
                     .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
                     .build();
         }
-
-        Resource resource = new FileSystemResource(target);
         if (StringUtils.hasText(rangeHeader)) {
-            try {
-                var ranges = HttpRange.parseRanges(rangeHeader);
-                if (ranges.isEmpty()) {
-                    throw new IllegalArgumentException("Invalid range");
-                }
-                HttpRange range = ranges.get(0);
-                ResourceRegion region = range.toResourceRegion(resource);
-                long start = region.getPosition();
-                long end = Math.min(start + region.getCount() - 1, target.length() - 1);
-                return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
-                        .header(HttpHeaders.ETAG, etag)
-                        .lastModified(target.lastModified())
-                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                        .header(HttpHeaders.CACHE_CONTROL, "private, max-age=0, must-revalidate")
-                        .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + target.length())
-                        .contentType(mediaType)
-                        .contentLength(region.getCount())
-                        .body(region);
-            } catch (IllegalArgumentException ex) {
-                return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                        .header(HttpHeaders.CONTENT_RANGE, "bytes */" + target.length())
-                        .header(HttpHeaders.ETAG, etag)
-                        .lastModified(target.lastModified())
-                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                        .build();
-            }
+            log.info("Ignoring range request for file id={}, name={}, range={} and falling back to full download for stability",
+                    f.getId(), f.getName(), rangeHeader);
         }
 
         return ResponseEntity.ok()
@@ -229,6 +214,20 @@ public class UserFileController {
                 .contentType(mediaType)
                 .contentLength(target.length())
                 .body(new FileSystemResource(target));
+    }
+
+    private MediaType resolveResponseMediaType(UserFile file) {
+        String rawMimeType = file.getMimeType();
+        if (!StringUtils.hasText(rawMimeType)) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        try {
+            return MediaType.parseMediaType(rawMimeType);
+        } catch (InvalidMediaTypeException ex) {
+            log.warn("Invalid mimeType '{}' for file id={}, name={}; using application/octet-stream",
+                    rawMimeType, file.getId(), file.getName(), ex);
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -243,7 +242,7 @@ public class UserFileController {
             service.delete(u.getUsername(), id);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -259,7 +258,7 @@ public class UserFileController {
         try {
             return ResponseEntity.ok(service.rename(u.getUsername(), id, body.get("name")));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -277,7 +276,7 @@ public class UserFileController {
                     ? ((Number) body.get("parentId")).longValue() : null;
             return ResponseEntity.ok(service.move(u.getUsername(), id, parentId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -292,7 +291,7 @@ public class UserFileController {
         try {
             return ResponseEntity.ok(service.getShareConfig(u.getUsername(), id));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -327,7 +326,7 @@ public class UserFileController {
                     shareToken
             ));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -343,7 +342,7 @@ public class UserFileController {
             service.disableShare(u.getUsername(), id);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return badRequest("FILE_REQUEST_INVALID", e, "/api/files");
         }
     }
 
@@ -552,3 +551,6 @@ public class UserFileController {
         return normalized;
     }
 }
+
+
+

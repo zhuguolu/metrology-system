@@ -34,20 +34,25 @@ struct DeviceListView: View {
                 MetrologyPalette.background.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 14) {
+                        pageHeroCard
                         filterCard(metrics: metrics)
                         statusLine
                         listPanel(metrics: metrics)
                         pagerBar
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
                     .padding(.bottom, 8)
                 }
                 .scrollIndicators(.hidden)
 
                 if let errorMessage = viewModel.errorMessage {
                     MetrologyNoticeDialog(
-                        title: "\u{63d0}\u{793a}",
-                        message: errorMessage
+                        title: "提示",
+                        message: errorMessage,
+                        eyebrow: "Notice",
+                        tone: .warning
                     ) {
                         viewModel.errorMessage = nil
                     }
@@ -149,67 +154,89 @@ struct DeviceListView: View {
         }
     }
 
+    private var pageHeroCard: some View {
+        MetrologyPageHeroCard(
+            eyebrow: heroEyebrow,
+            title: heroTitle,
+            subtitle: heroSubtitle,
+            accent: heroAccent
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("当前")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+
+                Text("\(formatCount(displayedOverallTotal))")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(heroAccent.tint)
+
+                Text(heroCountLabel)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.82))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(heroAccent.stroke.opacity(0.8), lineWidth: 1)
+            )
+        }
+    }
+
     private func filterCard(metrics: DeviceLayoutMetrics) -> some View {
         let useStackedActions = metrics.width < 380
 
-        return VStack(spacing: 10) {
-            if useStackedActions {
-                searchField
-                actionButtons(compact: true)
-            } else {
-                HStack(spacing: 8) {
+        return MetrologySectionPanel(
+            title: filterExpanded ? "筛选已展开" : "快速筛选",
+            subtitle: filterExpanded ? "按部门、有效性和使用状态快速收窄范围。" : "先搜索，再按状态胶囊快速切换。"
+        ) {
+            VStack(spacing: 10) {
+                if useStackedActions {
                     searchField
-                    actionButtons(compact: false)
-                }
-            }
-
-            if filterExpanded {
-                VStack(spacing: 8) {
+                    actionButtons(compact: true)
+                } else {
                     HStack(spacing: 8) {
-                        filterSelect(
-                            title: "部门",
-                            value: $viewModel.deptFilter,
-                            allLabel: "全部部门",
-                            options: departmentOptions
-                        )
-                        filterSelect(
-                            title: "有效性",
-                            value: $viewModel.validityFilter,
-                            allLabel: "全部有效性",
-                            options: validityOptions
-                        )
-                    }
-
-                    HStack(spacing: 8) {
-                        filterSelect(
-                            title: "使用状态",
-                            value: $viewModel.useStatusFilter,
-                            allLabel: "全部状态",
-                            options: useStatusOptions
-                        )
+                        searchField
+                        actionButtons(compact: false)
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
 
-            summaryTiles
+                if filterExpanded {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            filterSelect(
+                                title: "部门",
+                                value: $viewModel.deptFilter,
+                                allLabel: "全部部门",
+                                options: departmentOptions
+                            )
+                            filterSelect(
+                                title: "有效性",
+                                value: $viewModel.validityFilter,
+                                allLabel: "全部有效性",
+                                options: validityOptions
+                            )
+                        }
+
+                        HStack(spacing: 8) {
+                            filterSelect(
+                                title: "使用状态",
+                                value: $viewModel.useStatusFilter,
+                                allLabel: "全部状态",
+                                options: useStatusOptions
+                            )
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                summaryTiles
+            }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.cardRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.white, Color(hex: 0xF6FAFF)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: metrics.cardRadius, style: .continuous)
-                .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
-        )
-        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 5, x: 0, y: 2)
     }
 
     private var searchField: some View {
@@ -485,125 +512,136 @@ struct DeviceListView: View {
         compact: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: compact ? 2 : 4) {
-                HStack(spacing: compact ? 3 : 4) {
-                    Text(title)
-                        .font(.system(size: compact ? 10 : 11, weight: .bold))
-                        .foregroundStyle(style.textColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: compact ? 9 : 10, weight: .bold))
-                            .foregroundStyle(style.textColor)
-                    }
-                }
-                Text(valueText)
-                    .font(.system(size: compact ? 11 : 12, weight: .bold))
-                    .foregroundStyle(style.textColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, compact ? 6 : 10)
-            .padding(.vertical, compact ? 6 : 8)
-            .background(
-                RoundedRectangle(cornerRadius: compact ? 10 : 12, style: .continuous)
-                    .fill(isSelected ? style.selectedBackground : style.background)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: compact ? 10 : 12, style: .continuous)
-                    .stroke(isSelected ? style.selectedStroke : style.stroke, lineWidth: isSelected ? 2 : 1)
-            )
-            .shadow(color: isSelected ? style.selectedStroke.opacity(0.22) : .clear, radius: 4, x: 0, y: 2)
-            .scaleEffect(isSelected ? 1.03 : 1.0)
-        }
-        .buttonStyle(.plain)
+        MetrologyInteractivePill(
+            title: title,
+            value: valueText,
+            tone: style.tone,
+            isSelected: isSelected,
+            compact: compact,
+            action: action
+        )
     }
 
     private var statusLine: some View {
-        Group {
-            if deviceRows.isEmpty {
-                Text("暂无数据")
-            } else {
-                Text("共 \(formatCount(viewModel.total)) 条")
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("列表状态")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+
+                if deviceRows.isEmpty {
+                    Text("暂无数据")
+                } else {
+                    Text("共 \(formatCount(viewModel.total)) 条")
+                }
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(MetrologyPalette.textSecondary)
+
+            Spacer(minLength: 0)
+
+            if !viewModel.hintMessage.isEmpty {
+                Text(viewModel.hintMessage)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.navActive)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color(hex: 0xE9F1FF))
+                    )
             }
         }
-        .font(.system(size: 12, weight: .regular))
-        .foregroundStyle(MetrologyPalette.textMuted)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.86))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+        )
     }
 
     private func listPanel(metrics: DeviceLayoutMetrics) -> some View {
-        VStack(spacing: 0) {
-            if deviceRows.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "tray")
-                        .font(.system(size: 26))
-                        .foregroundStyle(MetrologyPalette.textMuted)
-                    Text("暂无设备数据")
-                        .font(.system(size: 13))
-                        .foregroundStyle(MetrologyPalette.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 30)
-                .background(
-                    RoundedRectangle(cornerRadius: metrics.cardRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white, Color(hex: 0xF6FAFF)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+        MetrologySectionPanel(
+            title: listPanelTitle,
+            subtitle: listPanelSubtitle
+        ) {
+            VStack(spacing: 0) {
+                if deviceRows.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 26))
+                            .foregroundStyle(MetrologyPalette.textMuted)
+                        Text("暂无设备数据")
+                            .font(.system(size: 13))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: metrics.cardRadius, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white, Color(hex: 0xF6FAFF)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: metrics.cardRadius, style: .continuous)
-                        .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
-                )
-            } else {
-                ForEach(deviceRows) { row in
-                    DeviceRowCard(
-                        item: row.item,
-                        mode: viewModel.mode,
-                        onTap: { selectedDevice = row.item },
-                        onQuickAction: {
-                            if viewModel.mode == .ledger {
-                                ledgerEditDevice = row.item
-                            } else {
-                                quickEditDevice = row.item
-                            }
-                        }
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: metrics.cardRadius, style: .continuous)
+                            .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+                    )
+                } else {
+                    ForEach(deviceRows) { row in
+                        DeviceRowCard(
+                            item: row.item,
+                            mode: viewModel.mode,
+                            onTap: { selectedDevice = row.item },
+                            onQuickAction: {
+                                if viewModel.mode == .ledger {
+                                    ledgerEditDevice = row.item
+                                } else {
+                                    quickEditDevice = row.item
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
     private var pagerBar: some View {
-        HStack(spacing: 12) {
-            Button("上一页") {
-                Task { await viewModel.prevPage() }
-            }
-            .buttonStyle(MetrologySecondaryButtonStyle())
-            .disabled(viewModel.page <= 1 || viewModel.isLoading)
-            .opacity((viewModel.page <= 1 || viewModel.isLoading) ? 0.45 : 1)
+        MetrologySectionPanel(
+            title: "翻页导航",
+            subtitle: "当前第 \(viewModel.page) / \(viewModel.totalPages) 页"
+        ) {
+            HStack(spacing: 12) {
+                Button("上一页") {
+                    Task { await viewModel.prevPage() }
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
+                .disabled(viewModel.page <= 1 || viewModel.isLoading)
+                .opacity((viewModel.page <= 1 || viewModel.isLoading) ? 0.45 : 1)
 
-            Text("第 \(viewModel.page) / \(viewModel.totalPages) 页")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(MetrologyPalette.textSecondary)
+                Text("第 \(viewModel.page) / \(viewModel.totalPages) 页")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity)
 
-            Button("下一页") {
-                Task { await viewModel.nextPage() }
+                Button("下一页") {
+                    Task { await viewModel.nextPage() }
+                }
+                .buttonStyle(MetrologyPrimaryButtonStyle())
+                .disabled(viewModel.page >= viewModel.totalPages || viewModel.isLoading)
+                .opacity((viewModel.page >= viewModel.totalPages || viewModel.isLoading) ? 0.45 : 1)
             }
-            .buttonStyle(MetrologyPrimaryButtonStyle())
-            .disabled(viewModel.page >= viewModel.totalPages || viewModel.isLoading)
-            .opacity((viewModel.page >= viewModel.totalPages || viewModel.isLoading) ? 0.45 : 1)
         }
-        .padding(.top, 4)
-        .padding(.bottom, 10)
     }
 
     private func field(_ placeholder: String, text: Binding<String>, metrics: DeviceLayoutMetrics) -> some View {
@@ -728,6 +766,83 @@ struct DeviceListView: View {
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
+
+    private var heroEyebrow: String {
+        switch viewModel.mode {
+        case .ledger:
+            return "Ledger"
+        case .calibration:
+            return "Calibration"
+        case .todo:
+            return "Todo"
+        }
+    }
+
+    private var heroTitle: String {
+        switch viewModel.mode {
+        case .ledger:
+            return "设备台账"
+        case .calibration:
+            return "校准管理"
+        case .todo:
+            return "我的待办"
+        }
+    }
+
+    private var heroSubtitle: String {
+        switch viewModel.mode {
+        case .ledger:
+            return "统一查看设备资产、使用状态与校准节点，适合做日常盘点与快速修订。"
+        case .calibration:
+            return "聚焦正常设备的校准任务，优先处理有效性与下次校准时间。"
+        case .todo:
+            return "把即将过期与失效设备集中收口，适合做日常待办清理。"
+        }
+    }
+
+    private var heroAccent: MetrologyPillTone {
+        switch viewModel.mode {
+        case .ledger:
+            return .neutral
+        case .calibration:
+            return .warning
+        case .todo:
+            return .expired
+        }
+    }
+
+    private var heroCountLabel: String {
+        switch viewModel.mode {
+        case .ledger:
+            return "设备总数"
+        case .calibration:
+            return "在管设备"
+        case .todo:
+            return "待处理项"
+        }
+    }
+
+    private var listPanelTitle: String {
+        switch viewModel.mode {
+        case .ledger:
+            return "设备清单"
+        case .calibration:
+            return "校准设备"
+        case .todo:
+            return "待办设备"
+        }
+    }
+
+    private var listPanelSubtitle: String {
+        switch viewModel.mode {
+        case .ledger:
+            return "点击卡片查看设备全量属性，右下角可直接快改。"
+        case .calibration:
+            return "点击设备查看校准记录与详情，快改仅修改本次校准信息。"
+        case .todo:
+            return "优先处理高风险设备，保持待办和校准记录同步。"
+        }
+    }
 }
 
 private struct DeviceListRow: Identifiable {
@@ -777,23 +892,36 @@ private struct DeviceRowCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(item.displayName)
-                    .font(.system(size: 14.5, weight: .bold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mode.cardEyebrow)
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .tracking(0.7)
+                        .foregroundStyle(chipStyle.textColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(chipStyle.background)
+                        )
+
+                    Text(item.displayName)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 Text(chipText)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(chipStyle.textColor)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                     .background(
-                        Capsule(style: .continuous).fill(chipStyle.background)
+                        Capsule(style: .continuous).fill(chipStyle.selectedBackground)
                     )
                     .overlay(
-                        Capsule(style: .continuous).stroke(chipStyle.stroke, lineWidth: 1)
+                        Capsule(style: .continuous).stroke(chipStyle.selectedStroke.opacity(0.78), lineWidth: 1)
                     )
             }
 
@@ -831,24 +959,25 @@ private struct DeviceRowCard: View {
                 Button("快改") {
                     onQuickAction()
                 }
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11, weight: .black))
                 .foregroundStyle(mode == .ledger ? Color(hex: 0x047857) : MetrologyPalette.navActive)
-                .frame(minWidth: 56, minHeight: 28)
-                .padding(.horizontal, 10)
+                .frame(minWidth: 62, minHeight: 32)
+                .padding(.horizontal, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(mode == .ledger ? Color(hex: 0x059669, alpha: 0.13) : Color(hex: 0x2563EB, alpha: 0.13))
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(mode == .ledger ? Color(hex: 0x059669, alpha: 0.14) : Color(hex: 0x2563EB, alpha: 0.14))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(mode == .ledger ? Color(hex: 0x059669, alpha: 0.40) : Color(hex: 0x2563EB, alpha: 0.40), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(mode == .ledger ? Color(hex: 0x059669, alpha: 0.42) : Color(hex: 0x2563EB, alpha: 0.42), lineWidth: 1)
                 )
+                .shadow(color: (mode == .ledger ? Color(hex: 0x059669) : Color(hex: 0x2563EB)).opacity(0.10), radius: 6, x: 0, y: 3)
             }
             .padding(.top, 3)
         }
-        .padding(12)
+        .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [Color.white, Color(hex: 0xF6FAFF)],
@@ -858,10 +987,10 @@ private struct DeviceRowCard: View {
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
         )
-        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 4, x: 0, y: 2)
+        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 8, x: 0, y: 4)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -904,28 +1033,20 @@ private struct QuickCalibrationEditView: View {
                 let horizontalPadding = min(max(proxy.size.width * 0.045, 12), 22)
                 let editorMinHeight = min(max(proxy.size.height * 0.20, 96), 170)
 
-                ZStack {
-                    MetrologyPalette.background.ignoresSafeArea()
-
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            if let validationMessage {
-                                Text(validationMessage)
-                                    .font(.footnote)
-                                    .foregroundStyle(MetrologyPalette.statusExpired)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 2)
-                            }
-
-                            quickHeaderCard
-                            quickFormCard(editorMinHeight: editorMinHeight)
-                        }
-                        .padding(.horizontal, horizontalPadding)
-                        .padding(.top, 10)
-                        .padding(.bottom, 14)
+                MetrologyFormSheetScaffold(
+                    eyebrow: mode == .todo ? "Todo" : "Calibration",
+                    title: mode == .todo ? "待办快改" : "校准快改",
+                    subtitle: "只修改本次校准时间、周期、结果和备注，减少无关字段干扰。",
+                    accent: mode == .todo ? .expired : .warning,
+                    bannerMessage: mode == .todo ? "适合快速处理待办设备，保存后会同步影响校准状态。" : "适合做当次校准更新，优先保证日期与结果准确。",
+                    bannerTone: mode == .todo ? .expired : .warning
+                ) {
+                    if let validationMessage {
+                        MetrologyInlineValidationMessage(message: validationMessage)
                     }
-                    .scrollIndicators(.hidden)
-                    .scrollDismissesKeyboard(.interactively)
+
+                    quickHeaderCard
+                    quickFormCard(editorMinHeight: editorMinHeight)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     quickActionBar(
@@ -1043,6 +1164,8 @@ private struct QuickCalibrationEditView: View {
         VStack(spacing: 0) {
             Divider().overlay(Color(hex: 0xD5E2F2))
             MetrologySaveCancelRow(
+                cancelTitle: "取消",
+                saveTitle: "保存快改",
                 onCancel: {
                     focusedField = nil
                     dismiss()
@@ -1145,151 +1268,170 @@ private struct DeviceDetailView: View {
     @State private var deletingErrorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            MetrologyPalette.background.ignoresSafeArea()
 
-                List {
-                    detailSection(title: "基本信息") {
-                        detailPairRow(
-                            leftLabel: "仪器名称",
-                            leftValue: device.displayName,
-                            rightLabel: "计量编号",
-                            rightValue: device.metricNo
-                        )
-                        detailPairRow(
-                            leftLabel: "资产编号",
-                            leftValue: device.assetNo,
-                            rightLabel: "出厂编号",
-                            rightValue: device.serialNo
-                        )
-                        detailPairRow(
-                            leftLabel: "ABC分类",
-                            leftValue: device.abcClass,
-                            rightLabel: "设备型号",
-                            rightValue: device.model
-                        )
-                        detailPairRow(
-                            leftLabel: "制造厂",
-                            leftValue: device.manufacturer,
-                            rightLabel: "使用部门",
-                            rightValue: device.dept
-                        )
-                        detailPairRow(
-                            leftLabel: "设备位置",
-                            leftValue: device.location,
-                            rightLabel: "使用责任人",
-                            rightValue: device.responsiblePerson
-                        )
-                        detailPairRow(
-                            leftLabel: "使用状态",
-                            leftValue: device.useStatus,
-                            leftStyle: .useStatus
-                        )
+            ScrollView {
+                VStack(spacing: 10) {
+                    heroSection
+
+                    if deletingInProgress {
+                        MetrologyStatusBanner(message: "正在删除设备，请稍候。", tone: .warning, compact: true)
                     }
 
-                    detailSection(title: "采购信息") {
-                        detailPairRow(
-                            leftLabel: "采购时间",
-                            leftValue: device.purchaseDate,
-                            rightLabel: "采购价格",
-                            rightValue: purchasePriceText
-                        )
-                        detailPairRow(
-                            leftLabel: "使用年限",
-                            leftValue: serviceLifeText
-                        )
+                    detailSection(title: "基本信息", subtitle: "台账主数据与责任信息保持统一展示。") {
+                        detailPairRow(leftLabel: "仪器名称", leftValue: device.displayName, rightLabel: "计量编号", rightValue: device.metricNo)
+                        detailPairRow(leftLabel: "资产编号", leftValue: device.assetNo, rightLabel: "出厂编号", rightValue: device.serialNo)
+                        detailPairRow(leftLabel: "ABC分类", leftValue: device.abcClass, rightLabel: "设备型号", rightValue: device.model)
+                        detailPairRow(leftLabel: "制造厂", leftValue: device.manufacturer, rightLabel: "使用部门", rightValue: device.dept)
+                        detailPairRow(leftLabel: "设备位置", leftValue: device.location, rightLabel: "使用责任人", rightValue: device.responsiblePerson)
+                        detailPairRow(leftLabel: "使用状态", leftValue: device.useStatus, leftStyle: .useStatus)
                     }
 
-                    detailSection(title: "技术参数") {
-                        detailPairRow(
-                            leftLabel: "分度值",
-                            leftValue: device.graduationValue,
-                            rightLabel: "测试范围",
-                            rightValue: device.testRange
-                        )
-                        detailPairRow(
-                            leftLabel: "允许误差",
-                            leftValue: device.allowableError
-                        )
+                    detailSection(title: "采购信息", subtitle: "采购时间、价格和寿命参数统一收口。") {
+                        detailPairRow(leftLabel: "采购时间", leftValue: device.purchaseDate, rightLabel: "采购价格", rightValue: purchasePriceText)
+                        detailPairRow(leftLabel: "使用年限", leftValue: serviceLifeText)
                     }
 
-                    detailSection(title: "校准信息") {
-                        detailPairRow(
-                            leftLabel: "检定周期",
-                            leftValue: formatCycle(device.cycle),
-                            rightLabel: "上次校准",
-                            rightValue: device.calDate
-                        )
-                        detailPairRow(
-                            leftLabel: "下次校准",
-                            leftValue: device.nextDate,
-                            leftStyle: .nextDate,
-                            rightLabel: "有效状态",
-                            rightValue: device.validity,
-                            rightStyle: .validity
-                        )
-                        detailPairRow(
-                            leftLabel: "校准结果",
-                            leftValue: device.calibrationResult
-                        )
+                    detailSection(title: "技术参数", subtitle: "量程、分度值与允许误差集中展示。") {
+                        detailPairRow(leftLabel: "分度值", leftValue: device.graduationValue, rightLabel: "测试范围", rightValue: device.testRange)
+                        detailPairRow(leftLabel: "允许误差", leftValue: device.allowableError)
+                    }
+
+                    detailSection(title: "校准信息", subtitle: "下次校准和有效状态保持重点强调。") {
+                        detailPairRow(leftLabel: "检定周期", leftValue: formatCycle(device.cycle), rightLabel: "上次校准", rightValue: device.calDate)
+                        detailPairRow(leftLabel: "下次校准", leftValue: device.nextDate, leftStyle: .nextDate, rightLabel: "有效状态", rightValue: device.validity, rightStyle: .validity)
+                        detailPairRow(leftLabel: "校准结果", leftValue: device.calibrationResult)
                     }
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
+                .padding(12)
+                .padding(.bottom, 128)
+            }
+            .scrollIndicators(.hidden)
 
-                if deletingConfirmOpen {
-                    MetrologyConfirmDialog(
-                        title: "删除设备",
-                        message: "确定删除“\(device.displayName)”吗？此操作不可撤销。",
-                        cancelTitle: "取消",
-                        confirmTitle: deletingInProgress ? "处理中..." : "删除",
-                        destructive: true,
-                        onCancel: {
-                            if !deletingInProgress {
-                                deletingConfirmOpen = false
-                            }
-                        },
-                        onConfirm: {
-                            handleDeleteConfirm()
+            footerBar
+
+            if deletingConfirmOpen {
+                MetrologyConfirmDialog(
+                    title: "删除设备",
+                    message: "确定删除“\(device.displayName)”吗？此操作不可撤销。",
+                    eyebrow: "Delete",
+                    tone: .expired,
+                    cancelTitle: "取消",
+                    confirmTitle: deletingInProgress ? "处理中..." : "确认删除",
+                    destructive: true,
+                    onCancel: {
+                        if !deletingInProgress {
+                            deletingConfirmOpen = false
                         }
-                    )
-                }
-
-                if let deletingErrorMessage {
-                    MetrologyNoticeDialog(
-                        title: "提示",
-                        message: deletingErrorMessage
-                    ) {
-                        self.deletingErrorMessage = nil
+                    },
+                    onConfirm: {
+                        handleDeleteConfirm()
                     }
+                )
+            }
+
+            if let deletingErrorMessage {
+                MetrologyNoticeDialog(
+                    title: "删除失败",
+                    message: deletingErrorMessage,
+                    eyebrow: "Warning",
+                    tone: .expired
+                ) {
+                    self.deletingErrorMessage = nil
                 }
             }
-            .navigationTitle("设备详情")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    if onSaveEdit != nil {
-                        Button("编辑") { showEditSheet = true }
-                            .disabled(deletingInProgress)
-                    }
-                    if mode == .ledger, onDelete != nil, device.id != nil {
-                        Button("删除") {
-                            deletingConfirmOpen = true
-                        }
-                        .foregroundStyle(MetrologyPalette.statusExpired)
-                        .disabled(deletingInProgress)
-                    }
-                }
-            }
-            .sheet(isPresented: $showEditSheet) {
-                DeviceEditView(device: device) { payload in
-                    onSaveEdit?(payload)
-                }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            DeviceEditView(device: device) { payload in
+                onSaveEdit?(payload)
             }
         }
         .presentationDetents([.large])
         .preferredColorScheme(.light)
+    }
+
+    private var heroSection: some View {
+        MetrologyPageHeroCard(
+            eyebrow: mode == .ledger ? "Ledger Detail" : "Calibration Detail",
+            title: device.displayName,
+            subtitle: "完整属性、校准信息和责任归属统一展示，底部动作区保持一致。",
+            accent: validityTone
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("当前状态")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                statusBadge(text: normalized(device.validity).isEmpty ? "待确认" : normalized(device.validity), tint: validityColor)
+                statusBadge(text: normalized(device.useStatus).isEmpty ? "待确认" : normalized(device.useStatus), tint: useStatusColor)
+            }
+        }
+    }
+
+    private var footerBar: some View {
+        VStack(spacing: 0) {
+            Divider().overlay(Color(hex: 0xD5E2F2))
+            HStack(spacing: 10) {
+                footerButton(title: "关闭", icon: "xmark", tone: .muted, prominent: false, disabled: deletingInProgress) {
+                    dismiss()
+                }
+
+                if onSaveEdit != nil {
+                    footerButton(title: "编辑", icon: "pencil", tone: .neutral, prominent: true, disabled: deletingInProgress) {
+                        showEditSheet = true
+                    }
+                }
+
+                if mode == .ledger, onDelete != nil, device.id != nil {
+                    footerButton(
+                        title: deletingInProgress ? "删除中" : "删除",
+                        icon: deletingInProgress ? "hourglass" : "trash",
+                        tone: .expired,
+                        prominent: false,
+                        disabled: deletingInProgress
+                    ) {
+                        deletingConfirmOpen = true
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+            .background(MetrologyPalette.background)
+        }
+    }
+
+    private func footerButton(
+        title: String,
+        icon: String,
+        tone: MetrologyPillTone,
+        prominent: Bool,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .black))
+                Text(title)
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .frame(maxWidth: .infinity, minHeight: 22)
+            .padding(.vertical, 10)
+            .foregroundStyle(prominent ? Color.white : tone.tint)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(prominent ? tone.tint : tone.background)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(prominent ? tone.tint.opacity(0.88) : tone.stroke, lineWidth: prominent ? 0 : 1)
+            )
+            .shadow(color: prominent ? tone.tint.opacity(0.22) : Color.clear, radius: 8, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
     }
 
     private func handleDeleteConfirm() {
@@ -1322,20 +1464,13 @@ private struct DeviceDetailView: View {
 
     private func detailSection<Content: View>(
         title: String,
+        subtitle: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        Section {
+        MetrologySectionPanel(title: title, subtitle: subtitle) {
             VStack(spacing: 10) {
                 content()
             }
-            .padding(.vertical, 2)
-            .listRowBackground(MetrologyPalette.background)
-            .listRowSeparator(.hidden)
-        } header: {
-            Text(title)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-                .textCase(nil)
         }
     }
 
@@ -1451,6 +1586,20 @@ private struct DeviceDetailView: View {
         return MetrologyPalette.navActive
     }
 
+    private var validityTone: MetrologyPillTone {
+        let validity = normalized(device.validity)
+        if validity.contains("失效") || validity.contains("过期") {
+            return .expired
+        }
+        if validity.contains("即将过期") || validity.contains("预警") {
+            return .warning
+        }
+        if validity.contains("有效") {
+            return .valid
+        }
+        return .neutral
+    }
+
     private var purchasePriceText: String {
         guard let value = device.purchasePrice else { return "-" }
         let formatter = NumberFormatter()
@@ -1531,6 +1680,28 @@ private enum ChipStyle {
         case .valid: return MetrologyPalette.statusValid
         case .warning: return MetrologyPalette.statusWarning
         case .expired: return MetrologyPalette.statusExpired
+        }
+    }
+
+    var tone: MetrologyPillTone {
+        switch self {
+        case .neutral: return .neutral
+        case .valid: return .valid
+        case .warning: return .warning
+        case .expired: return .expired
+        }
+    }
+}
+
+private extension DeviceListMode {
+    var cardEyebrow: String {
+        switch self {
+        case .ledger:
+            return "LEDGER"
+        case .calibration:
+            return "CALIBRATION"
+        case .todo:
+            return "TODO"
         }
     }
 }

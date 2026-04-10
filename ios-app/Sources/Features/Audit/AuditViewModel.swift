@@ -128,7 +128,7 @@ final class AuditViewModel: ObservableObject {
                     historyTotal = fallbackResult.totalElements ?? Int64(rawPageItems.count)
                     historyPage = max(1, fallbackResult.page ?? historyPage)
                     historyTotalPages = max(1, fallbackResult.totalPages ?? 1)
-                    historyFallbackHint = "\u{670d}\u{52a1}\u{7aef}\u{7b5b}\u{9009}\u{5931}\u{8d25}\u{ff0c}\u{5df2}\u{964d}\u{7ea7}\u{4e3a}\u{672c}\u{5730}\u{7b5b}\u{9009}\u{ff08}\u{4ec5}\u{5f53}\u{524d}\u{9875}\u{ff09}\u{3002}"
+                    historyFallbackHint = "服务端筛选失败，已降级为本地筛选（仅当前页）。"
                     updateHistoryHint(currentPageCount: rawPageItems.count, isDegraded: true)
                     errorMessage = nil
                 }
@@ -178,7 +178,7 @@ final class AuditViewModel: ObservableObject {
 
     func approve(_ item: AuditRecordDto) async {
         guard let id = item.id else {
-            errorMessage = "\u{5ba1}\u{6279}\u{8bb0}\u{5f55}\u{49}\u{44}\u{65e0}\u{6548}"
+            errorMessage = "审批记录ID无效"
             return
         }
 
@@ -196,7 +196,7 @@ final class AuditViewModel: ObservableObject {
 
     func reject(_ item: AuditRecordDto, reason: String?) async {
         guard let id = item.id else {
-            errorMessage = "\u{5ba1}\u{6279}\u{8bb0}\u{5f55}\u{49}\u{44}\u{65e0}\u{6548}"
+            errorMessage = "审批记录ID无效"
             return
         }
 
@@ -214,7 +214,7 @@ final class AuditViewModel: ObservableObject {
 
     func loadDetail(_ item: AuditRecordDto) async -> AuditRecordDto? {
         guard let id = item.id else {
-            errorMessage = "\u{5ba1}\u{6279}\u{8bb0}\u{5f55}\u{49}\u{44}\u{65e0}\u{6548}"
+            errorMessage = "审批记录ID无效"
             return nil
         }
         do {
@@ -303,10 +303,10 @@ final class AuditViewModel: ObservableObject {
             "invalid parameter",
             "unrecognized parameter",
             "unexpected parameter",
-            "\u{53c2}\u{6570}\u{4e0d}\u{652f}\u{6301}",
-            "\u{672a}\u{77e5}\u{53c2}\u{6570}",
-            "\u{975e}\u{6cd5}\u{53c2}\u{6570}",
-            "\u{4e0d}\u{652f}\u{6301}"
+            "参数不支持",
+            "未知参数",
+            "非法参数",
+            "不支持"
         ]
 
         let filterFieldHints = [
@@ -314,9 +314,9 @@ final class AuditViewModel: ObservableObject {
             "status",
             "type",
             "filter",
-            "\u{7b5b}\u{9009}",
-            "\u{8fc7}\u{6ee4}",
-            "\u{67e5}\u{8be2}\u{6761}\u{4ef6}"
+            "筛选",
+            "过滤",
+            "查询条件"
         ]
 
         let hasUnsupportedHint = unsupportedHints.contains { hint in
@@ -328,7 +328,7 @@ final class AuditViewModel: ObservableObject {
         if hasUnsupportedHint && hasFilterFieldHint {
             return true
         }
-        if hasUnsupportedHint && (lower.contains("parameter") || text.contains("\u{53c2}\u{6570}")) {
+        if hasUnsupportedHint && (lower.contains("parameter") || text.contains("参数")) {
             return true
         }
         return false
@@ -391,9 +391,9 @@ final class AuditViewModel: ObservableObject {
 
     private func updateHistoryHint(currentPageCount: Int, isDegraded: Bool) {
         if isDegraded {
-            historyHint = "\u{5171} \(historyTotal) \u{6761}\u{ff0c}\u{5f53}\u{524d}\u{7b2c} \(historyPage)/\(historyTotalPages) \u{9875}\u{ff0c}\u{672c}\u{9875}\u{7b5b}\u{9009}\u{540e} \(items.count)/\(currentPageCount) \u{6761}"
+            historyHint = "共 \(historyTotal) 条，当前第 \(historyPage)/\(historyTotalPages) 页，本页筛选后 \(items.count)/\(currentPageCount) 条"
         } else {
-            historyHint = "\u{5171} \(historyTotal) \u{6761}\u{ff0c}\u{5f53}\u{524d}\u{7b2c} \(historyPage)/\(historyTotalPages) \u{9875}"
+            historyHint = "共 \(historyTotal) 条，当前第 \(historyPage)/\(historyTotalPages) 页"
         }
     }
 
@@ -446,11 +446,11 @@ enum AuditListMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .pending:
-            return "\u{5f85}\u{5ba1}\u{6279}"
+            return "待审批"
         case .my:
-            return "\u{6211}\u{7684}\u{7533}\u{8bf7}"
+            return "我的申请"
         case .history:
-            return "\u{5ba1}\u{6279}\u{5386}\u{53f2}"
+            return "审批历史"
         }
     }
 }

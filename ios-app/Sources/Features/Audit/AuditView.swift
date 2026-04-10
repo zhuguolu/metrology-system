@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import SwiftUI
 
 struct AuditView: View {
@@ -13,49 +13,39 @@ struct AuditView: View {
         ZStack {
             MetrologyPalette.background.ignoresSafeArea()
 
-            VStack(spacing: 10) {
-                if viewModel.isAdmin {
-                    Picker("\u{5ba1}\u{6838}\u{6a21}\u{5f0f}", selection: $viewModel.mode) {
-                        Text(AuditListMode.pending.title).tag(AuditListMode.pending)
-                        Text(AuditListMode.my.title).tag(AuditListMode.my)
-                        Text(AuditListMode.history.title).tag(AuditListMode.history)
+            ScrollView {
+                VStack(spacing: 14) {
+                    heroSection
+
+                    if viewModel.isAdmin {
+                        modePills
                     }
-                    .pickerStyle(.segmented)
+
+                    if viewModel.mode == .history {
+                        historyFilterPanel
+                    }
+
+                    if let message = viewModel.errorMessage {
+                        noticePill(message: message, tone: .expired)
+                    }
+
+                    if viewModel.mode == .history, !viewModel.historyHint.isEmpty {
+                        noticePill(message: viewModel.historyHint, tone: .neutral)
+                    }
+
+                    if viewModel.mode == .history,
+                       let fallbackHint = viewModel.historyFallbackHint,
+                       !fallbackHint.isEmpty {
+                        noticePill(message: fallbackHint, tone: .warning)
+                    }
+
+                    auditListPanel
                 }
-
-                if viewModel.mode == .history {
-                    historyFilterPanel
-                }
-
-                if let message = viewModel.errorMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(Color.red.opacity(0.9))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if viewModel.mode == .history, !viewModel.historyHint.isEmpty {
-                    Text(viewModel.historyHint)
-                        .font(.footnote)
-                        .foregroundStyle(MetrologyPalette.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if viewModel.mode == .history,
-                   let fallbackHint = viewModel.historyFallbackHint,
-                   !fallbackHint.isEmpty {
-                    Text(fallbackHint)
-                        .font(.footnote)
-                        .foregroundStyle(Color.orange.opacity(0.9))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                auditListPanel
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .scrollIndicators(.hidden)
         }
         .task {
             viewModel.configure(role: appState.session?.role, username: appState.session?.username)
@@ -91,6 +81,75 @@ struct AuditView: View {
         }
     }
 
+    private var heroSection: some View {
+        MetrologyPageHeroCard(
+            eyebrow: "Audit",
+            title: "数据审核",
+            subtitle: "集中处理待审批、我的申请与历史记录，审批详情保持只显示真实变更项。",
+            accent: modeTone
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("当前")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+
+                Text("\(viewModel.items.count)")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(modeTone.tint)
+
+                Text(viewModel.mode.title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.82))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(modeTone.stroke.opacity(0.8), lineWidth: 1)
+            )
+        }
+    }
+
+    private var modePills: some View {
+        HStack(spacing: 8) {
+            modePill(.pending, tone: .warning, compact: false)
+            modePill(.my, tone: .neutral, compact: false)
+            modePill(.history, tone: .muted, compact: false)
+        }
+    }
+
+    private func modePill(_ mode: AuditListMode, tone: MetrologyPillTone, compact: Bool) -> some View {
+        MetrologyInteractivePill(
+            title: mode.title,
+            value: modeSubtitle(for: mode),
+            tone: tone,
+            isSelected: viewModel.mode == mode,
+            compact: compact
+        ) {
+            guard viewModel.mode != mode else { return }
+            viewModel.mode = mode
+        }
+    }
+
+    private func modeSubtitle(for mode: AuditListMode) -> String {
+        switch mode {
+        case .pending:
+            return "待处理"
+        case .my:
+            return "我的申请"
+        case .history:
+            return "可检索"
+        }
+    }
+
+    private func noticePill(message: String, tone: MetrologyPillTone) -> some View {
+        MetrologyStatusBanner(message: message, tone: tone)
+    }
+
     private var sessionIdentity: String {
         let username = appState.session?.username ?? ""
         let role = appState.session?.role ?? ""
@@ -117,45 +176,48 @@ struct AuditView: View {
     }
 
     private var historyFilterPanel: some View {
-        VStack(spacing: 8) {
-            TextField(
-                "\u{5173}\u{952e}\u{8bcd}\u{ff1a}\u{8bbe}\u{5907}\u{540d}\u{79f0}\u{2f}\u{8ba1}\u{91cf}\u{7f16}\u{53f7}\u{2f}\u{63d0}\u{4ea4}\u{4eba}",
-                text: $viewModel.historyKeyword
-            )
-            .metrologyInput()
+        MetrologySectionPanel(
+            title: "历史筛选",
+            subtitle: "支持按状态、类型和关键词快速检索历史审批记录。"
+        ) {
+            VStack(spacing: 8) {
+                TextField(
+                    "关键词：设备名称/计量编号/提交人",
+                    text: $viewModel.historyKeyword
+                )
+                .metrologyInput()
 
-            HStack(spacing: 8) {
-                Menu {
-                    Button("\u{5168}\u{90e8}\u{72b6}\u{6001}") { applyHistoryStatusFilter("") }
-                    Button("\u{5f85}\u{5ba1}\u{6279}") { applyHistoryStatusFilter("PENDING") }
-                    Button("\u{5df2}\u{901a}\u{8fc7}") { applyHistoryStatusFilter("APPROVED") }
-                    Button("\u{5df2}\u{9a73}\u{56de}") { applyHistoryStatusFilter("REJECTED") }
-                } label: {
-                    MetrologySelectField(
-                        title: "\u{72b6}\u{6001}",
-                        value: historyStatusLabel(viewModel.historyStatusFilter),
-                        compact: true
-                    )
+                HStack(spacing: 8) {
+                    Menu {
+                        Button("全部状态") { applyHistoryStatusFilter("") }
+                        Button("待审批") { applyHistoryStatusFilter("PENDING") }
+                        Button("已通过") { applyHistoryStatusFilter("APPROVED") }
+                        Button("已驳回") { applyHistoryStatusFilter("REJECTED") }
+                    } label: {
+                        MetrologySelectField(
+                            title: "状态",
+                            value: historyStatusLabel(viewModel.historyStatusFilter),
+                            compact: true
+                        )
+                    }
+
+                    Menu {
+                        Button("全部类型") { applyHistoryTypeFilter("") }
+                        Button("新增") { applyHistoryTypeFilter("CREATE") }
+                        Button("修改") { applyHistoryTypeFilter("UPDATE") }
+                        Button("删除") { applyHistoryTypeFilter("DELETE") }
+                    } label: {
+                        MetrologySelectField(
+                            title: "类型",
+                            value: historyTypeLabel(viewModel.historyTypeFilter),
+                            compact: true
+                        )
+                    }
+
+                    Spacer(minLength: 0)
                 }
-
-                Menu {
-                    Button("\u{5168}\u{90e8}\u{7c7b}\u{578b}") { applyHistoryTypeFilter("") }
-                    Button("\u{65b0}\u{589e}") { applyHistoryTypeFilter("CREATE") }
-                    Button("\u{4fee}\u{6539}") { applyHistoryTypeFilter("UPDATE") }
-                    Button("\u{5220}\u{9664}") { applyHistoryTypeFilter("DELETE") }
-                } label: {
-                    MetrologySelectField(
-                        title: "\u{7c7b}\u{578b}",
-                        value: historyTypeLabel(viewModel.historyTypeFilter),
-                        compact: true
-                    )
-                }
-
-                Spacer(minLength: 0)
             }
         }
-        .padding(10)
-        .metrologyCard()
     }
 
     private func applyHistoryStatusFilter(_ value: String) {
@@ -185,81 +247,76 @@ struct AuditView: View {
     private func historyStatusLabel(_ value: String) -> String {
         switch value {
         case "PENDING":
-            return "\u{5f85}\u{5ba1}\u{6279}"
+            return "待审批"
         case "APPROVED":
-            return "\u{5df2}\u{901a}\u{8fc7}"
+            return "已通过"
         case "REJECTED":
-            return "\u{5df2}\u{9a73}\u{56de}"
+            return "已驳回"
         default:
-            return "\u{5168}\u{90e8}\u{72b6}\u{6001}"
+            return "全部状态"
         }
     }
 
     private func historyTypeLabel(_ value: String) -> String {
         switch value {
         case "CREATE":
-            return "\u{65b0}\u{589e}"
+            return "新增"
         case "UPDATE":
-            return "\u{4fee}\u{6539}"
+            return "修改"
         case "DELETE":
-            return "\u{5220}\u{9664}"
+            return "删除"
         default:
-            return "\u{5168}\u{90e8}\u{7c7b}\u{578b}"
+            return "全部类型"
         }
     }
 
     private var historyPagerBar: some View {
         HStack(spacing: 12) {
-            Button("\u{4e0a}\u{4e00}\u{9875}") {
+            Button("上一页") {
                 Task { await viewModel.prevHistoryPage() }
             }
             .buttonStyle(MetrologySecondaryButtonStyle())
             .disabled(viewModel.historyPage <= 1 || viewModel.isLoading)
             .opacity((viewModel.historyPage <= 1 || viewModel.isLoading) ? 0.45 : 1)
 
-            Text("\u{7b2c} \(viewModel.historyPage) / \(viewModel.historyTotalPages) \u{9875}")
+            Text("第 \(viewModel.historyPage) / \(viewModel.historyTotalPages) 页")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(MetrologyPalette.textSecondary)
+                .frame(maxWidth: .infinity)
 
-            Button("\u{4e0b}\u{4e00}\u{9875}") {
+            Button("下一页") {
                 Task { await viewModel.nextHistoryPage() }
             }
             .buttonStyle(MetrologyPrimaryButtonStyle())
             .disabled(viewModel.historyPage >= viewModel.historyTotalPages || viewModel.isLoading)
             .opacity((viewModel.historyPage >= viewModel.historyTotalPages || viewModel.isLoading) ? 0.45 : 1)
         }
-        .padding(.top, 4)
-        .padding(.bottom, 10)
     }
 
     private var auditListPanel: some View {
-        ScrollView {
+        MetrologySectionPanel(
+            title: auditPanelTitle,
+            subtitle: auditPanelSubtitle
+        ) {
             VStack(spacing: 0) {
                 if auditRows.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 26))
-                            .foregroundStyle(MetrologyPalette.textMuted)
-                        Text("\u{6682}\u{65e0}\u{5ba1}\u{6838}\u{8bb0}\u{5f55}")
-                            .font(.system(size: 13))
-                            .foregroundStyle(MetrologyPalette.textSecondary)
+                    if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                        MetrologyErrorStateView(
+                            title: "审核记录加载失败",
+                            message: errorMessage,
+                            actionTitle: "重新加载",
+                            action: {
+                                Task { await viewModel.loadCurrent() }
+                            }
+                        )
+                    } else {
+                        MetrologyEmptyStateView(
+                            icon: "tray",
+                            title: "暂无审核记录",
+                            message: "当前模式下还没有匹配数据，可以切换标签或调整历史筛选条件。"
+                        )
+                        .metrologyCard()
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 30)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white, Color(hex: 0xF6FAFF)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
-                    )
                 } else {
                     ForEach(auditRows) { row in
                         AuditRowCard(
@@ -284,12 +341,44 @@ struct AuditView: View {
 
                 if viewModel.mode == .history {
                     historyPagerBar
+                        .padding(.top, 8)
                 }
             }
-            .padding(.bottom, 4)
         }
-        .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var modeTone: MetrologyPillTone {
+        switch viewModel.mode {
+        case .pending:
+            return .warning
+        case .my:
+            return .neutral
+        case .history:
+            return .muted
+        }
+    }
+
+    private var auditPanelTitle: String {
+        switch viewModel.mode {
+        case .pending:
+            return "待审批记录"
+        case .my:
+            return "我的申请"
+        case .history:
+            return "审批历史"
+        }
+    }
+
+    private var auditPanelSubtitle: String {
+        switch viewModel.mode {
+        case .pending:
+            return "支持直接查看详情、通过或驳回，适合快速收口当前待审批任务。"
+        case .my:
+            return "集中查看自己提交的申请，便于跟踪审批进度与结果。"
+        case .history:
+            return "历史记录支持筛选与翻页，详情仅显示真实变更项。"
+        }
     }
 }
 
@@ -314,12 +403,25 @@ private struct AuditRowCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(translateType(item.type))
-                    .font(.system(size: 14.5, weight: .bold))
-                    .foregroundStyle(MetrologyPalette.textPrimary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AUDIT")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .tracking(0.7)
+                        .foregroundStyle(statusColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(statusColor.opacity(0.12))
+                        )
+
+                    Text(translateType(item.type))
+                        .font(.system(size: 15.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MetrologyPalette.textPrimary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 Spacer()
 
@@ -327,24 +429,28 @@ private struct AuditRowCard: View {
                     .font(.system(size: 11, weight: .bold))
                     .padding(.horizontal, 11)
                     .padding(.vertical, 5)
-                    .background(statusColor.opacity(0.14))
+                    .background(statusColor.opacity(0.16))
                     .foregroundStyle(statusColor)
                     .clipShape(Capsule())
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(statusColor.opacity(0.28), lineWidth: 1)
+                    )
             }
 
-            Text("\u{5bf9}\u{8c61}: \(translateEntityType(item.entityType)) / ID: \(item.entityId.map(String.init) ?? "-")")
+                Text("对象: \(translateEntityType(item.entityType)) / ID: \(item.entityId.map(String.init) ?? "-")")
                 .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 8)
                 .lineLimit(1)
 
-            Text("\u{63d0}\u{4ea4}\u{4eba}: \(submittedByText)")
+                Text("提交人: \(submittedByText)")
                 .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 3)
                 .lineLimit(1)
 
-            Text("\u{8bb0}\u{5f55}\u{65f6}\u{95f4}: \(submittedAtText)")
+                Text("记录时间: \(submittedAtText)")
                 .font(valueFont)
                 .foregroundStyle(MetrologyPalette.textSecondary)
                 .padding(.top, 3)
@@ -352,7 +458,7 @@ private struct AuditRowCard: View {
 
             if showActionButtons {
                 HStack(spacing: 10) {
-                    Button("\u{901a}\u{8fc7}") { onApprove() }
+                    Button("通过") { onApprove() }
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(MetrologyPalette.navActive)
                         .frame(minWidth: 56, minHeight: 28)
@@ -366,7 +472,7 @@ private struct AuditRowCard: View {
                                 .stroke(Color(hex: 0x2563EB, alpha: 0.40), lineWidth: 1)
                         )
 
-                    Button("\u{9a73}\u{56de}") { onReject() }
+                    Button("驳回") { onReject() }
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(MetrologyPalette.statusExpired)
                         .frame(minWidth: 56, minHeight: 28)
@@ -385,9 +491,9 @@ private struct AuditRowCard: View {
                 .padding(.top, 6)
             }
         }
-        .padding(12)
+        .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [Color.white, Color(hex: 0xF6FAFF)],
@@ -397,10 +503,10 @@ private struct AuditRowCard: View {
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
         )
-        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 4, x: 0, y: 2)
+        .shadow(color: Color(hex: 0x7A95B8, alpha: 0.12), radius: 8, x: 0, y: 4)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -432,94 +538,141 @@ struct AuditDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("\u{57fa}\u{672c}\u{4fe1}\u{606f}") {
-                    AuditDetailRow(label: "\u{7c7b}\u{578b}", value: translateType(record.type))
-                    AuditDetailRow(label: "\u{5bf9}\u{8c61}", value: translateEntityType(record.entityType))
-                    AuditDetailRow(label: "\u{5bf9}\u{8c61}\u{49}\u{44}", value: record.entityId.map(String.init) ?? "-")
-                    AuditDetailRow(label: "\u{72b6}\u{6001}", value: translateStatus(record.status))
-                    AuditDetailRow(label: "\u{63d0}\u{4ea4}\u{4eba}", value: record.submittedBy ?? "-")
-                    AuditDetailRow(label: "\u{63d0}\u{4ea4}\u{65f6}\u{95f4}", value: auditTimeToMinute(record.submittedAt))
-                    AuditDetailRow(label: "\u{5ba1}\u{6279}\u{4eba}", value: record.approvedBy ?? "-")
-                    AuditDetailRow(label: "\u{5ba1}\u{6279}\u{65f6}\u{95f4}", value: auditTimeToMinute(record.approvedAt))
-                    AuditDetailRow(label: "\u{5907}\u{6ce8}", value: record.remark ?? "-")
-                    AuditDetailRow(label: "\u{9a73}\u{56de}\u{539f}\u{56e0}", value: record.rejectReason ?? "-")
-                }
+        ZStack(alignment: .bottom) {
+            MetrologyPalette.background.ignoresSafeArea()
 
-                Section("\u{5bf9}\u{6bd4}\u{65b9}\u{5f0f}") {
-                    Picker("\u{5bf9}\u{6bd4}\u{65b9}\u{5f0f}", selection: $compareMode) {
-                        Text("\u{5b57}\u{6bb5}\u{5bf9}\u{6bd4}").tag(AuditCompareMode.field)
-                        Text("\u{539f}\u{6587}\u{5bf9}\u{6bd4}").tag(AuditCompareMode.raw)
+            ScrollView {
+                VStack(spacing: 10) {
+                    heroSection
+
+                    if let bannerMessage {
+                        MetrologyStatusBanner(message: bannerMessage, tone: bannerTone, compact: true)
                     }
-                    .pickerStyle(.segmented)
-                }
 
-                if compareMode == .field {
-                    Section("\u{5b57}\u{6bb5}\u{5bf9}\u{6bd4}\u{ff08}\(diffRows.count) \u{9879}\u{ff09}") {
-                        if diffRows.isEmpty {
-                            Text("\u{672a}\u{68c0}\u{6d4b}\u{5230}\u{53ef}\u{5c55}\u{793a}\u{7684}\u{5dee}\u{5f02}")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(diffRows) { row in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text(row.label)
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("\u{539f}\u{59cb}\u{503c}")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Text(row.originalDisplay)
-                                            .font(.footnote)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(8)
-                                            .background(Color.red.opacity(row.changeStyle == .added ? 0.04 : 0.12))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("\u{53d8}\u{66f4}\u{503c}")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Text(row.newDisplay)
-                                            .font(.footnote)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(8)
-                                            .background(Color.green.opacity(row.changeStyle == .removed ? 0.04 : 0.12))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                    }
-                                }
-                                .padding(.vertical, 2)
-                            }
+                    MetrologySectionPanel(title: "基本信息", subtitle: "审批状态、提交人与审批信息统一展示。") {
+                        VStack(spacing: 10) {
+                            AuditDetailRow(label: "类型", value: translateType(record.type))
+                            AuditDetailRow(label: "对象", value: translateEntityType(record.entityType))
+                            AuditDetailRow(label: "对象 ID", value: record.entityId.map(String.init) ?? "-")
+                            AuditDetailRow(label: "状态", value: translateStatus(record.status), tone: statusTone)
+                            AuditDetailRow(label: "提交人", value: record.submittedBy ?? "-")
+                            AuditDetailRow(label: "提交时间", value: auditTimeToMinute(record.submittedAt))
+                            AuditDetailRow(label: "审批人", value: record.approvedBy ?? "-")
+                            AuditDetailRow(label: "审批时间", value: auditTimeToMinute(record.approvedAt))
+                            AuditDetailRow(label: "备注", value: record.remark ?? "-")
+                            AuditDetailRow(label: "驳回原因", value: record.rejectReason ?? "-")
                         }
                     }
-                } else {
-                    Section("\u{539f}\u{6587}\u{5bf9}\u{6bd4}") {
-                        AuditRawCompareCard(
-                            title: "\u{539f}\u{59cb}\u{6570}\u{636e}",
-                            text: prettyAuditJSON(record.originalData)
-                        )
-                        AuditRawCompareCard(
-                            title: "\u{53d8}\u{66f4}\u{6570}\u{636e}",
-                            text: prettyAuditJSON(record.newData)
-                        )
+
+                    MetrologySectionPanel(title: "对比方式", subtitle: "字段对比仅保留真实变更项，原文对比便于快速复核。") {
+                        Picker("对比方式", selection: $compareMode) {
+                            Text("字段对比").tag(AuditCompareMode.field)
+                            Text("原文对比").tag(AuditCompareMode.raw)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    if compareMode == .field {
+                        MetrologySectionPanel(title: "变更字段", subtitle: "共 \(diffRows.count) 项真实变更") {
+                            if diffRows.isEmpty {
+                                MetrologyEmptyStateView(
+                                    icon: "checkmark.seal",
+                                    title: "没有可展示的变更",
+                                    message: "当前审批详情没有检测到可展示的字段差异。"
+                                )
+                            } else {
+                                VStack(spacing: 10) {
+                                    ForEach(diffRows) { row in
+                                        AuditDiffCard(row: row)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        MetrologySectionPanel(title: "原文对比", subtitle: "保留原始 JSON 视图，便于追查完整上下文。") {
+                            AuditRawCompareCard(
+                                title: "原始数据",
+                                text: prettyAuditJSON(record.originalData)
+                            )
+                            AuditRawCompareCard(
+                                title: "变更数据",
+                                text: prettyAuditJSON(record.newData)
+                            )
+                        }
                     }
                 }
+                .padding(12)
+                .padding(.bottom, 102)
             }
-            .scrollContentBackground(.hidden)
-            .background(MetrologyPalette.background)
-            .navigationTitle("\u{5ba1}\u{6838}\u{8be6}\u{60c5}")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("\u{5173}\u{95ed}") {
-                        dismiss()
+            .scrollIndicators(.hidden)
+
+            VStack(spacing: 0) {
+                Divider().overlay(Color(hex: 0xD5E2F2))
+                MetrologySaveCancelRow(
+                    cancelTitle: "关闭",
+                    saveTitle: compareMode == .field ? "切换原文" : "切换字段",
+                    onCancel: { dismiss() },
+                    onSave: {
+                        compareMode = compareMode == .field ? .raw : .field
                     }
-                }
+                )
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+                .background(MetrologyPalette.background)
             }
         }
+    }
+
+    private var heroSection: some View {
+        MetrologyPageHeroCard(
+            eyebrow: "Audit Detail",
+            title: auditTitle,
+            subtitle: "审批详情仅保留真实变更项，适合快速复核当前申请的变更范围。",
+            accent: statusTone
+        ) {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("当前状态")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                Text(translateStatus(record.status))
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(statusTone.tint)
+                Text("变更项 \(diffRows.count)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+            }
+        }
+    }
+
+    private var statusTone: MetrologyPillTone {
+        switch (record.status ?? "").uppercased() {
+        case "APPROVED": return .valid
+        case "REJECTED": return .expired
+        case "PENDING": return .warning
+        default: return .neutral
+        }
+    }
+
+    private var auditTitle: String {
+        "\(translateType(record.type))申请 · \(translateStatus(record.status))"
+    }
+
+    private var bannerMessage: String? {
+        let reject = record.rejectReason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !reject.isEmpty {
+            return "驳回原因：\(reject)"
+        }
+        let remark = record.remark?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !remark.isEmpty {
+            return "备注：\(remark)"
+        }
+        return nil
+    }
+
+    private var bannerTone: MetrologyPillTone {
+        let reject = record.rejectReason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return reject.isEmpty ? .neutral : .expired
     }
 }
 
@@ -531,30 +684,53 @@ private struct AuditRejectReasonSheet: View {
     @State private var reason: String = ""
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("\u{8bb0}\u{5f55}\u{49}\u{44}: \(record.id.map(String.init) ?? "-")")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                TextEditor(text: $reason)
-                    .frame(minHeight: 120)
-                    .padding(8)
-                    .background(MetrologyPalette.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Spacer()
-            }
-            .padding(14)
-            .navigationTitle("\u{9a73}\u{56de}\u{539f}\u{56e0}")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("\u{53d6}\u{6d88}") { onCancel() }
+        ZStack(alignment: .bottom) {
+            MetrologyFormSheetScaffold(
+                eyebrow: "Reject",
+                title: "驳回申请",
+                subtitle: "填写驳回原因后提交，审批记录会保留该说明。",
+                accent: .expired,
+                bannerMessage: "留空也可提交，系统会按“无驳回原因”处理。",
+                bannerTone: .warning
+            ) {
+                MetrologySectionPanel(title: "审批信息", subtitle: "确认记录后再填写驳回原因。") {
+                    VStack(spacing: 10) {
+                        AuditDetailRow(label: "记录 ID", value: record.id.map(String.init) ?? "-")
+                        AuditDetailRow(label: "类型", value: translateType(record.type))
+                        AuditDetailRow(label: "对象", value: translateEntityType(record.entityType))
+                    }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("\u{63d0}\u{4ea4}") {
+
+                MetrologySectionPanel(title: "驳回原因", subtitle: "建议写明不通过原因，方便申请人快速修正。") {
+                    TextEditor(text: $reason)
+                        .frame(minHeight: 140)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                        )
+                }
+            }
+
+            VStack(spacing: 0) {
+                Divider().overlay(Color(hex: 0xD5E2F2))
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: "提交驳回",
+                    onCancel: { onCancel() },
+                    onSave: {
                         let text = reason.trimmingCharacters(in: .whitespacesAndNewlines)
                         onSubmit(text.isEmpty ? nil : text)
                     }
-                }
+                )
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+                .background(MetrologyPalette.background)
             }
         }
     }
@@ -578,15 +754,79 @@ private struct AuditListRow: Identifiable {
 private struct AuditDetailRow: View {
     let label: String
     let value: String
+    var tone: MetrologyPillTone? = nil
 
     var body: some View {
         HStack(alignment: .top) {
             Text(label)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 12)
-            Text(value)
-                .multilineTextAlignment(.trailing)
+            if let tone, value != "-" {
+                Text(value)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(tone.tint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(tone.background)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(tone.stroke, lineWidth: 1)
+                    )
+            } else {
+                Text(value)
+                    .multilineTextAlignment(.trailing)
+            }
         }
+    }
+}
+
+private struct AuditDiffCard: View {
+    let row: AuditDiffRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(row.label)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(MetrologyPalette.textPrimary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("修改前")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                Text(row.originalDisplay)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color.red.opacity(row.changeStyle == .added ? 0.04 : 0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("修改后")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MetrologyPalette.textSecondary)
+                Text(row.newDisplay)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(MetrologyPalette.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color.green.opacity(row.changeStyle == .removed ? 0.04 : 0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(hex: 0xD5E2F2), lineWidth: 1)
+        )
     }
 }
 
@@ -768,9 +1008,9 @@ private func normalizeAuditFieldValue(key: String, value: Any?) -> String {
         return auditTimeToMinute(text)
     case "cycle":
         if let cycle = Int(text) {
-            if cycle == 6 { return "\u{534a}\u{5e74}" }
-            if cycle == 12 { return "\u{4e00}\u{5e74}" }
-            return "\(cycle)\u{4e2a}\u{6708}"
+        if cycle == 6 { return "半年" }
+        if cycle == 12 { return "一年" }
+        return "\(cycle)个月"
         }
         return text
     default:
@@ -844,11 +1084,11 @@ private func translateType(_ value: String?) -> String {
     let code = (value ?? "").uppercased()
     switch code {
     case "CREATE":
-        return "\u{65b0}\u{589e}"
+            return "新增"
     case "UPDATE":
-        return "\u{4fee}\u{6539}"
+            return "修改"
     case "DELETE":
-        return "\u{5220}\u{9664}"
+            return "删除"
     default:
         return fallbackAuditText(value)
     }
@@ -858,13 +1098,13 @@ private func translateEntityType(_ value: String?) -> String {
     let code = (value ?? "").uppercased()
     switch code {
     case "DEVICE":
-        return "\u{8bbe}\u{5907}"
+            return "设备"
     case "CALIBRATION":
-        return "\u{6821}\u{51c6}"
+            return "校准"
     case "USER":
-        return "\u{7528}\u{6237}"
+            return "用户"
     case "DEPARTMENT":
-        return "\u{90e8}\u{95e8}"
+            return "部门"
     default:
         return fallbackAuditText(value)
     }
@@ -874,17 +1114,17 @@ private func translateStatus(_ value: String?) -> String {
     let code = (value ?? "").uppercased()
     switch code {
     case "PENDING":
-        return "\u{5f85}\u{5ba1}\u{6279}"
+            return "待审批"
     case "APPROVED":
-        return "\u{5df2}\u{901a}\u{8fc7}"
+            return "已通过"
     case "REJECTED":
-        return "\u{5df2}\u{9a73}\u{56de}"
+            return "已驳回"
     case "NORMAL":
-        return "\u{6b63}\u{5e38}"
+            return "正常"
     case "FAULT":
-        return "\u{6545}\u{969c}"
+            return "故障"
     case "SCRAP":
-        return "\u{62a5}\u{5e9f}"
+            return "报废"
     default:
         return fallbackAuditText(value)
     }
@@ -894,11 +1134,11 @@ private func translateValidity(_ value: String?) -> String {
     let code = (value ?? "").uppercased()
     switch code {
     case "VALID":
-        return "\u{6709}\u{6548}"
+            return "有效"
     case "WARNING", "EXPIRING", "NEAR_EXPIRY":
-        return "\u{5373}\u{5c06}\u{8fc7}\u{671f}"
+            return "即将过期"
     case "EXPIRED", "INVALID":
-        return "\u{5931}\u{6548}"
+            return "失效"
     default:
         return fallbackAuditText(value)
     }
@@ -908,9 +1148,9 @@ private func translateCalibrationResult(_ value: String?) -> String {
     let code = (value ?? "").uppercased()
     switch code {
     case "QUALIFIED":
-        return "\u{5408}\u{683c}"
+            return "合格"
     case "UNQUALIFIED":
-        return "\u{4e0d}\u{5408}\u{683c}"
+            return "不合格"
     default:
         return fallbackAuditText(value)
     }

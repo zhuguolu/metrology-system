@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct ChangeRecordView: View {
     @EnvironmentObject private var appState: AppState
@@ -34,10 +34,12 @@ struct ChangeRecordView: View {
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
 
-            if let errorMessage = viewModel.errorMessage {
+            if let errorMessage = viewModel.errorMessage, !rowItems.isEmpty {
                 MetrologyNoticeDialog(
-                    title: "\u{63d0}\u{793a}",
-                    message: errorMessage
+                    title: "提示",
+                    message: errorMessage,
+                    eyebrow: "Notice",
+                    tone: .warning
                 ) {
                     viewModel.errorMessage = nil
                 }
@@ -77,16 +79,7 @@ struct ChangeRecordView: View {
         }
         .overlay {
             if viewModel.isLoading {
-                ProgressView("加载中...")
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(MetrologyPalette.surface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(MetrologyPalette.stroke, lineWidth: 1)
-                    )
+                MetrologyLoadingCard(title: "加载中...")
             }
         }
     }
@@ -114,26 +107,26 @@ struct ChangeRecordView: View {
 
             HStack(spacing: 8) {
                 Menu {
-                    Button("\u{5168}\u{90e8}") { viewModel.type = "" }
-                    Button("\u{65b0}\u{589e}") { viewModel.type = "CREATE" }
-                    Button("\u{4fee}\u{6539}") { viewModel.type = "UPDATE" }
-                    Button("\u{5220}\u{9664}") { viewModel.type = "DELETE" }
+                    Button("全部") { viewModel.type = "" }
+                    Button("新增") { viewModel.type = "CREATE" }
+                    Button("修改") { viewModel.type = "UPDATE" }
+                    Button("删除") { viewModel.type = "DELETE" }
                 } label: {
                     MetrologySelectField(
-                        title: "\u{64cd}\u{4f5c}\u{7c7b}\u{578b}",
+                        title: "操作类型",
                         value: typeLabel(viewModel.type),
                         compact: true
                     )
                 }
 
                 Menu {
-                    Button("\u{5168}\u{90e8}") { viewModel.status = "" }
-                    Button("\u{5f85}\u{5ba1}\u{6279}") { viewModel.status = "PENDING" }
-                    Button("\u{5df2}\u{901a}\u{8fc7}") { viewModel.status = "APPROVED" }
-                    Button("\u{5df2}\u{9a73}\u{56de}") { viewModel.status = "REJECTED" }
+                    Button("全部") { viewModel.status = "" }
+                    Button("待审批") { viewModel.status = "PENDING" }
+                    Button("已通过") { viewModel.status = "APPROVED" }
+                    Button("已驳回") { viewModel.status = "REJECTED" }
                 } label: {
                     MetrologySelectField(
-                        title: "\u{5904}\u{7406}\u{72b6}\u{6001}",
+                        title: "处理状态",
                         value: statusLabel(viewModel.status),
                         compact: true
                     )
@@ -187,25 +180,29 @@ struct ChangeRecordView: View {
     }
 
     private var hintLine: some View {
-        HStack(spacing: 8) {
-            Text(viewModel.hint)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(message: viewModel.hint, tone: .neutral, compact: true)
     }
 
     private var recordsList: some View {
         VStack(spacing: 8) {
             if rowItems.isEmpty, !viewModel.isLoading {
-                Text("暂无变更记录")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
+                if let errorMessage = viewModel.errorMessage, !errorMessage.isEmpty {
+                    MetrologyErrorStateView(
+                        title: "变更记录加载失败",
+                        message: errorMessage,
+                        actionTitle: "重新加载",
+                        action: {
+                            Task { await viewModel.applyFilters() }
+                        }
+                    )
+                } else {
+                    MetrologyEmptyStateView(
+                        icon: "clock.arrow.circlepath",
+                        title: "暂无变更记录",
+                        message: "当前筛选条件下没有匹配结果，可以调整条件后重新查询。"
+                    )
                     .metrologyCard()
+                }
             } else {
                 ForEach(rowItems) { row in
                     ChangeRecordRowCard(
@@ -385,22 +382,22 @@ private struct ChangeRecordDatePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 14) {
-                DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .labelsHidden()
+        VStack(spacing: 14) {
+            DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .labelsHidden()
 
-                HStack(spacing: 10) {
-                    Button("清空") {
-                        onClear()
-                        dismiss()
-                    }
-                    .buttonStyle(MetrologySecondaryButtonStyle())
+            HStack(spacing: 10) {
+                Button("清空") {
+                    onClear()
+                    dismiss()
+                }
+                .buttonStyle(MetrologySecondaryButtonStyle())
 
-                    Button("确定") {
-                        onSelect(selectedDate)
-                        dismiss()
-                    }
+                Button("确定") {
+                    onSelect(selectedDate)
+                    dismiss()
+                }
                     .buttonStyle(MetrologyPrimaryButtonStyle())
                 }
             }
@@ -673,4 +670,5 @@ private extension Color {
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 }
+
 

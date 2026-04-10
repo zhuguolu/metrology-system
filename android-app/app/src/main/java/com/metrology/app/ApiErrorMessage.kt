@@ -8,10 +8,17 @@ fun Throwable.toUserMessage(defaultMessage: String): String {
     if (isCancellationLike()) {
         return "操作已取消"
     }
-    val bodyMessage = (this as? HttpException)?.response()?.errorBody()?.string()
-        ?.let(::extractApiMessage)
-    val message = bodyMessage ?: message
-    return message.fixMojibake().ifBlank { defaultMessage }
+    val parsedError = (this as? HttpException)?.response()?.errorBody()?.string()
+        ?.let(::extractApiError)
+    val resolvedMessage = parsedError?.message ?: message
+    val resolvedCode = parsedError?.code
+    if (!resolvedMessage.isNullOrBlank()) {
+        return resolvedMessage.fixMojibake().ifBlank { defaultMessage }
+    }
+    if (!resolvedCode.isNullOrBlank()) {
+        return "请求失败：$resolvedCode"
+    }
+    return defaultMessage
 }
 
 fun Throwable.isCancellationLike(): Boolean {
@@ -27,9 +34,17 @@ fun Throwable.isCancellationLike(): Boolean {
         raw.contains("stream was reset: cancel")
 }
 
-private fun extractApiMessage(rawBody: String): String? {
+private data class ParsedApiError(
+    val code: String?,
+    val message: String?
+)
+
+private fun extractApiError(rawBody: String): ParsedApiError? {
     return runCatching {
         val jsonObject = JsonParser.parseString(rawBody).asJsonObject
-        jsonObject.get("message")?.asString
-    }.getOrNull()?.trim()
+        ParsedApiError(
+            code = jsonObject.get("code")?.takeIf { !it.isJsonNull }?.asString?.trim(),
+            message = jsonObject.get("message")?.takeIf { !it.isJsonNull }?.asString?.trim()
+        )
+    }.getOrNull()
 }

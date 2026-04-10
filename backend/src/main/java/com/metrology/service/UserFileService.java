@@ -537,7 +537,7 @@ public class UserFileService {
 
     private Map<String, Object> buildListResult(List<UserFile> items, boolean readOnly, boolean canWrite) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("items", items);
+        result.put("items", items.stream().map(this::toFileItemPayload).toList());
         result.put("access", Map.of(
                 "readOnly", readOnly,
                 "canWrite", canWrite
@@ -548,7 +548,7 @@ public class UserFileService {
     private Comparator<UserFile> fileComparator() {
         return Comparator
                 .comparing((UserFile file) -> TYPE_FILE.equals(file.getType()))
-                .thenComparing(file -> file.getName().toLowerCase());
+                .thenComparing(file -> safeLowerName(file.getName()));
     }
 
     private List<UserFile> loadGrantedRootFolders(Long userId, List<UserFile> existingItems) {
@@ -598,7 +598,7 @@ public class UserFileService {
 
         Arrays.sort(children, Comparator
                 .comparing(File::isFile)
-                .thenComparing(file -> file.getName().toLowerCase()));
+                .thenComparing(file -> safeLowerName(file.getName())));
 
         Map<String, UserFile> existingByName = new LinkedHashMap<>();
         for (UserFile existing : repo.findByUserIdAndParentIdOrderByTypeAscNameAsc(userId, parentId)) {
@@ -1134,6 +1134,29 @@ public class UserFileService {
 
     private String normalizeNullableText(String value) {
         return hasText(value) ? value.trim() : null;
+    }
+
+    private Map<String, Object> toFileItemPayload(UserFile file) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", file.getId());
+        item.put("userId", file.getUserId());
+        item.put("parentId", file.getParentId());
+        item.put("name", file.getName());
+        item.put("type", file.getType());
+        item.put("filePath", file.getFilePath());
+        item.put("fileSize", file.getFileSize());
+        item.put("mimeType", file.getMimeType());
+        item.put("createdAt", file.getCreatedAt() != null ? file.getCreatedAt().toString() : null);
+        item.put("readOnly", file.getReadOnly());
+        item.put("shared", file.getShared());
+        item.put("grantRootId", file.getGrantRootId());
+        item.put("sharedOwner", file.getSharedOwner());
+        item.put("isFolder", TYPE_FOLDER.equals(file.getType()));
+        return item;
+    }
+
+    private String safeLowerName(String value) {
+        return value == null ? "" : value.toLowerCase();
     }
 
     private static class ScanStats {

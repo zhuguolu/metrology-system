@@ -9,7 +9,7 @@ struct LoginView: View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [Color(hex: 0x061B3F), Color(hex: 0x0B2A57)],
+                    colors: [Color(hex: 0x071A3E), Color(hex: 0x0D2A58), Color(hex: 0x10346D)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -31,8 +31,25 @@ struct LoginView: View {
                     .frame(width: 300, height: 300)
                     .offset(x: 190, y: 330)
 
+                RoundedRectangle(cornerRadius: 44, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .padding(18)
+
                 VStack {
-                    Spacer(minLength: 0)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("计量管理系统")
+                            .font(.system(size: 34, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+
+                        Text("设备、校准、审核与资料统一归集。")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.74))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 34)
+                    .padding(.top, 78)
+
+                    Spacer(minLength: 20)
 
                     loginCard
                         .padding(.horizontal, 24)
@@ -57,6 +74,7 @@ struct LoginView: View {
                             )
                         )
                         .frame(width: 54, height: 54)
+
                     Image(systemName: "gauge.with.dots.needle.100percent")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(.white)
@@ -72,8 +90,8 @@ struct LoginView: View {
                 }
             }
 
-            Text("欢迎使用")
-                .font(.system(size: 20, weight: .bold))
+            Text("欢迎回来")
+                .font(.system(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(MetrologyPalette.textPrimary)
                 .padding(.top, 18)
 
@@ -181,7 +199,8 @@ struct LoginView: View {
             Image(systemName: "person")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(MetrologyPalette.textMuted)
-            TextField("用户名", text: $viewModel.username)
+
+            TextField("请输入用户名", text: $viewModel.username)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.system(size: 16))
@@ -207,11 +226,11 @@ struct LoginView: View {
 
             Group {
                 if showPassword {
-                    TextField("密码", text: $viewModel.password)
+                    TextField("请输入密码", text: $viewModel.password)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 } else {
-                    SecureField("密码", text: $viewModel.password)
+                    SecureField("请输入密码", text: $viewModel.password)
                 }
             }
             .font(.system(size: 16))

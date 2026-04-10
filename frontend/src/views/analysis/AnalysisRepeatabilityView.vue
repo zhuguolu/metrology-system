@@ -1,5 +1,17 @@
 ﻿<template>
   <div class="repeatability-shell">
+    <section class="analysis-report-hero analysis-report-hero-repeat">
+      <div>
+        <div class="analysis-report-kicker">Repeatability</div>
+        <h1 class="analysis-report-title">重复性结果报告页</h1>
+        <p class="analysis-report-desc">把样本覆盖、EV、Rbar 与控制图放到统一首屏，让重复性结论更像正式量测分析摘要。</p>
+      </div>
+      <div class="analysis-report-badges">
+        <span class="analysis-report-badge strong">样本 {{ sampleCount }} / {{ requiredCount }}</span>
+        <span class="analysis-report-badge" :class="isResultStale ? 'warn' : 'success'">{{ isResultStale ? '结果待刷新' : '结果已同步' }}</span>
+        <span class="analysis-report-badge primary">{{ result?.summary || '等待计算' }}</span>
+      </div>
+    </section>
     <div class="rp-card">
       <div class="rp-card-title">重复性参数</div>
       <div class="rp-form-grid">
@@ -729,5 +741,27 @@ function resizeCharts() {
     padding: 6px 0;
   }
   .rp-chart { height: 280px; }
+}
+.rp-card { border-radius: 22px; border: 1px solid rgba(226,232,240,.94); box-shadow: 0 16px 34px rgba(15,23,42,.06); }
+.rp-chart-panel { border-radius: 18px; box-shadow: inset 0 1px 0 rgba(255,255,255,.72); }
+.analysis-report-hero {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding:24px 26px; margin-bottom:18px;
+  border-radius:28px; border:1px solid rgba(187,247,208,.82);
+  background:radial-gradient(circle at top right, rgba(220,252,231,.8), transparent 28%), linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
+  box-shadow:0 24px 60px rgba(15,23,42,.08);
+}
+.analysis-report-kicker { display:inline-flex; align-items:center; min-height:28px; padding:0 12px; border-radius:999px; background:rgba(16,185,129,.1); color:#059669; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.analysis-report-title { margin:14px 0 8px; font-size:30px; line-height:1.12; color:#0f172a; }
+.analysis-report-desc { margin:0; max-width:760px; color:#64748b; line-height:1.7; }
+.analysis-report-badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; min-width:240px; }
+.analysis-report-badge { display:inline-flex; align-items:center; min-height:38px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; border:1px solid rgba(226,232,240,.94); background:rgba(241,245,249,.96); color:#475569; }
+.analysis-report-badge.strong { color:#2563eb; background:rgba(219,234,254,.78); border-color:rgba(147,197,253,.9); }
+.analysis-report-badge.success { color:#047857; background:rgba(209,250,229,.92); border-color:rgba(110,231,183,.9); }
+.analysis-report-badge.warn { color:#b45309; background:rgba(254,243,199,.95); border-color:rgba(252,211,77,.9); }
+.analysis-report-badge.primary { color:#047857; background:rgba(209,250,229,.92); border-color:rgba(110,231,183,.9); }
+@media (max-width: 768px) {
+  .analysis-report-hero { flex-direction:column; padding:18px; border-radius:22px; }
+  .analysis-report-title { font-size:24px; }
+  .analysis-report-badges { justify-content:flex-start; min-width:0; }
 }
 </style>

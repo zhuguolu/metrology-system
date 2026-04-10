@@ -49,7 +49,7 @@ private struct DashboardSnapshot: Codable {
 final class DashboardViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
-    @Published var hintText: String = "\u{6570}\u{636E}\u{66F4}\u{65B0}\u{65F6}\u{95F4}\u{FF1A}\u{521A}\u{521A}"
+    @Published var hintText: String = "数据更新时间：刚刚"
 
     @Published var total: Int64 = 0
     @Published var dueThisMonth: Int64 = 0
@@ -83,7 +83,7 @@ final class DashboardViewModel: ObservableObject {
 
             trend = parseTrend(result.monthlyTrend)
             deptStats = parseDeptStats(result.deptStats)
-            hintText = "\u{6570}\u{636E}\u{66F4}\u{65B0}\u{65F6}\u{95F4}\u{FF1A}\u{521A}\u{521A}"
+            hintText = "数据更新时间：刚刚"
             saveSnapshot()
         } catch {
             if let apiError = error as? APIError {
@@ -122,7 +122,7 @@ final class DashboardViewModel: ObservableObject {
                 row.department ??
                 row.name ??
                 row.label
-            ) ?? "\u{90E8}\u{95E8}\(index + 1)"
+            ) ?? "部门\(index + 1)"
 
             let valid = max(0, row.valid ?? row.validCount ?? row.normal ?? 0)
             let warning = max(0, row.warning ?? row.warningCount ?? row.aboutToExpire ?? 0)
@@ -167,7 +167,7 @@ final class DashboardViewModel: ObservableObject {
             let hit = String(text[match])
             let parts = hit.components(separatedBy: CharacterSet(charactersIn: "-/.年"))
             if let mm = parts.last, let month = Int(mm) {
-                return String(format: "%02d\u{6708}", month)
+                return String(format: "%02d月", month)
             }
         }
 
@@ -175,7 +175,7 @@ final class DashboardViewModel: ObservableObject {
         if let match = text.range(of: mmPattern, options: .regularExpression) {
             let hit = String(text[match]).replacingOccurrences(of: "月", with: "")
             if let month = Int(hit) {
-                return String(format: "%02d\u{6708}", month)
+                return String(format: "%02d月", month)
             }
         }
 
@@ -207,7 +207,7 @@ final class DashboardViewModel: ObservableObject {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.unitsStyle = .short
         let relative = formatter.localizedString(for: snapshot.savedAt, relativeTo: Date())
-        hintText = "\u{6570}\u{636E}\u{66F4}\u{65B0}\u{65F6}\u{95F4}\u{FF1A}\(relative)"
+        hintText = "数据更新时间：\(relative)"
     }
 
     private func saveSnapshot() {

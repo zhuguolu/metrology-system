@@ -55,9 +55,9 @@
 
     <div class="page-results-bar">
       <div class="page-results-meta">
-        <span class="page-results-chip page-results-chip-strong">待处理 {{ totalItems }} 条</span>
-        <span class="page-results-chip" :style="{ background:'#fef2f2', color:'#dc2626', borderColor:'#fca5a5' }">失效 {{ countByV('失效') }}</span>
-        <span class="page-results-chip" :style="{ background:'#fffbeb', color:'#b45309', borderColor:'#fcd34d' }">即将过期 {{ countByV('即将过期') }}</span>
+        <span class="page-results-chip page-results-chip-strong is-clickable" :class="{ 'is-active': !filterValidity }" @click="applyTodoValidityFilter('')">待处理 {{ totalItems }} 条</span>
+        <span class="page-results-chip page-results-chip-danger is-clickable" :class="{ 'is-active': isTodoValidityActive('失效') }" @click="applyTodoValidityFilter('失效')">失效 {{ countByV('失效') }}</span>
+        <span class="page-results-chip page-results-chip-warning is-clickable" :class="{ 'is-active': isTodoValidityActive('即将过期') }" @click="applyTodoValidityFilter('即将过期')">即将过期 {{ countByV('即将过期') }}</span>
         <span v-if="selectedIds.length" class="page-results-chip">已选 {{ selectedIds.length }} 项</span>
       </div>
       <div v-if="activeFilterCount" class="page-results-extra">已启用 {{ activeFilterCount }} 个筛选</div>
@@ -134,8 +134,8 @@
                 <input type="checkbox" :checked="isSelected(d.id)" @change="toggleSelection(d.id)" />
               </td>
               <td>
-                <span v-if="d.validity==='失效'" class="tag tag-expired">已失效</span>
-                <span v-else class="tag tag-warning">即将过期</span>
+                <span v-if="d.validity==='失效'" :class="['tag', 'tag-expired', 'tag-clickable', { 'is-active': isTodoValidityActive('失效') }]" @click.stop="applyTodoValidityFilter('失效')">已失效</span>
+                <span v-else :class="['tag', 'tag-warning', 'tag-clickable', { 'is-active': isTodoValidityActive('即将过期') }]" @click.stop="applyTodoValidityFilter('即将过期')">即将过期</span>
               </td>
               <td>
                 <span class="todo-device-link" @click="openPreview(d)">{{ d.name }}</span>
@@ -168,7 +168,7 @@
             <input type="checkbox" :checked="isSelected(d.id)" @change="toggleSelection(d.id)" />
             <div class="m-card-title todo-device-link" @click="openPreview(d)">{{ d.name }}</div>
           </div>
-          <span :class="['tag', d.validity==='失效'?'tag-expired':'tag-warning', 'todo-mobile-validity']">
+          <span :class="['tag', d.validity==='失效'?'tag-expired':'tag-warning', 'todo-mobile-validity', 'tag-clickable', { 'is-active': isTodoValidityActive(d.validity) }]" @click.stop="applyTodoValidityFilter(d.validity)">
             {{ d.validity==='失效' ? '失效' : '即将过期' }}
           </span>
         </div>
@@ -533,6 +533,13 @@ function resetFilter() {
   loadData()
 }
 function countByV(v) { return Number(summaryCounts.value?.[v] || 0) }
+function isTodoValidityActive(validity) { return (filterValidity.value || '') === (validity || '') }
+function applyTodoValidityFilter(validity) {
+  const nextValue = filterValidity.value === validity ? '' : (validity || '')
+  if (filterValidity.value === nextValue) return
+  filterValidity.value = nextValue
+  handleFilterChange()
+}
 function isSelected(id) { return selectedIds.value.includes(id) }
 function toggleSelection(id) {
   selectedIds.value = isSelected(id)
@@ -1145,4 +1152,67 @@ onUnmounted(() => {
     font-size: 11.5px;
   }
 }
+
+.todo-filter-bar {
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.88);
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.72), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+}
+
+.page-results-bar {
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+}
+
+.stats-grid .stat-card {
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.06);
+}
+
+.todo-mobile-card,
+.modal-box.modal-md,
+.modal-box.modal-sm {
+  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.08);
+}
+
+.page-pagination {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+}
+
+
+.module-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(254, 215, 170, 0.82);
+  background: radial-gradient(circle at top right, rgba(255,237,213,0.82), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+.module-hero-eyebrow { display:inline-flex; align-items:center; min-height:28px; padding:0 12px; border-radius:999px; background:rgba(245,158,11,0.12); color:#d97706; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.module-hero-title { margin:14px 0 8px; font-size:30px; line-height:1.12; color:#0f172a; }
+.module-hero-desc { margin:0; max-width:760px; color:#64748b; line-height:1.7; }
+.module-hero-pills { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; min-width:240px; }
+.module-hero-pill { display:inline-flex; align-items:center; min-height:38px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; border:1px solid transparent; }
+.module-hero-pill.strong { color:#2563eb; background:rgba(219,234,254,0.78); border-color:rgba(147,197,253,0.9); }
+.module-hero-pill.warning { color:#b45309; background:rgba(254,243,199,0.95); border-color:rgba(252,211,77,0.9); }
+.module-hero-pill.danger { color:#b91c1c; background:rgba(254,226,226,0.95); border-color:rgba(252,165,165,0.9); }
+.module-hero-pill.neutral { color:#475569; background:rgba(241,245,249,0.96); border-color:rgba(226,232,240,0.96); }
+.page-results-chip-warning { background:#fffbeb; color:#b45309; border-color:#fcd34d; }
+.page-results-chip-danger { background:#fef2f2; color:#dc2626; border-color:#fca5a5; }
+@media (max-width: 768px) {
+  .module-hero { flex-direction:column; padding:18px; border-radius:22px; }
+  .module-hero-title { font-size:24px; }
+  .module-hero-pills { justify-content:flex-start; min-width:0; }
+}
 </style>
+

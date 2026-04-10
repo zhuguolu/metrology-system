@@ -26,10 +26,12 @@ struct UserManagementView: View {
 
             if let deleteTarget {
                 MetrologyConfirmDialog(
-                    title: "\u{5220}\u{9664}\u{7528}\u{6237}",
+                    title: "删除用户",
                     message: "确定删除用户“\(displayUsername(deleteTarget))”？",
-                    cancelTitle: "\u{53d6}\u{6d88}",
-                    confirmTitle: "\u{5220}\u{9664}",
+                    eyebrow: "Delete",
+                    tone: .expired,
+                    cancelTitle: "取消",
+                    confirmTitle: "删除",
                     destructive: true,
                     onCancel: {
                         self.deleteTarget = nil
@@ -47,11 +49,18 @@ struct UserManagementView: View {
 
             if let errorMessage = viewModel.errorMessage {
                 MetrologyNoticeDialog(
-                    title: "\u{63d0}\u{793a}",
-                    message: errorMessage
+                    title: "提示",
+                    message: errorMessage,
+                    eyebrow: "Notice",
+                    tone: .warning
                 ) {
                     viewModel.errorMessage = nil
                 }
+            }
+        }
+        .overlay {
+            if viewModel.isLoading {
+                MetrologyLoadingCard(title: "加载中...")
             }
         }
         .navigationTitle("用户管理")
@@ -135,29 +144,18 @@ struct UserManagementView: View {
     }
 
     private var hintLine: some View {
-        HStack(spacing: 8) {
-            if viewModel.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
-            Text(viewModel.hint)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(message: viewModel.hint, tone: .neutral, compact: true)
     }
 
     private var userList: some View {
         VStack(spacing: 8) {
             if userRows.isEmpty, !viewModel.isLoading {
-                Text("暂无用户数据")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-                    .metrologyCard()
+                MetrologyEmptyStateView(
+                    icon: "person.2",
+                    title: "暂无用户数据",
+                    message: "可以直接新增一个用户，或稍后刷新再试。"
+                )
+                .metrologyCard()
             } else {
                 ForEach(userRows) { row in
                     UserRowCard(
@@ -324,87 +322,85 @@ private struct UserCreateSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+            MetrologyFormSheetScaffold(
+                eyebrow: "User",
+                title: "新增用户",
+                subtitle: "创建账号并配置基础权限，普通用户的访问范围可在这里一次性完成。",
+                accent: .neutral,
+                bannerMessage: draft.admin ? "管理员默认拥有全量权限，普通用户权限设置将自动收起。" : "普通用户可按模块勾选权限，后续也可以再进入详情调整。",
+                bannerTone: draft.admin ? .warning : .valid
+            ) {
+                MetrologySectionPanel(
+                    title: "基础信息",
+                    subtitle: "先填写用户名与登录密码。"
+                ) {
+                    VStack(spacing: 8) {
+                        TextField("用户名", text: $draft.username)
+                            .metrologyInput()
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
 
-                ScrollView {
-                    VStack(spacing: 10) {
-                        VStack(spacing: 8) {
-                            TextField("用户名", text: $draft.username)
-                                .metrologyInput()
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
+                        SecureField("密码（至少6位）", text: $draft.password)
+                            .metrologyInput()
 
-                            SecureField("密码（至少6位）", text: $draft.password)
-                                .metrologyInput()
-
-                            Toggle("设为管理员", isOn: $draft.admin)
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-                        }
-                        .padding(10)
-                        .metrologyCard()
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("普通用户权限")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-
-                            ForEach(UserPermissionCatalog.options) { option in
-                                Toggle(
-                                    option.label,
-                                    isOn: Binding(
-                                        get: {
-                                            draft.permissions.contains(option.code)
-                                        },
-                                        set: { enabled in
-                                            if enabled {
-                                                draft.permissions.insert(option.code)
-                                            } else {
-                                                draft.permissions.remove(option.code)
-                                            }
-                                        }
-                                    )
-                                )
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-                                .disabled(draft.admin)
-                                .opacity(draft.admin ? 0.45 : 1)
-                            }
-                        }
-                        .padding(10)
-                        .metrologyCard()
-
-                        if let validationMessage, !validationMessage.isEmpty {
-                            Text(validationMessage)
-                                .font(.footnote)
-                                .foregroundStyle(MetrologyPalette.statusExpired)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 2)
-                        }
-
-                        MetrologySaveCancelRow(
-                            onCancel: onCancel,
-                            onSave: {
-                                let username = draft.username.trimmingCharacters(in: .whitespacesAndNewlines)
-                                guard !username.isEmpty else {
-                                    validationMessage = "用户名不能为空"
-                                    return
-                                }
-                                guard draft.password.count >= 6 else {
-                                    validationMessage = "密码至少 6 位"
-                                    return
-                                }
-                                validationMessage = nil
-                                draft.username = username
-                                onSave(draft)
-                            }
-                        )
+                        Toggle("设为管理员", isOn: $draft.admin)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
                     }
-                    .padding(12)
-                    .padding(.bottom, 18)
                 }
-                .scrollIndicators(.hidden)
+
+                MetrologySectionPanel(
+                    title: "普通用户权限",
+                    subtitle: "仅在普通用户模式下生效。"
+                ) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(UserPermissionCatalog.options) { option in
+                            Toggle(
+                                option.label,
+                                isOn: Binding(
+                                    get: {
+                                        draft.permissions.contains(option.code)
+                                    },
+                                    set: { enabled in
+                                        if enabled {
+                                            draft.permissions.insert(option.code)
+                                        } else {
+                                            draft.permissions.remove(option.code)
+                                        }
+                                    }
+                                )
+                            )
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                            .disabled(draft.admin)
+                            .opacity(draft.admin ? 0.45 : 1)
+                        }
+                    }
+                }
+
+                if let validationMessage, !validationMessage.isEmpty {
+                    MetrologyInlineValidationMessage(message: validationMessage)
+                }
+
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: "保存用户",
+                    onCancel: onCancel,
+                    onSave: {
+                        let username = draft.username.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !username.isEmpty else {
+                            validationMessage = "用户名不能为空"
+                            return
+                        }
+                        guard draft.password.count >= 6 else {
+                            validationMessage = "密码至少 6 位"
+                            return
+                        }
+                        validationMessage = nil
+                        draft.username = username
+                        onSave(draft)
+                    }
+                )
             }
             .navigationTitle("新增用户")
         }
@@ -434,62 +430,64 @@ private struct UserPermissionSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 10) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("用户")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-                            Text(user.username?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? user.username ?? "" : "-")
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(MetrologyPalette.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .metrologyCard()
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("普通用户权限")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-
-                            ForEach(UserPermissionCatalog.options) { option in
-                                Toggle(
-                                    option.label,
-                                    isOn: Binding(
-                                        get: {
-                                            editingPermissions.contains(option.code)
-                                        },
-                                        set: { enabled in
-                                            if enabled {
-                                                editingPermissions.insert(option.code)
-                                            } else {
-                                                editingPermissions.remove(option.code)
-                                            }
-                                        }
-                                    )
-                                )
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(MetrologyPalette.textPrimary)
-                            }
-                        }
-                        .padding(10)
-                        .metrologyCard()
-
-                        MetrologySaveCancelRow(
-                            onCancel: onCancel,
-                            onSave: {
-                                onSave(editingPermissions)
-                            }
-                        )
+            MetrologyFormSheetScaffold(
+                eyebrow: "Permissions",
+                title: "权限设置",
+                subtitle: "按模块控制普通用户的访问与维护能力，变更后会立即生效。",
+                accent: .warning,
+                bannerMessage: "管理员账号默认拥有全量权限，这里只调整普通用户的可访问模块。",
+                bannerTone: .warning
+            ) {
+                MetrologySectionPanel(
+                    title: "当前用户",
+                    subtitle: "确认本次要调整权限的账号。"
+                ) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("用户")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                        Text(user.username?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? user.username ?? "" : "-")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
                     }
-                    .padding(12)
-                    .padding(.bottom, 18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scrollIndicators(.hidden)
+
+                MetrologySectionPanel(
+                    title: "普通用户权限",
+                    subtitle: "勾选后即可开放对应模块能力。"
+                ) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(UserPermissionCatalog.options) { option in
+                            Toggle(
+                                option.label,
+                                isOn: Binding(
+                                    get: {
+                                        editingPermissions.contains(option.code)
+                                    },
+                                    set: { enabled in
+                                        if enabled {
+                                            editingPermissions.insert(option.code)
+                                        } else {
+                                            editingPermissions.remove(option.code)
+                                        }
+                                    }
+                                )
+                            )
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textPrimary)
+                        }
+                    }
+                }
+
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: "保存权限",
+                    onCancel: onCancel,
+                    onSave: {
+                        onSave(editingPermissions)
+                    }
+                )
             }
             .navigationTitle("权限设置")
         }
@@ -511,46 +509,45 @@ private struct ResetPasswordSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                MetrologyPalette.background.ignoresSafeArea()
+            MetrologyFormSheetScaffold(
+                eyebrow: "Security",
+                title: "重置密码",
+                subtitle: "为指定账号设置新的登录密码，保存后旧密码将立即失效。",
+                accent: .expired,
+                bannerMessage: "新密码至少需要 6 位，建议使用大小写与数字组合。",
+                bannerTone: .expired
+            ) {
+                MetrologySectionPanel(
+                    title: "用户账号",
+                    subtitle: "确认当前重置对象后再输入新密码。"
+                ) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("用户: \(username)")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(MetrologyPalette.textSecondary)
 
-                ScrollView {
-                    VStack(spacing: 10) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("用户: \(username)")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(MetrologyPalette.textSecondary)
-
-                            SecureField("输入新密码（至少6位）", text: $password)
-                                .metrologyInput()
-                        }
-                        .padding(10)
-                        .metrologyCard()
-
-                        if let validationMessage, !validationMessage.isEmpty {
-                            Text(validationMessage)
-                                .font(.footnote)
-                                .foregroundStyle(MetrologyPalette.statusExpired)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 2)
-                        }
-
-                        MetrologySaveCancelRow(
-                            onCancel: onCancel,
-                            onSave: {
-                                guard password.count >= 6 else {
-                                    validationMessage = "密码至少 6 位"
-                                    return
-                                }
-                                validationMessage = nil
-                                onSave(password)
-                            }
-                        )
+                        SecureField("输入新密码（至少6位）", text: $password)
+                            .metrologyInput()
                     }
-                    .padding(12)
-                    .padding(.bottom, 18)
                 }
-                .scrollIndicators(.hidden)
+
+                if let validationMessage, !validationMessage.isEmpty {
+                    MetrologyInlineValidationMessage(message: validationMessage)
+                }
+
+                MetrologySaveCancelRow(
+                    cancelTitle: "取消",
+                    saveTitle: "保存密码",
+                    onCancel: onCancel,
+                    onSave: {
+                        guard password.count >= 6 else {
+                            validationMessage = "密码至少 6 位"
+                            return
+                        }
+                        validationMessage = nil
+                        onSave(password)
+                    }
+                )
             }
             .navigationTitle("重置密码")
         }

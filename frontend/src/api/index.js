@@ -1,4 +1,4 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api', timeout: 30000 })
 const publicApi = axios.create({ baseURL: '/api', timeout: 30000 })
@@ -68,6 +68,29 @@ function handlePublicResponseError(err) {
   }
   return Promise.reject(err)
 }
+
+export function extractApiError(error, fallbackMessage = '请求失败') {
+  const data = error?.response?.data
+  const message = data?.message || error?.message
+  const code = data?.code
+  if (message && String(message).trim()) {
+    return {
+      code: code || null,
+      message: String(message).trim(),
+    }
+  }
+  if (code && String(code).trim()) {
+    return {
+      code: String(code).trim(),
+      message: `${fallbackMessage}：${String(code).trim()}`,
+    }
+  }
+  return {
+    code: null,
+    message: fallbackMessage,
+  }
+}
+
 attachAuthRequestInterceptor(api)
 attachAuthRequestInterceptor(transferApi)
 
@@ -254,3 +277,4 @@ export const changeRecordApi = {
 }
 
 export default api
+

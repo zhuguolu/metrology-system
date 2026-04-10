@@ -23,10 +23,12 @@ struct DepartmentView: View {
 
             if let deletingItem {
                 MetrologyConfirmDialog(
-                    title: "\u{5220}\u{9664}\u{90e8}\u{95e8}",
+                    title: "删除部门",
                     message: "确定删除“\(deletingName(deletingItem))”？",
-                    cancelTitle: "\u{53d6}\u{6d88}",
-                    confirmTitle: "\u{5220}\u{9664}",
+                    eyebrow: "Delete",
+                    tone: .expired,
+                    cancelTitle: "取消",
+                    confirmTitle: "删除",
                     destructive: true,
                     onCancel: {
                         self.deletingItem = nil
@@ -46,11 +48,18 @@ struct DepartmentView: View {
 
             if let errorMessage = viewModel.errorMessage {
                 MetrologyNoticeDialog(
-                    title: "\u{63d0}\u{793a}",
-                    message: errorMessage
+                    title: "提示",
+                    message: errorMessage,
+                    eyebrow: "Notice",
+                    tone: .warning
                 ) {
                     viewModel.errorMessage = nil
                 }
+            }
+        }
+        .overlay {
+            if viewModel.isLoading {
+                MetrologyLoadingCard(title: "加载中...")
             }
         }
         .navigationTitle("部门管理")
@@ -111,29 +120,18 @@ struct DepartmentView: View {
     }
 
     private var hintLine: some View {
-        HStack(spacing: 8) {
-            if viewModel.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
-            Text(viewModel.hint)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MetrologyPalette.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        MetrologyStatusBanner(message: viewModel.hint, tone: .neutral, compact: true)
     }
 
     private var contentList: some View {
         VStack(spacing: 8) {
             if departmentRows.isEmpty, !viewModel.isLoading {
-                Text("暂无部门数据")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(MetrologyPalette.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-                    .metrologyCard()
+                MetrologyEmptyStateView(
+                    icon: "building.2",
+                    title: "暂无部门数据",
+                    message: "可以调整搜索条件，或直接新增一个部门。"
+                )
+                .metrologyCard()
             } else {
                 ForEach(departmentRows) { row in
                     DepartmentRow(
