@@ -46,6 +46,7 @@ struct AuditView: View {
                 .padding(.bottom, 12)
             }
             .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
         }
         .task {
             viewModel.configure(role: appState.session?.role, username: appState.session?.username)

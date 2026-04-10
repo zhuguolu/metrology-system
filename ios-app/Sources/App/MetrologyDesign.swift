@@ -148,7 +148,8 @@ struct MetrologyPrimaryButtonStyle: ButtonStyle {
 }
 
 enum MetrologyLayout {
-    static let pageHorizontalPadding: CGFloat = 12
+    static let pageHorizontalPadding: CGFloat = 4
+    static let controlHorizontalPadding: CGFloat = 12
 }
 
 struct MetrologySecondaryButtonStyle: ButtonStyle {
@@ -156,7 +157,7 @@ struct MetrologySecondaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(MetrologyPalette.textPrimary)
-            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
+            .padding(.horizontal, MetrologyLayout.controlHorizontalPadding)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -202,7 +203,7 @@ struct MetrologyDangerButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(Color.white)
-            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
+            .padding(.horizontal, MetrologyLayout.controlHorizontalPadding)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -424,24 +425,24 @@ struct MetrologyInteractivePill: View {
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
-                HStack(alignment: .center, spacing: compact ? 5 : 8) {
+                HStack(alignment: .center, spacing: compact ? 3 : 8) {
                     Circle()
                         .fill(tone.tint)
-                        .frame(width: compact ? 4 : 6, height: compact ? 4 : 6)
+                        .frame(width: compact ? 3 : 6, height: compact ? 3 : 6)
 
                     VStack(alignment: .leading, spacing: compact ? 2 : 4) {
                         Text(title)
-                            .font(.system(size: compact ? 10 : 11, weight: .bold))
+                            .font(.system(size: compact ? 8 : 11, weight: .bold))
                             .foregroundStyle(tone.tint)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.78)
+                            .minimumScaleFactor(0.72)
                             .allowsTightening(true)
 
                         Text(value)
-                            .font(.system(size: compact ? 12 : 14, weight: .black, design: .rounded))
+                            .font(.system(size: compact ? 10 : 14, weight: .black, design: .rounded))
                             .foregroundStyle(isSelected ? tone.tint : MetrologyPalette.textPrimary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.72)
+                            .minimumScaleFactor(0.68)
                             .allowsTightening(true)
                     }
 
@@ -450,29 +451,29 @@ struct MetrologyInteractivePill: View {
 
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: compact ? 9 : 10, weight: .black))
+                        .font(.system(size: compact ? 7 : 10, weight: .black))
                         .foregroundStyle(tone.tint)
-                        .padding(.top, compact ? 4 : 6)
-                        .padding(.trailing, compact ? 4 : 6)
+                        .padding(.top, compact ? 2 : 6)
+                        .padding(.trailing, compact ? 2 : 6)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: compact ? 54 : 62, alignment: .leading)
-            .padding(.horizontal, compact ? 9 : 12)
-            .padding(.vertical, compact ? 7 : 10)
+            .frame(minHeight: compact ? 42 : 62, alignment: .leading)
+            .padding(.horizontal, compact ? 6 : 12)
+            .padding(.vertical, compact ? 5 : 10)
             .background(
-                RoundedRectangle(cornerRadius: compact ? 14 : 16, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 12 : 16, style: .continuous)
                     .fill(isSelected ? tone.strongBackground : tone.background)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: compact ? 14 : 16, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 12 : 16, style: .continuous)
                     .stroke(isSelected ? tone.tint.opacity(0.95) : tone.stroke, lineWidth: isSelected ? 2 : 1)
             )
             .shadow(color: isSelected ? tone.tint.opacity(0.16) : Color.clear, radius: 8, x: 0, y: 4)
             .scaleEffect(isSelected ? 1.02 : 1)
             .opacity(isSelected ? 1 : 0.86)
         }
-        .contentShape(RoundedRectangle(cornerRadius: compact ? 14 : 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: compact ? 12 : 16, style: .continuous))
         .buttonStyle(.plain)
     }
 }

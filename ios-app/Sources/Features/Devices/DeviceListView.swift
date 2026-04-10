@@ -46,6 +46,7 @@ struct DeviceListView: View {
                     .padding(.bottom, 8)
                 }
                 .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
 
                 if let errorMessage = viewModel.errorMessage {
                     MetrologyNoticeDialog(
@@ -459,11 +460,11 @@ struct DeviceListView: View {
     private func summaryTileWidth(metrics: DeviceLayoutMetrics) -> CGFloat {
         switch viewModel.mode {
         case .ledger:
-            return metrics.width < 380 ? 86 : 92
+            return metrics.width < 380 ? 70 : 76
         case .calibration:
-            return metrics.width < 380 ? 100 : 108
+            return metrics.width < 380 ? 82 : 90
         case .todo:
-            return metrics.width < 380 ? 104 : 112
+            return metrics.width < 380 ? 84 : 92
         }
     }
 
