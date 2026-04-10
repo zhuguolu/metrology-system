@@ -148,7 +148,7 @@ struct DeviceEditView: View {
         }
     }
 
-    private func sectionCard<Content: View>(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) -> some View {
+    private func sectionCard<Content: View>(title: String, subtitle: String? = nil, @ViewBuilder content: @escaping () -> Content) -> some View {
         MetrologySectionPanel(title: title, subtitle: subtitle) {
             VStack(alignment: .leading, spacing: 8) {
                 content()

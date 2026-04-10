@@ -1465,7 +1465,7 @@ private struct DeviceDetailView: View {
     private func detailSection<Content: View>(
         title: String,
         subtitle: String,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         MetrologySectionPanel(title: title, subtitle: subtitle) {
             VStack(spacing: 10) {
