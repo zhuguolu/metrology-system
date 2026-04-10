@@ -32,7 +32,7 @@ struct FilesView: View {
                     headerPanel
                     contentPanel
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.top, 10)
                 .padding(.bottom, hasSelection ? 86 : 14)
             }
@@ -209,7 +209,7 @@ struct FilesView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -406,7 +406,7 @@ struct FilesView: View {
                 .stroke(MetrologyPalette.stroke, lineWidth: 1)
         )
         .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 8, x: 0, y: 2)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
         .padding(.bottom, 10)
     }
 
@@ -1025,7 +1025,7 @@ private struct FilesTextEntryDialog: View {
                     onSave: onConfirm
                 )
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: 360)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1103,7 +1103,7 @@ private struct FilesActionMenuDialog: View {
                     .buttonStyle(MetrologySecondaryButtonStyle())
                 }
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: 360)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1142,7 +1142,7 @@ private struct FilePreviewFullScreenView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             previewHeader
-                .padding(.horizontal, 14)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.top, 8)
                 .padding(.bottom, 10)
                 .background(
@@ -1159,7 +1159,7 @@ private struct FilePreviewFullScreenView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             previewBottomBar
-                .padding(.horizontal, 14)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.top, 10)
                 .padding(.bottom, 12)
                 .background(
@@ -1224,7 +1224,7 @@ private struct FilePreviewFullScreenView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -1261,7 +1261,7 @@ private struct FilePreviewFullScreenView: View {
             }
             .buttonStyle(MetrologyPrimaryButtonStyle())
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)

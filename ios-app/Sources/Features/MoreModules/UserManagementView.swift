@@ -19,7 +19,7 @@ struct UserManagementView: View {
                     hintLine
                     userList
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)

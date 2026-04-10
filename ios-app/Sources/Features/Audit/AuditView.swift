@@ -41,7 +41,7 @@ struct AuditView: View {
 
                     auditListPanel
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.top, 10)
                 .padding(.bottom, 12)
             }
@@ -101,7 +101,7 @@ struct AuditView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
-            .padding(.horizontal, 14)
+                    .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)

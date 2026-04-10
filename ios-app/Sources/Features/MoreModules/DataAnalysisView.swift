@@ -20,7 +20,7 @@ struct DataAnalysisView: View {
                     grrResultCard
                     hintLine
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.top, 10)
                 .padding(.bottom, 18)
             }
@@ -59,7 +59,7 @@ struct DataAnalysisView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)

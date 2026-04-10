@@ -147,12 +147,16 @@ struct MetrologyPrimaryButtonStyle: ButtonStyle {
     }
 }
 
+enum MetrologyLayout {
+    static let pageHorizontalPadding: CGFloat = 12
+}
+
 struct MetrologySecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(MetrologyPalette.textPrimary)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -198,7 +202,7 @@ struct MetrologyDangerButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(Color.white)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -419,33 +423,43 @@ struct MetrologyInteractivePill: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .center, spacing: compact ? 6 : 8) {
-                Circle()
-                    .fill(tone.tint)
-                    .frame(width: compact ? 5 : 6, height: compact ? 5 : 6)
+            ZStack(alignment: .topTrailing) {
+                HStack(alignment: .center, spacing: compact ? 5 : 8) {
+                    Circle()
+                        .fill(tone.tint)
+                        .frame(width: compact ? 4 : 6, height: compact ? 4 : 6)
 
-                VStack(alignment: .leading, spacing: compact ? 2 : 4) {
-                    Text(title)
-                        .font(.system(size: compact ? 10 : 11, weight: .bold))
-                        .foregroundStyle(tone.tint)
-                        .lineLimit(1)
-                    Text(value)
-                        .font(.system(size: compact ? 12 : 14, weight: .black, design: .rounded))
-                        .foregroundStyle(isSelected ? tone.tint : MetrologyPalette.textPrimary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: compact ? 2 : 4) {
+                        Text(title)
+                            .font(.system(size: compact ? 10 : 11, weight: .bold))
+                            .foregroundStyle(tone.tint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .allowsTightening(true)
+
+                        Text(value)
+                            .font(.system(size: compact ? 12 : 14, weight: .black, design: .rounded))
+                            .foregroundStyle(isSelected ? tone.tint : MetrologyPalette.textPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                            .allowsTightening(true)
+                    }
+
+                    Spacer(minLength: 0)
                 }
-
-                Spacer(minLength: 0)
 
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(size: compact ? 9 : 10, weight: .black))
                         .foregroundStyle(tone.tint)
+                        .padding(.top, compact ? 4 : 6)
+                        .padding(.trailing, compact ? 4 : 6)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, compact ? 10 : 12)
-            .padding(.vertical, compact ? 8 : 10)
+            .frame(minHeight: compact ? 54 : 62, alignment: .leading)
+            .padding(.horizontal, compact ? 9 : 12)
+            .padding(.vertical, compact ? 7 : 10)
             .background(
                 RoundedRectangle(cornerRadius: compact ? 14 : 16, style: .continuous)
                     .fill(isSelected ? tone.strongBackground : tone.background)
@@ -458,6 +472,7 @@ struct MetrologyInteractivePill: View {
             .scaleEffect(isSelected ? 1.02 : 1)
             .opacity(isSelected ? 1 : 0.86)
         }
+        .contentShape(RoundedRectangle(cornerRadius: compact ? 14 : 16, style: .continuous))
         .buttonStyle(.plain)
     }
 }
@@ -489,7 +504,7 @@ struct MetrologySectionPanel<Content: View>: View {
 
             content()
         }
-        .padding(14)
+        .padding(12)
         .metrologyCard()
     }
 }
@@ -540,7 +555,8 @@ struct MetrologyFormSheetScaffold<Content: View>: View {
 
                     content()
                 }
-                .padding(12)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
+                .padding(.top, 12)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)
@@ -789,7 +805,7 @@ struct MetrologyNoticeDialog: View {
                     .frame(maxWidth: .infinity, minHeight: 42)
                     .buttonStyle(MetrologyPrimaryButtonStyle())
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: 360)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -867,7 +883,7 @@ struct MetrologyConfirmDialog: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: 360)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)

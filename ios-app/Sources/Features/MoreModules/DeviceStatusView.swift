@@ -15,7 +15,7 @@ struct DeviceStatusView: View {
                     hintLine
                     statusList
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)

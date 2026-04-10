@@ -19,7 +19,7 @@ struct WebDavView: View {
                     hintLine
                     fileList
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.bottom, 18)
             }
             .scrollIndicators(.hidden)

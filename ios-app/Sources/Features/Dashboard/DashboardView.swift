@@ -53,7 +53,7 @@ struct DashboardView: View {
                     distributionSection
                     departmentSection
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                 .padding(.top, 10)
                 .padding(.bottom, 14)
             }
@@ -103,7 +103,7 @@ struct DashboardView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -350,7 +350,7 @@ private struct DashboardDistributionDetailDialog: View {
                     .frame(maxWidth: .infinity, minHeight: 42)
                     .buttonStyle(MetrologyPrimaryButtonStyle())
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: 360)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -757,7 +757,7 @@ private struct DashboardDeptStatCard: View {
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
         }
-        .padding(14)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.white)

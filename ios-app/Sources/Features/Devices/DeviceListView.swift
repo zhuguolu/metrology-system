@@ -41,7 +41,7 @@ struct DeviceListView: View {
                         listPanel(metrics: metrics)
                         pagerBar
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
                     .padding(.top, 10)
                     .padding(.bottom, 8)
                 }
@@ -174,7 +174,7 @@ struct DeviceListView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -234,7 +234,7 @@ struct DeviceListView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                summaryTiles
+                summaryTiles(metrics: metrics)
             }
         }
     }
@@ -313,134 +313,157 @@ struct DeviceListView: View {
             .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var summaryTiles: some View {
-        let columnsCount: Int
-        switch viewModel.mode {
-        case .ledger:
-            columnsCount = 5
-        case .calibration:
-            columnsCount = 4
-        case .todo:
-            columnsCount = 3
-        }
-        let columns: [GridItem] = Array(
-            repeating: GridItem(.flexible(minimum: 0), spacing: 6),
-            count: columnsCount
-        )
+    private func summaryTiles(metrics: DeviceLayoutMetrics) -> some View {
+        let tileWidth = summaryTileWidth(metrics: metrics)
 
-        return LazyVGrid(columns: columns, spacing: 8) {
-            if viewModel.mode == .ledger {
-                summaryTile(
-                    title: "共",
-                    valueText: "\(formatCount(displayedOverallTotal))台",
-                    style: .neutral,
-                    isSelected: ledgerSummaryAllSelected,
-                    compact: true
-                ) {
-                    applySummaryFilter(nil)
-                }
-                summaryTile(
-                    title: "正常",
-                    value: displayedOverallUseStatus("正常"),
-                    style: .valid,
-                    isSelected: viewModel.useStatusFilter == "正常",
-                    compact: true
-                ) {
-                    applySummaryFilter("正常")
-                }
-                summaryTile(
-                    title: "故障",
-                    value: displayedOverallUseStatus("故障"),
-                    style: .warning,
-                    isSelected: viewModel.useStatusFilter == "故障",
-                    compact: true
-                ) {
-                    applySummaryFilter("故障")
-                }
-                summaryTile(
-                    title: "报废",
-                    value: displayedOverallUseStatus("报废"),
-                    style: .expired,
-                    isSelected: viewModel.useStatusFilter == "报废",
-                    compact: true
-                ) {
-                    applySummaryFilter("报废")
-                }
-                summaryTile(
-                    title: "其他",
-                    value: displayedLedgerOtherCount,
-                    style: .neutral,
-                    isSelected: viewModel.useStatusFilter == "其他",
-                    compact: true
-                ) {
-                    applySummaryFilter("其他")
-                }
-            } else if viewModel.mode == .calibration {
-                summaryTile(
-                    title: "共",
-                    valueText: "\(formatCount(displayedOverallTotal))台",
-                    style: .neutral,
-                    isSelected: validitySummaryAllSelected,
-                    compact: true
-                ) {
-                    applySummaryFilter(nil)
-                }
-                summaryTile(
-                    title: "有效",
-                    value: displayedOverallValidity("有效"),
-                    style: .valid,
-                    isSelected: viewModel.validityFilter == "有效",
-                    compact: true
-                ) {
-                    applySummaryFilter("有效")
-                }
-                summaryTile(
-                    title: "即将过期",
-                    value: displayedOverallValidity("即将过期"),
-                    style: .warning,
-                    isSelected: viewModel.validityFilter == "即将过期",
-                    compact: true
-                ) {
-                    applySummaryFilter("即将过期")
-                }
-                summaryTile(
-                    title: "失效",
-                    value: displayedOverallValidity("失效"),
-                    style: .expired,
-                    isSelected: viewModel.validityFilter == "失效",
-                    compact: true
-                ) {
-                    applySummaryFilter("失效")
-                }
-            } else {
-                summaryTile(
-                    title: "共",
-                    valueText: "\(formatCount(displayedOverallTotal))台",
-                    style: .neutral,
-                    isSelected: validitySummaryAllSelected,
-                    compact: true
-                ) {
-                    applySummaryFilter(nil)
-                }
-                summaryTile(
-                    title: "即将过期",
-                    value: displayedOverallValidity("即将过期"),
-                    style: .warning,
-                    isSelected: viewModel.validityFilter == "即将过期",
-                    compact: true
-                ) {
-                    applySummaryFilter("即将过期")
-                }
-                summaryTile(
-                    title: "失效",
-                    value: displayedOverallValidity("失效"),
-                    style: .expired,
-                    isSelected: viewModel.validityFilter == "失效",
-                    compact: true
-                ) {
-                    applySummaryFilter("失效")
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if viewModel.mode == .ledger {
+                    summaryTile(
+                        title: "共",
+                        valueText: "\(formatCount(displayedOverallTotal))台",
+                        style: .neutral,
+                        isSelected: ledgerSummaryAllSelected,
+                        compact: true
+                    ) {
+                        applySummaryFilter(nil)
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "正常",
+                        value: displayedOverallUseStatus("正常"),
+                        style: .valid,
+                        isSelected: viewModel.useStatusFilter == "正常",
+                        compact: true
+                    ) {
+                        applySummaryFilter("正常")
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "故障",
+                        value: displayedOverallUseStatus("故障"),
+                        style: .warning,
+                        isSelected: viewModel.useStatusFilter == "故障",
+                        compact: true
+                    ) {
+                        applySummaryFilter("故障")
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "报废",
+                        value: displayedOverallUseStatus("报废"),
+                        style: .expired,
+                        isSelected: viewModel.useStatusFilter == "报废",
+                        compact: true
+                    ) {
+                        applySummaryFilter("报废")
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "其他",
+                        value: displayedLedgerOtherCount,
+                        style: .neutral,
+                        isSelected: viewModel.useStatusFilter == "其他",
+                        compact: true
+                    ) {
+                        applySummaryFilter("其他")
+                    }
+                    .frame(width: tileWidth)
+                } else if viewModel.mode == .calibration {
+                    summaryTile(
+                        title: "共",
+                        valueText: "\(formatCount(displayedOverallTotal))台",
+                        style: .neutral,
+                        isSelected: validitySummaryAllSelected,
+                        compact: true
+                    ) {
+                        applySummaryFilter(nil)
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "有效",
+                        value: displayedOverallValidity("有效"),
+                        style: .valid,
+                        isSelected: viewModel.validityFilter == "有效",
+                        compact: true
+                    ) {
+                        applySummaryFilter("有效")
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "即将过期",
+                        value: displayedOverallValidity("即将过期"),
+                        style: .warning,
+                        isSelected: viewModel.validityFilter == "即将过期",
+                        compact: true
+                    ) {
+                        applySummaryFilter("即将过期")
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "失效",
+                        value: displayedOverallValidity("失效"),
+                        style: .expired,
+                        isSelected: viewModel.validityFilter == "失效",
+                        compact: true
+                    ) {
+                        applySummaryFilter("失效")
+                    }
+                    .frame(width: tileWidth)
+                } else {
+                    summaryTile(
+                        title: "共",
+                        valueText: "\(formatCount(displayedOverallTotal))台",
+                        style: .neutral,
+                        isSelected: validitySummaryAllSelected,
+                        compact: true
+                    ) {
+                        applySummaryFilter(nil)
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "即将过期",
+                        value: displayedOverallValidity("即将过期"),
+                        style: .warning,
+                        isSelected: viewModel.validityFilter == "即将过期",
+                        compact: true
+                    ) {
+                        applySummaryFilter("即将过期")
+                    }
+                    .frame(width: tileWidth)
+
+                    summaryTile(
+                        title: "失效",
+                        value: displayedOverallValidity("失效"),
+                        style: .expired,
+                        isSelected: viewModel.validityFilter == "失效",
+                        compact: true
+                    ) {
+                        applySummaryFilter("失效")
+                    }
+                    .frame(width: tileWidth)
                 }
             }
+            .padding(.horizontal, 2)
+        }
+    }
+
+    private func summaryTileWidth(metrics: DeviceLayoutMetrics) -> CGFloat {
+        switch viewModel.mode {
+        case .ledger:
+            return metrics.width < 380 ? 86 : 92
+        case .calibration:
+            return metrics.width < 380 ? 100 : 108
+        case .todo:
+            return metrics.width < 380 ? 104 : 112
         }
     }
 
@@ -553,7 +576,7 @@ struct DeviceListView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -975,7 +998,7 @@ private struct DeviceRowCard: View {
             }
             .padding(.top, 3)
         }
-        .padding(14)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(
