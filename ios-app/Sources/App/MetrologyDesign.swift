@@ -4,7 +4,7 @@ import UIKit
 enum MetrologyPalette {
     static let brandBlue = Color(hex: 0x2563EB)
 
-    static let background = Color(hex: 0xEEF4FB)         // surfacePage
+    static let background = Color.white                  // surfacePage
     static let surface = Color.white
     static let card = Color(hex: 0xF9FCFF)               // surfaceCard
     static let cardSoftBlue = Color(hex: 0xEEF4FF)
@@ -424,56 +424,80 @@ struct MetrologyInteractivePill: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                HStack(alignment: .center, spacing: compact ? 2 : 8) {
-                    Circle()
-                        .fill(tone.tint)
-                        .frame(width: compact ? 2 : 6, height: compact ? 2 : 6)
-
-                    VStack(alignment: .leading, spacing: compact ? 1 : 4) {
+            Group {
+                if compact {
+                    HStack(spacing: 4) {
                         Text(title)
-                            .font(.system(size: compact ? 7 : 11, weight: .bold))
-                            .foregroundStyle(tone.tint)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(isSelected ? Color.white : tone.tint)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.65)
+                            .minimumScaleFactor(0.85)
                             .allowsTightening(true)
 
                         Text(value)
-                            .font(.system(size: compact ? 9 : 14, weight: .black, design: .rounded))
-                            .foregroundStyle(isSelected ? tone.tint : MetrologyPalette.textPrimary)
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(isSelected ? Color.white : MetrologyPalette.textPrimary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.62)
+                            .minimumScaleFactor(0.82)
                             .allowsTightening(true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(height: 32)
+                    .padding(.horizontal, 10)
+                } else {
+                    HStack(alignment: .center, spacing: 8) {
+                        Circle()
+                            .fill(tone.tint)
+                            .frame(width: 6, height: 6)
 
-                    Spacer(minLength: 0)
-                }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(title)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(tone.tint)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.65)
+                                .allowsTightening(true)
 
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: compact ? 6 : 10, weight: .black))
-                        .foregroundStyle(tone.tint)
-                        .padding(.top, compact ? 1 : 6)
-                        .padding(.trailing, compact ? 1 : 6)
+                            Text(value)
+                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .foregroundStyle(isSelected ? tone.tint : MetrologyPalette.textPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                                .allowsTightening(true)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundStyle(tone.tint)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 62, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: compact ? 24 : 62, alignment: .leading)
-            .padding(.horizontal, compact ? 4 : 12)
-            .padding(.vertical, compact ? 2 : 10)
             .background(
-                RoundedRectangle(cornerRadius: compact ? 9 : 16, style: .continuous)
-                    .fill(isSelected ? tone.strongBackground : tone.background)
+                Capsule(style: .continuous)
+                    .fill(compact ? (isSelected ? tone.tint : Color.white) : (isSelected ? tone.strongBackground : tone.background))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: compact ? 9 : 16, style: .continuous)
-                    .stroke(isSelected ? tone.tint.opacity(0.95) : tone.stroke, lineWidth: isSelected ? 2 : 1)
+                Capsule(style: .continuous)
+                    .stroke(isSelected ? tone.tint.opacity(0.95) : tone.stroke, lineWidth: compact ? 1 : (isSelected ? 2 : 1))
             )
-            .shadow(color: isSelected ? tone.tint.opacity(0.16) : Color.clear, radius: 8, x: 0, y: 4)
-            .scaleEffect(isSelected ? 1.02 : 1)
+            .shadow(
+                color: isSelected ? tone.tint.opacity(compact ? 0.12 : 0.16) : Color.clear,
+                radius: compact ? 3 : 8,
+                x: 0,
+                y: compact ? 2 : 4
+            )
+            .scaleEffect(compact ? 1 : (isSelected ? 1.02 : 1))
             .opacity(isSelected ? 1 : 0.86)
         }
-        .contentShape(RoundedRectangle(cornerRadius: compact ? 9 : 16, style: .continuous))
+        .contentShape(Capsule(style: .continuous))
         .buttonStyle(.plain)
     }
 }
