@@ -196,19 +196,23 @@ struct FilesView: View {
             subtitle: "统一管理文件夹、资料与预览动作，支持根目录、返回上级、同步与批量处理。",
             accent: .neutral
         ) {
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .center, spacing: 8) {
                 Text("当前")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("\(fileRows.count)")
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(MetrologyPalette.navActive)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text(isSearching ? "筛选结果" : "可见项目")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
+            .frame(maxHeight: .infinity, alignment: .center)
             .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(

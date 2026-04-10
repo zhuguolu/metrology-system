@@ -162,19 +162,23 @@ struct DeviceListView: View {
             subtitle: heroSubtitle,
             accent: heroAccent
         ) {
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .center, spacing: 8) {
                 Text("当前")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("\(formatCount(displayedOverallTotal))")
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(heroAccent.tint)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text(heroCountLabel)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
+            .frame(maxHeight: .infinity, alignment: .center)
             .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
@@ -315,8 +319,6 @@ struct DeviceListView: View {
     }
 
     private func summaryTiles(metrics: DeviceLayoutMetrics) -> some View {
-        let tileWidth = summaryTileWidth(metrics: metrics)
-
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 if viewModel.mode == .ledger {
@@ -329,7 +331,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter(nil)
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "正常",
@@ -340,7 +342,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("正常")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "故障",
@@ -351,7 +353,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("故障")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "报废",
@@ -362,7 +364,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("报废")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "其他",
@@ -373,7 +375,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("其他")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                 } else if viewModel.mode == .calibration {
                     summaryTile(
                         title: "共",
@@ -384,7 +386,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter(nil)
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "有效",
@@ -395,7 +397,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("有效")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "即将过期",
@@ -406,7 +408,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("即将过期")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "失效",
@@ -417,7 +419,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("失效")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                 } else {
                     summaryTile(
                         title: "共",
@@ -428,7 +430,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter(nil)
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "即将过期",
@@ -439,7 +441,7 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("即将过期")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     summaryTile(
                         title: "失效",
@@ -450,21 +452,10 @@ struct DeviceListView: View {
                     ) {
                         applySummaryFilter("失效")
                     }
-                    .frame(width: tileWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
             }
-            .padding(.horizontal, 2)
-        }
-    }
-
-    private func summaryTileWidth(metrics: DeviceLayoutMetrics) -> CGFloat {
-        switch viewModel.mode {
-        case .ledger:
-            return metrics.width < 380 ? 56 : 62
-        case .calibration:
-            return metrics.width < 380 ? 68 : 74
-        case .todo:
-            return metrics.width < 380 ? 70 : 76
+            .padding(.horizontal, 4)
         }
     }
 

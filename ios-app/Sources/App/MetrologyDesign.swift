@@ -77,7 +77,7 @@ struct MetrologyCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color.white, Color(hex: 0xF6FAFF)],
+                            colors: [Color.white, Color(hex: 0xFBFDFF)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -85,9 +85,9 @@ struct MetrologyCardModifier: ViewModifier {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(MetrologyPalette.stroke, lineWidth: 1)
+                    .stroke(Color(hex: 0xDCE6F3), lineWidth: 0.9)
             )
-            .shadow(color: Color(hex: 0x7A95B8, alpha: 0.10), radius: 6, x: 0, y: 2)
+            .shadow(color: Color(hex: 0x7A95B8, alpha: 0.05), radius: 3, x: 0, y: 1)
     }
 }
 
@@ -148,7 +148,7 @@ struct MetrologyPrimaryButtonStyle: ButtonStyle {
 }
 
 enum MetrologyLayout {
-    static let pageHorizontalPadding: CGFloat = 0
+    static let pageHorizontalPadding: CGFloat = 6
     static let controlHorizontalPadding: CGFloat = 12
 }
 
@@ -398,8 +398,8 @@ struct MetrologyPageHeroCard<Trailing: View>: View {
                     LinearGradient(
                         colors: [
                             Color.white,
-                            accent.background.opacity(0.95),
-                            Color(hex: 0xF6FAFF)
+                            accent.background.opacity(0.55),
+                            Color(hex: 0xFBFDFF)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -408,9 +408,9 @@ struct MetrologyPageHeroCard<Trailing: View>: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(accent.stroke.opacity(0.65), lineWidth: 1)
+                .stroke(accent.stroke.opacity(0.45), lineWidth: 0.9)
         )
-        .shadow(color: accent.tint.opacity(0.12), radius: 14, x: 0, y: 6)
+        .shadow(color: accent.tint.opacity(0.05), radius: 6, x: 0, y: 2)
     }
 }
 
@@ -426,23 +426,23 @@ struct MetrologyInteractivePill: View {
         Button(action: action) {
             Group {
                 if compact {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Text(title)
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(isSelected ? Color.white : tone.tint)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.85)
+                            .minimumScaleFactor(0.92)
                             .allowsTightening(true)
 
                         Text(value)
                             .font(.system(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(isSelected ? Color.white : MetrologyPalette.textPrimary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.82)
+                            .minimumScaleFactor(0.9)
                             .allowsTightening(true)
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .frame(height: 32)
+                    .frame(height: 30)
                     .padding(.horizontal, 10)
                 } else {
                     HStack(alignment: .center, spacing: 8) {
@@ -489,10 +489,10 @@ struct MetrologyInteractivePill: View {
                     .stroke(isSelected ? tone.tint.opacity(0.95) : tone.stroke, lineWidth: compact ? 1 : (isSelected ? 2 : 1))
             )
             .shadow(
-                color: isSelected ? tone.tint.opacity(compact ? 0.12 : 0.16) : Color.clear,
-                radius: compact ? 3 : 8,
+                color: isSelected ? tone.tint.opacity(compact ? 0.08 : 0.16) : Color.clear,
+                radius: compact ? 2 : 8,
                 x: 0,
-                y: compact ? 2 : 4
+                y: compact ? 1 : 4
             )
             .scaleEffect(compact ? 1 : (isSelected ? 1.02 : 1))
             .opacity(isSelected ? 1 : 0.86)

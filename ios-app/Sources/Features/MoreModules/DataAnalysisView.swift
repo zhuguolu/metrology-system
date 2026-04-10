@@ -46,19 +46,23 @@ struct DataAnalysisView: View {
             subtitle: "把过程能力与量具 GRR 收到同一页，适合快速计算、结果查看与专业判断。",
             accent: .neutral
         ) {
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .center, spacing: 8) {
                 Text("当前模块")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text(viewModel.capabilityResult == nil && viewModel.grrResult == nil ? "待计算" : "已产出")
                     .font(.system(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(MetrologyPalette.navActive)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("能力 / GRR")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
+            .frame(maxHeight: .infinity, alignment: .center)
             .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(

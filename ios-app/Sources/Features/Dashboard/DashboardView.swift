@@ -90,19 +90,23 @@ struct DashboardView: View {
             subtitle: "把设备规模、校准趋势、有效性分布和部门统计收拢到同一页，适合日常巡检与汇总查看。",
             accent: .neutral
         ) {
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .center, spacing: 8) {
                 Text("有效占比")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text(ratioText(viewModel.valid, max(viewModel.total, 0)))
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(MetrologyPalette.statusValid)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("总设备 \(formatCount(viewModel.total)) 台")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(MetrologyPalette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
+            .frame(maxHeight: .infinity, alignment: .center)
             .padding(.horizontal, MetrologyLayout.pageHorizontalPadding)
             .padding(.vertical, 12)
             .background(
